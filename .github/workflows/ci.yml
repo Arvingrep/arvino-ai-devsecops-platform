@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
   id-token: write
+  security-events: write
 
 env:
   IMAGE: asia-southeast1-docker.pkg.dev/fh580-70533/containers/arvino
@@ -36,6 +37,7 @@ jobs:
           curl -fsSL https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static -o /usr/local/bin/opa && chmod +x /usr/local/bin/opa
           curl -fsSL https://github.com/open-policy-agent/conftest/releases/download/v0.58.0/conftest_0.58.0_Linux_x86_64.tar.gz | tar xz -C /usr/local/bin conftest
           curl -fsSL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz | tar xz -C /usr/local/bin gitleaks
+          curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.59.1
 
       - name: Ruff lint + format
         run: |
@@ -77,6 +79,25 @@ jobs:
       - name: Gitleaks
         run: gitleaks git --no-banner --redact -c .gitleaks.toml .
 
+      - name: Trivy config scan (IaC)
+        run: |
+          trivy config --severity HIGH,CRITICAL --format sarif --output trivy-config.sarif deploy/
+
+      - name: Upload Trivy config SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-config.sarif
+          category: trivy-config
+
+      - name: Upload Trivy config artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-config-sarif
+          path: trivy-config.sarif
+          retention-days: 30
+
       - uses: azure/setup-kubectl@v4
 
   build:
@@ -96,10 +117,36 @@ jobs:
       - name: Configure Docker for Artifact Registry
         run: gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
 
-      - name: Build and push
+      - name: Install Trivy
+        run: curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin v0.59.1
+
+      - name: Build image
         run: |
           SHA=${GITHUB_SHA::12}
           docker build -t $IMAGE:$SHA -t $IMAGE:latest .
-          docker push $IMAGE:$SHA
+          echo "SHA=$SHA" >> $GITHUB_ENV
+
+      - name: Trivy image scan
+        run: |
+          trivy image --severity HIGH,CRITICAL --format sarif --output trivy-image.sarif $IMAGE:${{ env.SHA }}
+
+      - name: Upload Trivy image SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
+
+      - name: Upload Trivy image artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: trivy-image-sarif
+          path: trivy-image.sarif
+          retention-days: 30
+
+      - name: Push image
+        run: |
+          docker push $IMAGE:${{ env.SHA }}
           docker push $IMAGE:latest
-          echo "Pushed $IMAGE:$SHA"
+          echo "Pushed $IMAGE:${{ env.SHA }}"
