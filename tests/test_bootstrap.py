@@ -5,8 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
-
 from arvino.bootstrap import (
     DenyAllPolicy,
     NoopNotifier,
@@ -19,7 +17,6 @@ from arvino.bootstrap import (
 from arvino.engine import Engine
 from arvino.fakes import QueueExecutor, SandboxExecutor, UnconfiguredGit
 from arvino.settings import Settings
-
 
 # --------------------------------------------------------------------------- #
 # build_git_provider

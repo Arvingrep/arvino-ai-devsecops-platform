@@ -15,7 +15,7 @@ import pytest
 
 from arvino.adapters.git_provider import GiteaProvider, GitHubProvider
 from arvino.domain import Principal, PrincipalKind
-from arvino.ports import GitProvider, PullRequestInfo
+from arvino.ports import PullRequestInfo
 
 PRINCIPAL = Principal(id="agent:dev", kind=PrincipalKind.AGENT, roles=())
 REPO = "acme/app"
@@ -90,12 +90,14 @@ class TestGitHubPushBranch:
 
 
 class TestGitHubOpenPR:
-    PR_RESPONSE = json.dumps({
-        "number": 42,
-        "head": {"ref": "arvino/run-1/pr", "sha": "abc123" + "0" * 34},
-        "base": {"ref": "main"},
-        "merged": False,
-    })
+    PR_RESPONSE = json.dumps(
+        {
+            "number": 42,
+            "head": {"ref": "arvino/run-1/pr", "sha": "abc123" + "0" * 34},
+            "base": {"ref": "main"},
+            "merged": False,
+        }
+    )
 
     def test_returns_pull_request_info(self) -> None:
         gh = GitHubProvider()
@@ -111,12 +113,14 @@ class TestGitHubOpenPR:
 
 
 class TestGitHubGetPR:
-    PR_RESPONSE = json.dumps({
-        "number": 7,
-        "head": {"ref": "feature/x", "sha": "def456" + "0" * 34},
-        "base": {"ref": "develop"},
-        "merged": True,
-    })
+    PR_RESPONSE = json.dumps(
+        {
+            "number": 7,
+            "head": {"ref": "feature/x", "sha": "def456" + "0" * 34},
+            "base": {"ref": "develop"},
+            "merged": True,
+        }
+    )
 
     def test_returns_pull_request_info(self) -> None:
         gh = GitHubProvider()
@@ -212,11 +216,13 @@ class TestGiteaPushBranch:
             requests_log.append(req)
             return httpx.Response(201, json={"name": "new-branch"})
 
-        provider = _make_gitea({
-            ("GET", f"/repos/{REPO}"): {"default_branch": "main"},
-            ("GET", f"/repos/{REPO}/branches/main"): {"commit": {"id": "abc" * 13 + "a"}},
-            ("POST", f"/repos/{REPO}/branches"): branch_create,
-        })
+        provider = _make_gitea(
+            {
+                ("GET", f"/repos/{REPO}"): {"default_branch": "main"},
+                ("GET", f"/repos/{REPO}/branches/main"): {"commit": {"id": "abc" * 13 + "a"}},
+                ("POST", f"/repos/{REPO}/branches"): branch_create,
+            }
+        )
 
         provider.push_branch(REPO, "arvino/run-1/dev", PRINCIPAL)
         assert len(requests_log) == 1
@@ -227,11 +233,13 @@ class TestGiteaPushBranch:
         def branch_conflict(req: httpx.Request) -> httpx.Response:
             return httpx.Response(409, json={"message": "already exists"})
 
-        provider = _make_gitea({
-            ("GET", f"/repos/{REPO}"): {"default_branch": "main"},
-            ("GET", f"/repos/{REPO}/branches/main"): {"commit": {"id": "abc" * 13 + "a"}},
-            ("POST", f"/repos/{REPO}/branches"): branch_conflict,
-        })
+        provider = _make_gitea(
+            {
+                ("GET", f"/repos/{REPO}"): {"default_branch": "main"},
+                ("GET", f"/repos/{REPO}/branches/main"): {"commit": {"id": "abc" * 13 + "a"}},
+                ("POST", f"/repos/{REPO}/branches"): branch_conflict,
+            }
+        )
 
         # Should not raise
         provider.push_branch(REPO, "arvino/run-1/dev", PRINCIPAL)
@@ -239,9 +247,11 @@ class TestGiteaPushBranch:
 
 class TestGiteaOpenPR:
     def test_returns_pull_request_info(self) -> None:
-        provider = _make_gitea({
-            ("POST", f"/repos/{REPO}/pulls"): _PR_DATA,
-        })
+        provider = _make_gitea(
+            {
+                ("POST", f"/repos/{REPO}/pulls"): _PR_DATA,
+            }
+        )
 
         pr = provider.open_pull_request(REPO, "arvino/r1/pr", "main", "Title", "Body", PRINCIPAL)
         assert isinstance(pr, PullRequestInfo)
@@ -252,9 +262,11 @@ class TestGiteaOpenPR:
 
 class TestGiteaGetPR:
     def test_returns_pull_request_info(self) -> None:
-        provider = _make_gitea({
-            ("GET", f"/repos/{REPO}/pulls/5"): {**_PR_DATA, "merged": True},
-        })
+        provider = _make_gitea(
+            {
+                ("GET", f"/repos/{REPO}/pulls/5"): {**_PR_DATA, "merged": True},
+            }
+        )
 
         pr = provider.get_pull_request(REPO, 5)
         assert pr.number == 5
@@ -264,9 +276,11 @@ class TestGiteaGetPR:
 class TestGiteaChangedPaths:
     def test_single_page(self) -> None:
         files = [{"filename": "a.py"}, {"filename": "b.py"}]
-        provider = _make_gitea({
-            ("GET", f"/repos/{REPO}/pulls/3/files"): files,
-        })
+        provider = _make_gitea(
+            {
+                ("GET", f"/repos/{REPO}/pulls/3/files"): files,
+            }
+        )
 
         paths = provider.changed_paths(REPO, 3)
         assert paths == ["a.py", "b.py"]
@@ -283,9 +297,11 @@ class TestGiteaChangedPaths:
                 return httpx.Response(200, json=[{"filename": "last.py"}])
             return httpx.Response(200, json=[])
 
-        provider = _make_gitea({
-            ("GET", f"/repos/{REPO}/pulls/3/files"): paginated,
-        })
+        provider = _make_gitea(
+            {
+                ("GET", f"/repos/{REPO}/pulls/3/files"): paginated,
+            }
+        )
 
         paths = provider.changed_paths(REPO, 3)
         assert len(paths) == 51
@@ -297,9 +313,11 @@ class TestGiteaHTTPErrors:
         def error_handler(req: httpx.Request) -> httpx.Response:
             return httpx.Response(500, json={"message": "internal"})
 
-        provider = _make_gitea({
-            ("GET", f"/repos/{REPO}/pulls/99"): error_handler,
-        })
+        provider = _make_gitea(
+            {
+                ("GET", f"/repos/{REPO}/pulls/99"): error_handler,
+            }
+        )
 
         with pytest.raises(httpx.HTTPStatusError):
             provider.get_pull_request(REPO, 99)

@@ -20,10 +20,10 @@ import httpx
 from arvino.domain import Principal
 from arvino.ports import PullRequestInfo
 
-
 # ---------------------------------------------------------------------------
 # GitHub  (gh CLI)
 # ---------------------------------------------------------------------------
+
 
 class GitHubProvider:
     """GitProvider backed by the ``gh`` CLI.
@@ -37,8 +37,10 @@ class GitHubProvider:
         self._gh(
             "api",
             f"/repos/{repo}/git/refs",
-            "-X", "GET",
-            "--jq", f'[.[] | select(.ref == "refs/heads/{branch}")] | length',
+            "-X",
+            "GET",
+            "--jq",
+            f'[.[] | select(.ref == "refs/heads/{branch}")] | length',
         )
         # We actually need to ensure the ref exists on the remote.  The engine
         # assumes a local commit was already made; push_branch is "make sure
@@ -61,11 +63,16 @@ class GitHubProvider:
         raw = self._gh(
             "api",
             f"/repos/{repo}/pulls",
-            "-X", "POST",
-            "-f", f"head={head}",
-            "-f", f"base={base}",
-            "-f", f"title={title}",
-            "-f", f"body={body}",
+            "-X",
+            "POST",
+            "-f",
+            f"head={head}",
+            "-f",
+            f"base={base}",
+            "-f",
+            f"title={title}",
+            "-f",
+            f"body={body}",
         )
         data = json.loads(raw)
         return PullRequestInfo(
@@ -122,15 +129,14 @@ class GitHubProvider:
     def _run(cmd: list[str]) -> str:
         result = subprocess.run(cmd, capture_output=True, text=True, check=False)
         if result.returncode != 0:
-            raise RuntimeError(
-                f"{cmd[0]} failed (rc={result.returncode}): {result.stderr.strip()}"
-            )
+            raise RuntimeError(f"{cmd[0]} failed (rc={result.returncode}): {result.stderr.strip()}")
         return result.stdout
 
 
 # ---------------------------------------------------------------------------
 # Gitea  (httpx REST v1)
 # ---------------------------------------------------------------------------
+
 
 class GiteaProvider:
     """GitProvider backed by the Gitea REST API v1 using :mod:`httpx`.
@@ -220,8 +226,12 @@ class GiteaProvider:
     def _to_pr_info(data: dict[str, Any]) -> PullRequestInfo:
         return PullRequestInfo(
             number=data["number"],
-            head_ref=data["head"]["ref"] if isinstance(data["head"], dict) else data["head"]["label"],
+            head_ref=data["head"]["ref"]
+            if isinstance(data["head"], dict)
+            else data["head"]["label"],
             head_sha=data["head"]["sha"] if isinstance(data["head"], dict) else "",
-            base_ref=data["base"]["ref"] if isinstance(data["base"], dict) else data["base"]["label"],
+            base_ref=data["base"]["ref"]
+            if isinstance(data["base"], dict)
+            else data["base"]["label"],
             merged=data.get("merged", False),
         )
