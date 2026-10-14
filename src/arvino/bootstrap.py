@@ -18,7 +18,7 @@ from arvino.fakes import (
 )
 from arvino.policy import FailClosedPolicy, OpaCliPolicy, OpaHttpPolicy
 from arvino.ports import AgentExecutor, Decision, GitProvider, PolicyClient, Ports, RunNotifier
-from arvino.settings import Settings
+from arvino.settings import Settings, secret
 from arvino.workflows.model import load_registry
 
 log = logging.getLogger(__name__)
@@ -57,6 +57,62 @@ def build_notifier(settings: Settings) -> RunNotifier:
     return NoopNotifier()
 
 
+def build_git_provider(settings: Settings) -> GitProvider:
+    """Instantiate the configured Git provider for production mode.
+
+    Returns ``GitHubProvider`` (default) or ``GiteaProvider`` based on
+    ``ARVINO_GIT_PROVIDER``.  Falls back to ``UnconfiguredGit`` (fail-closed)
+    when the required credentials are missing.
+    """
+    if settings.git_provider == "gitea":
+        gitea_url = settings.gitea_url
+        gitea_token = secret(settings.gitea_token)
+        if gitea_url and gitea_token:
+            from arvino.adapters.git_provider import GiteaProvider
+
+            log.info("Git provider: Gitea at %s", gitea_url)
+            return GiteaProvider(gitea_url, gitea_token)
+        log.error(
+            "ARVINO_GIT_PROVIDER=gitea but ARVINO_GITEA_URL / ARVINO_GITEA_TOKEN not set; "
+            "Git operations will fail"
+        )
+        return UnconfiguredGit()
+
+    # Default: GitHub via gh CLI (authentication handled by gh itself).
+    from arvino.adapters.git_provider import GitHubProvider
+
+    log.info("Git provider: GitHub (gh CLI)")
+    return GitHubProvider()
+
+
+def build_executor(settings: Settings) -> AgentExecutor:
+    """Instantiate the agent executor for production (queue) mode.
+
+    When ``ARVINO_REPO_BASE_DIR`` is set, ``ClaudeCodeExecutor`` runs Claude
+    Code in isolated worktrees under that directory.  Otherwise the pull-model
+    ``QueueExecutor`` is used (external harness picks up work items and posts
+    completion via the API).
+    """
+    repo_base = Path(settings.repo_base_dir) if settings.repo_base_dir else None
+    if repo_base is not None:
+        from arvino.adapters.claude_code import ClaudeCodeExecutor
+
+        log.info(
+            "Agent executor: ClaudeCodeExecutor (model=%s, repo_base=%s)",
+            settings.claude_model,
+            repo_base,
+        )
+        return ClaudeCodeExecutor(
+            repo_base_dir=repo_base,
+            claude_bin=settings.claude_bin,
+            model=settings.claude_model,
+            max_turns=settings.claude_max_turns,
+            timeout_seconds=settings.claude_timeout_seconds,
+        )
+    log.info("Agent executor: QueueExecutor (external harness)")
+    return QueueExecutor()
+
+
 def build_engine(settings: Settings, *, init_db: bool = True) -> Engine:
     sa = make_engine(settings.database_url)
     if init_db:
@@ -69,7 +125,9 @@ def build_engine(settings: Settings, *, init_db: bool = True) -> Engine:
         fake = FakeGit()
         git, executor = fake, SandboxExecutor(fake)
     else:
-        git, executor = UnconfiguredGit(), QueueExecutor()
+        # Production mode: wire real adapters.
+        git = build_git_provider(settings)
+        executor = build_executor(settings)
     ports = Ports(
         executor=executor,
         tracker=RecordingTracker(),
