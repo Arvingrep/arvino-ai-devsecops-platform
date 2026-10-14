@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: arvino-orchestrator-config
+data:
+  ARVINO_OPA_URL: http://opa:8181
+  # "queue": agent steps wait for the external harness (OpenHands / Claude Code wrapper).
+  # NEVER "sandbox" outside local smoke tests (in-process fakes).
+  ARVINO_ADAPTERS: queue
+  ARVINO_RECONCILE_INTERVAL_SECONDS: "30"
+  ARVINO_TEMPORAL_ADDRESS: temporal-frontend.temporal.svc.cluster.local:7233
+  ARVINO_TEMPORAL_NAMESPACE: default
+  ARVINO_TEMPORAL_TASK_QUEUE: arvino-runs
+  # JSON list of Git accounts used by agents; a merge by one of them fails the run (detective control).
+  ARVINO_AGENT_ACCOUNTS: '["arvino-agent"]'

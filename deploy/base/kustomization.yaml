@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+# Namespace is set by each overlay. Secrets are NOT part of the base: see ../secrets-examples
+# (placeholders only) and README "Secrets". Plane and Temporal are installed from their upstream
+# Helm charts via ../argocd (values in ../helm-values).
+resources:
+  - orchestrator/serviceaccount.yaml
+  - orchestrator/configmap.yaml
+  - orchestrator/deployment-api.yaml
+  - orchestrator/deployment-worker.yaml
+  - orchestrator/service.yaml
+  - orchestrator/networkpolicy.yaml
+  - opa/configmap-policy.yaml
+  - opa/deployment.yaml
+  - opa/service.yaml
+  - postgres/statefulset.yaml
+  - postgres/service.yaml
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: arvino-platform
+    includeSelectors: false
+images:
+  - name: ghcr.io/arvino/orchestrator
+    newTag: 0.1.0

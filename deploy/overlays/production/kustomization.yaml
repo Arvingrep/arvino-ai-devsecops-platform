@@ -1,0 +1,36 @@
+# PRODUCTION overlay. Changes here require an owner-reviewed PR (policy/config.rego marks
+# deploy/overlays/production/** as forbidden for agent-authored changes) and a MANUAL Argo CD
+# sync (see ../../argocd/applications.yaml): there is no automated sync for production.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: arvino-production
+resources:
+  - ../../base
+  - namespace.yaml
+labels:
+  - pairs: {app.kubernetes.io/instance: arvino-production}
+    includeSelectors: false
+patches:
+  - target: {kind: Deployment, name: arvino-orchestrator}
+    patch: |-
+      - {op: replace, path: /spec/replicas, value: 2}
+  # Ledger DB is external in production (managed PostgreSQL or an operator with backups/PITR);
+  # ARVINO_DATABASE_URL in the arvino-orchestrator-secrets Secret points at it.
+  - patch: |-
+      $patch: delete
+      apiVersion: apps/v1
+      kind: StatefulSet
+      metadata:
+        name: arvino-postgres
+  - patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: arvino-postgres
+  - patch: |-
+      $patch: delete
+      apiVersion: networking.k8s.io/v1
+      kind: NetworkPolicy
+      metadata:
+        name: postgres

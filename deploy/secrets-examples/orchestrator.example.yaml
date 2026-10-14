@@ -1,0 +1,9 @@
+# EXAMPLE ONLY - placeholders. Create the real Secret out-of-band (External Secrets / SOPS / kubectl).
+# Never commit real values. This file is NOT referenced by any kustomization.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: arvino-orchestrator-secrets
+type: Opaque
+stringData:
+  ARVINO_DATABASE_URL ARVINO_OWNER_TOKEN ARVINO_AGENT_TOKEN ARVINO_AUTOMATION_TOKEN ARVINO_PLANE_WEBHOOK_SECRET ARVINO_GITEA_WEBHOOK_SECRET ARVINO_GITHUB_WEBHOOK_SECRET ARVINO_CI_WEBHOOK_TOKEN ARVINO_ARGOCD_WEBHOOK_TOKEN ARVINO_NIGHTINGALE_WEBHOOK_TOKEN: REPLACE_ME

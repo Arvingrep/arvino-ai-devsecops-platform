@@ -1,0 +1,32 @@
+# EXAMPLE ONLY - not applied by any Application. Shows how Argo CD notifications can feed
+# POST /webhooks/argocd (see docs/webhooks.md). Not yet exercised against a real Argo CD.
+# The token comes from the argocd-notifications-secret (key: arvino-webhook-token), never inline.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-cm
+  namespace: argocd
+data:
+  service.webhook.arvino: |
+    url: http://arvino-orchestrator.arvino-production.svc.cluster.local/webhooks/argocd
+    headers:
+      - name: X-Arvino-Token
+        value: $arvino-webhook-token
+      - name: Content-Type
+        value: application/json
+  template.arvino-status: |
+    webhook:
+      arvino:
+        method: POST
+        body: |
+          {"app": "{{.app.metadata.name}}",
+           "revision": "{{.app.status.sync.revision}}",
+           "health": "{{.app.status.health.status}}",
+           "sync_status": "{{.app.status.sync.status}}",
+           "operation_phase": "{{if .app.status.operationState}}{{.app.status.operationState.phase}}{{end}}"}
+  trigger.arvino-on-change: |
+    - when: "true"
+      send: [arvino-status]
+  subscriptions: |
+    - recipients: [webhook:arvino]
+      triggers: [arvino-on-change]

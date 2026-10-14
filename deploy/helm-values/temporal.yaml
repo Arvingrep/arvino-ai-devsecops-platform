@@ -1,0 +1,44 @@
+# Temporal server (chart temporal/temporal 1.7.0) using an external PostgreSQL. No bundled
+# Cassandra/Elasticsearch. Credentials come from the Secret `temporal-db` (key: password).
+# Not yet deployed anywhere: rendered with `helm template` only (see README, Verification status).
+server:
+  replicaCount: 1
+  config:
+    persistence:
+      defaultStore: default
+      visibilityStore: visibility
+      numHistoryShards: 512
+      datastores:
+        default:
+          sql:
+            createDatabase: true
+            manageSchema: true
+            pluginName: postgres12
+            driverName: postgres12
+            databaseName: temporal
+            connectAddr: "arvino-postgres.arvino-production.svc.cluster.local:5432"
+            connectProtocol: tcp
+            user: arvino
+            existingSecret: temporal-db
+            secretKey: password
+        visibility:
+          sql:
+            createDatabase: true
+            manageSchema: true
+            pluginName: postgres12
+            driverName: postgres12
+            databaseName: temporal_visibility
+            connectAddr: "arvino-postgres.arvino-production.svc.cluster.local:5432"
+            connectProtocol: tcp
+            user: arvino
+            existingSecret: temporal-db
+            secretKey: password
+    namespaces:
+      create: true
+      namespace:
+        - name: default
+          retention: 7d
+admintools:
+  enabled: true
+web:
+  enabled: true

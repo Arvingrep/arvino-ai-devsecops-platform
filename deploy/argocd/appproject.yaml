@@ -1,0 +1,31 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: arvino
+  namespace: argocd
+spec:
+  description: Arvino AI DevSecOps platform components
+  sourceRepos:
+    - https://git.example.invalid/arvino/ai-devsecops-platform.git # REPLACE with the real repo URL
+    - https://go.temporal.io/helm-charts
+    - https://helm.plane.so/
+  destinations:
+    - {server: https://kubernetes.default.svc, namespace: arvino-dev}
+    - {server: https://kubernetes.default.svc, namespace: arvino-staging}
+    - {server: https://kubernetes.default.svc, namespace: arvino-production}
+    - {server: https://kubernetes.default.svc, namespace: temporal}
+    - {server: https://kubernetes.default.svc, namespace: plane}
+  clusterResourceWhitelist:
+    - {group: "", kind: Namespace}
+  namespaceResourceBlacklist:
+    - {group: "", kind: ResourceQuota}
+    - {group: "", kind: LimitRange}
+  orphanedResources:
+    warn: true
+  # Production syncs happen only inside this window unless an owner overrides in the UI.
+  syncWindows:
+    - kind: deny
+      schedule: "0 22 * * *"
+      duration: 8h
+      applications: ["arvino-production"]
+      manualSync: true

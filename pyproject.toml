@@ -41,6 +41,7 @@ arvino = ["workflows/definitions/*.yaml"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+pythonpath = ["src", "."]
 addopts = "-ra --strict-markers"
 markers = [
   "opa: requires an `opa` binary (or ARVINO_OPA_BIN); skipped when absent",

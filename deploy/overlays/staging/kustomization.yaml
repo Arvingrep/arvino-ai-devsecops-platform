@@ -1,0 +1,13 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: arvino-staging
+resources:
+  - ../../base
+  - namespace.yaml
+labels:
+  - pairs: {app.kubernetes.io/instance: arvino-staging}
+    includeSelectors: false
+patches:
+  - target: {kind: Deployment, name: arvino-orchestrator}
+    patch: |-
+      - {op: replace, path: /spec/replicas, value: 2}

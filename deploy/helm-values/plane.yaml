@@ -1,0 +1,17 @@
+# Plane Community (chart plane/plane-ce 1.8.5). All credentials come from pre-created Secrets
+# (see deploy/secrets-examples/plane-*.example.yaml for the required keys). requireExplicitSecrets
+# makes the render FAIL instead of silently using the chart's public example keys.
+# Bundled postgres/redis/rabbitmq/minio are used for the MVP (single-node); externalise in Phase 5.
+ingress:
+  enabled: true
+  appHost: plane.example.invalid # REPLACE
+  ingressClass: nginx
+env:
+  requireExplicitSecrets: true
+external_secrets:
+  app_keys_existingSecret: plane-app-keys
+  app_env_existingSecret: plane-app-env
+  live_env_existingSecret: plane-live-env
+  doc_store_existingSecret: plane-doc-store
+  pgdb_existingSecret: plane-pgdb
+  rabbitmq_existingSecret: plane-rabbitmq

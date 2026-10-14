@@ -1,0 +1,9 @@
+# EXAMPLE ONLY - placeholders. Create the real Secret out-of-band (External Secrets / SOPS / kubectl).
+# Never commit real values. This file is NOT referenced by any kustomization.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: plane-rabbitmq
+type: Opaque
+stringData:
+  RABBITMQ_DEFAULT_USER RABBITMQ_DEFAULT_PASS: REPLACE_ME

@@ -1,0 +1,41 @@
+# Temporal worker: runs the RunDriver workflow + advance_run activity (same image, same ledger DB).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: arvino-worker
+  labels: {app.kubernetes.io/name: arvino-orchestrator, app.kubernetes.io/component: worker}
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app.kubernetes.io/name: arvino-orchestrator, app.kubernetes.io/component: worker}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: arvino-orchestrator, app.kubernetes.io/component: worker}
+    spec:
+      serviceAccountName: arvino-orchestrator
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: worker
+          image: ghcr.io/arvino/orchestrator:0.1.0
+          imagePullPolicy: IfNotPresent
+          command: ["arvino", "worker"]
+          envFrom:
+            - configMapRef: {name: arvino-orchestrator-config}
+            - secretRef: {name: arvino-orchestrator-secrets, optional: false}
+          resources:
+            requests: {cpu: 50m, memory: 128Mi}
+            limits: {cpu: 500m, memory: 384Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+      volumes:
+        - name: tmp
+          emptyDir: {sizeLimit: 64Mi}

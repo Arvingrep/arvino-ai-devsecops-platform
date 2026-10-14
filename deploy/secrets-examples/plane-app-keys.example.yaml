@@ -1,0 +1,9 @@
+# EXAMPLE ONLY - placeholders. Create the real Secret out-of-band (External Secrets / SOPS / kubectl).
+# Never commit real values. This file is NOT referenced by any kustomization.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: plane-app-keys
+type: Opaque
+stringData:
+  SECRET_KEY LIVE_SERVER_SECRET_KEY: REPLACE_ME
