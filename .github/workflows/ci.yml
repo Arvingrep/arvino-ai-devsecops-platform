@@ -7,6 +7,12 @@ on:
 
 permissions:
   contents: read
+  id-token: write
+
+env:
+  IMAGE: asia-southeast1-docker.pkg.dev/fh580-70533/containers/arvino
+  WIF_PROVIDER: projects/962691151362/locations/global/workloadIdentityPools/github-actions-pool/providers/github-oidc
+  WIF_SA: github-cicd-deployer@fh580-70533.iam.gserviceaccount.com
 
 jobs:
   check:
@@ -27,11 +33,8 @@ jobs:
         run: |
           uv tool install ruff
           uv tool install mypy
-          # OPA
           curl -fsSL https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static -o /usr/local/bin/opa && chmod +x /usr/local/bin/opa
-          # conftest
           curl -fsSL https://github.com/open-policy-agent/conftest/releases/download/v0.58.0/conftest_0.58.0_Linux_x86_64.tar.gz | tar xz -C /usr/local/bin conftest
-          # gitleaks
           curl -fsSL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz | tar xz -C /usr/local/bin gitleaks
 
       - name: Ruff lint + format
@@ -74,5 +77,29 @@ jobs:
       - name: Gitleaks
         run: gitleaks git --no-banner --redact -c .gitleaks.toml .
 
-      - name: kubectl (for kustomize)
-        uses: azure/setup-kubectl@v4
+      - uses: azure/setup-kubectl@v4
+
+  build:
+    needs: check
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ env.WIF_PROVIDER }}
+          service_account: ${{ env.WIF_SA }}
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker asia-southeast1-docker.pkg.dev --quiet
+
+      - name: Build and push
+        run: |
+          SHA=${GITHUB_SHA::12}
+          docker build -t $IMAGE:$SHA -t $IMAGE:latest .
+          docker push $IMAGE:$SHA
+          docker push $IMAGE:latest
+          echo "Pushed $IMAGE:$SHA"
