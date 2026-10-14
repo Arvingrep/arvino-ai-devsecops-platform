@@ -1,0 +1,78 @@
+name: ci
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install Python + dependencies
+        run: |
+          uv python install 3.12
+          uv sync --all-extras
+
+      - name: Install tools
+        run: |
+          uv tool install ruff
+          uv tool install mypy
+          # OPA
+          curl -fsSL https://openpolicyagent.org/downloads/latest/opa_linux_amd64_static -o /usr/local/bin/opa && chmod +x /usr/local/bin/opa
+          # conftest
+          curl -fsSL https://github.com/open-policy-agent/conftest/releases/download/v0.58.0/conftest_0.58.0_Linux_x86_64.tar.gz | tar xz -C /usr/local/bin conftest
+          # gitleaks
+          curl -fsSL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz | tar xz -C /usr/local/bin gitleaks
+
+      - name: Ruff lint + format
+        run: |
+          uv run ruff check src/ tests/
+          uv run ruff format --check src/ tests/
+
+      - name: mypy --strict
+        run: uv run mypy
+
+      - name: yamllint
+        run: uv run yamllint -s .
+
+      - name: Validate workflow definitions
+        run: uv run arvino validate-workflows
+
+      - name: pytest
+        run: uv run pytest -q --tb=short
+
+      - name: OPA policy tests
+        run: |
+          opa check --strict policy/
+          opa test policy/
+
+      - name: Kustomize + conftest
+        run: |
+          for env in dev staging production; do
+            kubectl kustomize deploy/overlays/$env > /tmp/$env.yaml
+            conftest test --no-color --policy policy/k8s --namespace k8s.workloads --namespace k8s.nosecrets /tmp/$env.yaml
+          done
+          conftest test --no-color --policy policy/k8s --namespace k8s.secrets deploy/secrets-examples/
+          conftest test --no-color --policy policy/k8s --namespace k8s.argocd deploy/argocd/appproject.yaml deploy/argocd/applications.yaml
+
+      - name: Negative controls
+        run: |
+          ! conftest test --no-color --policy policy/k8s --namespace k8s.workloads tests/fixtures/bad/deployment.yaml
+          ! conftest test --no-color --policy policy/k8s --namespace k8s.secrets tests/fixtures/bad/secret.yaml
+          ! conftest test --no-color --policy policy/k8s --namespace k8s.argocd tests/fixtures/bad/argocd.yaml
+
+      - name: Gitleaks
+        run: gitleaks git --no-banner --redact -c .gitleaks.toml .
+
+      - name: kubectl (for kustomize)
+        uses: azure/setup-kubectl@v4
