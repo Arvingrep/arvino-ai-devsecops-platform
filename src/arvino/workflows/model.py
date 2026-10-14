@@ -191,14 +191,17 @@ def _safety_lint(defn: WorkflowDef) -> list[str]:
                         )
     if defn.profile is Profile.GOVERNED:
         for s in defn.steps:
-            if s.kind is StepKind.AGENT and s.role in IMPLEMENTER_ROLES:
-                if not any(
+            if (
+                s.kind is StepKind.AGENT
+                and s.role in IMPLEMENTER_ROLES
+                and not any(
                     a.kind is StepKind.APPROVAL and a.approval_kind is ApprovalKind.ARCHITECTURE
                     for a in anc_steps(s.key)
-                ):
-                    errs.append(
-                        f"governed implementation {s.key} must descend from an architecture approval"
-                    )
+                )
+            ):
+                errs.append(
+                    f"governed implementation {s.key} must descend from an architecture approval"
+                )
     return errs
 
 

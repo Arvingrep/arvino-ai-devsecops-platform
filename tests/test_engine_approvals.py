@@ -27,7 +27,9 @@ def test_unapproved_release_blocks_downstream_and_never_promotes(env: Env) -> No
     run = env.engine.get_run(run_id)
     assert run.status == "waiting_approval"
     assert run.step("release").status == "pending"
-    assert [r.environment for r in env.promoter.requests] == ["preview"]  # production never requested
+    assert [r.environment for r in env.promoter.requests] == [
+        "preview"
+    ]  # production never requested
     for _ in range(3):
         env.engine.advance(run_id)
     assert [r.environment for r in env.promoter.requests] == ["preview"]
@@ -37,7 +39,9 @@ def test_unapproved_release_blocks_downstream_and_never_promotes(env: Env) -> No
 def test_owner_approval_unblocks_release(env: Env) -> None:
     run_id = to_release_approval(env)
     # PR gets merged by the human owner: this gives the production revision.
-    env.engine.update_git_state(run_id, merged=True, merge_sha="b" * 40, merged_by="owner", source="test")
+    env.engine.update_git_state(
+        run_id, merged=True, merge_sha="b" * 40, merged_by="owner", source="test"
+    )
     appr = env.approve(run_id, "release_approval")
     assert appr.status == "approved" and appr.decided_by and appr.decided_by["id"] == "owner"
     run = env.engine.get_run(run_id)
@@ -125,18 +129,21 @@ def test_production_never_dispatches_without_human_owner_approval_row() -> None:
     run_id = to_release_approval(env)
     appr = env.engine.get_run(run_id).approvals[0]
     # Tamper: mark the approval approved but "decided by" an agent. Policy allows everything.
-    with transaction(env.engine._sf) as s:  # noqa: SLF001
+    with transaction(env.engine._sf) as s:
         row = s.get(ApprovalRow, appr.id)
         assert row is not None
         row.status = "approved"
         row.decided_by = AGENT.model_dump(mode="json")
     # Force the approval step to succeed as if the engine had been fooled.
-    from arvino.db import StepRow
     from sqlalchemy import update
 
-    with transaction(env.engine._sf) as s:  # noqa: SLF001
+    from arvino.db import StepRow
+
+    with transaction(env.engine._sf) as s:
         s.execute(
-            update(StepRow).where(StepRow.run_id == run_id, StepRow.key == "release_approval").values(status="succeeded")
+            update(StepRow)
+            .where(StepRow.run_id == run_id, StepRow.key == "release_approval")
+            .values(status="succeeded")
         )
     run = env.engine.advance(run_id)
     assert run.step("release").status == "failed"
@@ -164,7 +171,9 @@ def test_governed_requires_staging_then_second_approval_then_production(env: Env
     run = env.engine.get_run(run.id)
     assert run.step("staging").status == "running"
     assert run.step("production_approval").status == "pending"  # not before staging converges
-    env.engine.update_git_state(run.id, merged=True, merge_sha=SHA, merged_by="owner", source="test")
+    env.engine.update_git_state(
+        run.id, merged=True, merge_sha=SHA, merged_by="owner", source="test"
+    )
     env.converge("acme-staging")
     run = env.engine.get_run(run.id)
     assert run.step("production_approval").status == "waiting_approval"

@@ -57,7 +57,9 @@ def test_attempts_exhausted_fails_run_and_cancels_downstream(env: Env) -> None:
     assert run.step("develop").status == "failed"
     assert run.step("develop").attempt == 2
     assert run.status == "failed" and "still broken" in (run.failure_reason or "")
-    assert {s.key: s.status for s in run.steps if s.key in {"tests", "pull_request", "ci", "preview"}} == {
+    assert {
+        s.key: s.status for s in run.steps if s.key in {"tests", "pull_request", "ci", "preview"}
+    } == {
         "tests": "cancelled",
         "pull_request": "cancelled",
         "ci": "cancelled",
@@ -120,7 +122,9 @@ def test_completion_from_timed_out_attempt_is_fenced(env: Env) -> None:
     run = env.engine.get_run(run.id)
     assert run.step("triage").attempt == old_attempt + 1
 
-    res = env.engine.complete_step(run.id, "triage", old_attempt, StepOutcome(status="succeeded"), AGENT)
+    res = env.engine.complete_step(
+        run.id, "triage", old_attempt, StepOutcome(status="succeeded"), AGENT
+    )
     assert res is CompletionResult.STALE
     assert env.engine.get_run(run.id).step("triage").status == "running"
     assert "step.stale_completion_ignored" in [e.type for e in env.engine.events(run.id)]
@@ -152,8 +156,12 @@ def test_next_wakeup_reports_backoff_and_deadlines(env: Env) -> None:
 
 
 def test_create_run_is_idempotent_on_key(env: Env) -> None:
-    a, created_a = env.engine.create_run(env.project_id, env.issue_id, Profile.FAST, "same", "owner")
-    b, created_b = env.engine.create_run(env.project_id, env.issue_id, Profile.FAST, "same", "owner")
+    a, created_a = env.engine.create_run(
+        env.project_id, env.issue_id, Profile.FAST, "same", "owner"
+    )
+    b, created_b = env.engine.create_run(
+        env.project_id, env.issue_id, Profile.FAST, "same", "owner"
+    )
     assert (created_a, created_b) == (True, False)
     assert a.id == b.id and len(b.steps) == len(a.steps)
     assert len(env.engine.list_runs()) == 1
@@ -179,9 +187,13 @@ def test_duplicate_completion_is_a_noop(env: Env) -> None:
     run = env.start(Profile.FAST)
     attempt = run.step("triage").attempt
     ok = StepOutcome(status="succeeded")
-    assert env.engine.complete_step(run.id, "triage", attempt, ok, AGENT) is CompletionResult.APPLIED
+    assert (
+        env.engine.complete_step(run.id, "triage", attempt, ok, AGENT) is CompletionResult.APPLIED
+    )
     n_events = len(env.engine.events(run.id))
-    assert env.engine.complete_step(run.id, "triage", attempt, ok, AGENT) is CompletionResult.DUPLICATE
+    assert (
+        env.engine.complete_step(run.id, "triage", attempt, ok, AGENT) is CompletionResult.DUPLICATE
+    )
     assert len(env.engine.events(run.id)) == n_events
     assert len(env.executor.calls_for("develop")) == 1
 
@@ -200,7 +212,9 @@ def test_artifacts_are_recorded_with_producer_identity(env: Env) -> None:
     env.executor.script("triage", StepOutcome(status="succeeded", artifacts=[a]))
     run = env.start(Profile.FAST)
     got = [x for x in run.artifacts if x.step_key == "triage"]
-    assert [(x.name, x.sha256, x.produced_by) for x in got] == [("spec.md", "1" * 64, "agent:triage")]
+    assert [(x.name, x.sha256, x.produced_by) for x in got] == [
+        ("spec.md", "1" * 64, "agent:triage")
+    ]
 
 
 def test_conflicting_artifact_content_fails_step(env: Env) -> None:
@@ -211,15 +225,24 @@ def test_conflicting_artifact_content_fails_step(env: Env) -> None:
     # Simulate a prior partial registration for this (step, name) from an earlier attempt.
     from arvino.db import ArtifactRow, transaction
 
-    with transaction(env.engine._sf) as s:  # noqa: SLF001
+    with transaction(env.engine._sf) as s:
         s.add(
             ArtifactRow(
-                run_id=run.id, step_key="triage", kind="spec", name="spec.md", uri=first.uri,
-                sha256=first.sha256, produced_by="agent:triage", extra={}, created_at=env.clock.now(),
-            )  # fmt: skip
+                run_id=run.id,
+                step_key="triage",
+                kind="spec",
+                name="spec.md",
+                uri=first.uri,
+                sha256=first.sha256,
+                produced_by="agent:triage",
+                extra={},
+                created_at=env.clock.now(),
+            )
         )
     changed = first.model_copy(update={"sha256": "2" * 64})
-    env.engine.complete_step(run.id, "triage", attempt, StepOutcome(status="succeeded", artifacts=[changed]), AGENT)
+    env.engine.complete_step(
+        run.id, "triage", attempt, StepOutcome(status="succeeded", artifacts=[changed]), AGENT
+    )
     run = env.engine.get_run(run.id)
     assert run.step("triage").status == "failed"
     assert "immutable" in (run.step("triage").last_error or "")
@@ -243,7 +266,7 @@ def test_claim_is_compare_and_set_under_concurrent_advance(tmp_path: Path) -> No
         try:
             gate.wait()
             e.engine.advance(view.id)
-        except BaseException as exc:  # noqa: BLE001
+        except BaseException as exc:
             errors.append(exc)
 
     threads = [threading.Thread(target=worker) for _ in range(4)]

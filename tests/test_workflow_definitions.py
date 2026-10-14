@@ -78,7 +78,10 @@ def test_standard_has_parallel_fanout_and_fanin() -> None:
 def test_governed_has_two_owner_approvals_and_staging_before_production() -> None:
     g = REG.get(Profile.GOVERNED)
     approvals = [s for s in g.steps if s.kind is StepKind.APPROVAL]
-    assert {a.approval_kind for a in approvals} == {ApprovalKind.ARCHITECTURE, ApprovalKind.PRODUCTION_DEPLOY}
+    assert {a.approval_kind for a in approvals} == {
+        ApprovalKind.ARCHITECTURE,
+        ApprovalKind.PRODUCTION_DEPLOY,
+    }
     assert "staging" in g.ancestors("production")
     assert "production_approval" in g.ancestors("production")
     assert "architecture_approval" in g.ancestors("implementation")

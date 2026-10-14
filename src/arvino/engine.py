@@ -484,7 +484,9 @@ class Engine:
                 if res.rowcount != 1:  # type: ignore[attr-defined]
                     continue  # another worker claimed it
                 claimed.append((st.key, new_attempt))
-                self._event(s, run.id, "step.started", "system:engine", step=st.key, attempt=new_attempt)
+                self._event(
+                    s, run.id, "step.started", "system:engine", step=st.key, attempt=new_attempt
+                )
             s.flush()
             s.expire_all()
             self._refresh_run_status(s, self._lock_run(s, run_id))
@@ -779,12 +781,11 @@ class Engine:
             kind = next(k for kk, _, k in targets if kk == key)
             if kind is StepKind.CI:
                 out = self._eval_ci(run_id, key)
-            if out.status != "running":
-                if (
-                    self._finalize(run_id, key, attempt, out, source="engine")
-                    is CompletionResult.APPLIED
-                ):
-                    progressed = True
+            if out.status != "running" and (
+                self._finalize(run_id, key, attempt, out, source="engine")
+                is CompletionResult.APPLIED
+            ):
+                progressed = True
         return progressed
 
     # ------------------------------------------------------------------ completion
@@ -871,9 +872,15 @@ class Engine:
                 ):
                     return CompletionResult.DUPLICATE
                 self._event(
-                    s, run_id, "step.stale_completion_ignored", source,
-                    step=key, attempt=attempt, current_attempt=st.attempt, status=st.status,
-                )  # fmt: skip
+                    s,
+                    run_id,
+                    "step.stale_completion_ignored",
+                    source,
+                    step=key,
+                    attempt=attempt,
+                    current_attempt=st.attempt,
+                    status=st.status,
+                )
                 return CompletionResult.STALE
 
             if outcome.status == "running":
@@ -912,9 +919,15 @@ class Engine:
                     st.status = StepStatus.PENDING.value
                     st.not_before = now + timedelta(seconds=delay)
                     self._event(
-                        s, run_id, "step.retry_scheduled", source,
-                        step=key, attempt=attempt, error=err, not_before=st.not_before.isoformat(),
-                    )  # fmt: skip
+                        s,
+                        run_id,
+                        "step.retry_scheduled",
+                        source,
+                        step=key,
+                        attempt=attempt,
+                        error=err,
+                        not_before=st.not_before.isoformat(),
+                    )
                 else:
                     st.status = StepStatus.FAILED.value
                     st.finished_at = now
@@ -1040,7 +1053,7 @@ class Engine:
                         title=issue.title,
                         body=issue.body,
                         labels=issue.labels,
-                    ),  # fmt: skip
+                    ),
                     f"Arvino run {view.id} ({view.profile}) is {view.status}"
                     + (f": {view.failure_reason}" if view.failure_reason else ""),
                 )
@@ -1149,9 +1162,15 @@ class Engine:
     # ------------------------------------------------------------------ trusted inbound facts
 
     def record_check(
-        self, run_id: str, name: str, head_sha: str, conclusion: Literal["success", "failure", "pending"],
-        *, url: str | None = None, source: str = "ci",
-    ) -> None:  # fmt: skip
+        self,
+        run_id: str,
+        name: str,
+        head_sha: str,
+        conclusion: Literal["success", "failure", "pending"],
+        *,
+        url: str | None = None,
+        source: str = "ci",
+    ) -> None:
         """Record a CI check result (called only from authenticated webhook handlers)."""
         before = self._run_status(run_id)
         with transaction(self._sf) as s:
@@ -1173,7 +1192,7 @@ class Engine:
                         url=url,
                         source=source,
                         updated_at=self._now(),
-                    )  # fmt: skip
+                    )
                 )
             else:
                 row.conclusion, row.url, row.source, row.updated_at = (
@@ -1254,7 +1273,7 @@ class Engine:
                         sync_status=sync_status,
                         operation_phase=operation_phase,
                         observed_at=now,
-                    )  # fmt: skip
+                    )
                 )
             else:
                 row.revision, row.health, row.sync_status = revision, health, sync_status

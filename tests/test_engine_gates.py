@@ -36,7 +36,9 @@ def test_failed_required_check_fails_run_and_blocks_gate_and_deploy(env: Env) ->
     env.checks(run_id, ["secret-scan"], "failure")
     run = env.engine.get_run(run_id)
     assert run.status == "failed" and "secret-scan" in (run.failure_reason or "")
-    assert run.step("merge_gate").status == "cancelled" and run.step("preview").status == "cancelled"
+    assert (
+        run.step("merge_gate").status == "cancelled" and run.step("preview").status == "cancelled"
+    )
     assert env.promoter.requests == []
 
 
@@ -126,7 +128,10 @@ def test_gate_does_not_trust_agent_claims_about_paths_or_checks() -> None:
         output={"changed_paths": ["README.md"], "checks": {"unit-tests": "success"}},
         artifacts=[
             ArtifactSpec(
-                kind="pull-request", name="pr", uri="x", metadata={"number": 1, "paths": ["README.md"]}
+                kind="pull-request",
+                name="pr",
+                uri="x",
+                metadata={"number": 1, "paths": ["README.md"]},
             )
         ],
     )
@@ -148,7 +153,9 @@ def test_pull_request_outside_run_namespace_is_rejected(env: Env) -> None:
         env.git.register_pr(REPO, 7, "run-000000000000", ["src/a.py"], SHA)  # somebody else's PR
         return StepOutcome(
             status="succeeded",
-            artifacts=[ArtifactSpec(kind="pull-request", name="pr", uri="x", metadata={"number": 7})],
+            artifacts=[
+                ArtifactSpec(kind="pull-request", name="pr", uri="x", metadata={"number": 7})
+            ],
         )
 
     env.executor.script("pull_request", script)
@@ -161,7 +168,9 @@ def test_pull_request_outside_run_namespace_is_rejected(env: Env) -> None:
 def test_pull_request_artifact_without_number_is_rejected(env: Env) -> None:
     env.executor.script(
         "pull_request",
-        StepOutcome(status="succeeded", artifacts=[ArtifactSpec(kind="pull-request", name="pr", uri="x")]),
+        StepOutcome(
+            status="succeeded", artifacts=[ArtifactSpec(kind="pull-request", name="pr", uri="x")]
+        ),
     )
     run = env.start(Profile.FAST)
     assert run.step("pull_request").status == "failed"
@@ -257,7 +266,9 @@ def test_agent_account_merging_is_a_violation_that_fails_the_run() -> None:
     env = build_env(agent_accounts=frozenset({"arvino-bot"}))
     run_id = at_ci(env)
     env.webhook_pr(run_id)
-    env.engine.update_git_state(run_id, merged=True, merge_sha="d" * 40, merged_by="arvino-bot", source="test")
+    env.engine.update_git_state(
+        run_id, merged=True, merge_sha="d" * 40, merged_by="arvino-bot", source="test"
+    )
     run = env.engine.get_run(run_id)
     assert run.status == "failed" and "policy violation" in (run.failure_reason or "")
     assert run.merge_sha is None

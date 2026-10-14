@@ -70,7 +70,9 @@ def test_protected_paths_are_denied_for_every_profile(policy: FailClosedPolicy, 
     assert env.promoter.requests == []
 
 
-def test_governed_architecture_approval_does_not_unlock_forbidden_paths(policy: FailClosedPolicy) -> None:
+def test_governed_architecture_approval_does_not_unlock_forbidden_paths(
+    policy: FailClosedPolicy,
+) -> None:
     env = build_env(policy=policy)
     run_id = run_to_gate(env, ["policy/config.rego"], Profile.GOVERNED)
     assert env.engine.get_run(run_id).step("merge_gate").status == "failed"
@@ -78,13 +80,17 @@ def test_governed_architecture_approval_does_not_unlock_forbidden_paths(policy: 
 
 def test_restricted_path_needs_architecture_approval(policy: FailClosedPolicy) -> None:
     env = build_env(policy=policy)
-    run_id = run_to_gate(env, ["terraform/main.tf"], Profile.STANDARD)  # standard has no architecture approval
+    run_id = run_to_gate(
+        env, ["terraform/main.tf"], Profile.STANDARD
+    )  # standard has no architecture approval
     run = env.engine.get_run(run_id)
     assert run.step("merge_gate").status == "failed"
     assert "architecture approval" in (run.step("merge_gate").last_error or "")
 
     env2 = build_env(policy=policy)
-    run_id2 = run_to_gate(env2, ["terraform/main.tf"], Profile.GOVERNED)  # governed: owner approved the ADR
+    run_id2 = run_to_gate(
+        env2, ["terraform/main.tf"], Profile.GOVERNED
+    )  # governed: owner approved the ADR
     assert env2.engine.get_run(run_id2).step("merge_gate").status == "succeeded"
 
 
@@ -105,7 +111,9 @@ def test_full_standard_release_with_real_policy(policy: FailClosedPolicy) -> Non
     env = build_env(policy=policy)
     run_id = run_to_gate(env, ["src/app.py"], Profile.STANDARD)
     env.converge("acme-preview")
-    env.engine.update_git_state(run_id, merged=True, merge_sha="b" * 40, merged_by="owner", source="test")
+    env.engine.update_git_state(
+        run_id, merged=True, merge_sha="b" * 40, merged_by="owner", source="test"
+    )
     assert env.engine.get_run(run_id).step("release_approval").status == "waiting_approval"
     env.approve(run_id, "release_approval")
     assert env.engine.get_run(run_id).step("release").status == "running"

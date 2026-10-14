@@ -11,7 +11,12 @@ def test_fast_runs_in_dependency_order_to_preview(env: Env) -> None:
     env.executor.script("pull_request", env.pr_script())
     run = env.start(Profile.FAST)
     # Agent steps ran strictly in order, one at a time, and stopped at the CI wait.
-    assert [c.step_key for c in env.executor.calls] == ["triage", "develop", "tests", "pull_request"]
+    assert [c.step_key for c in env.executor.calls] == [
+        "triage",
+        "develop",
+        "tests",
+        "pull_request",
+    ]
     assert run.statuses()["ci"] == "running"
     assert run.status == "running"
 
@@ -55,7 +60,9 @@ def test_fanin_waits_for_all_parallel_branches(env: Env) -> None:
     run = env.start(Profile.STANDARD)
 
     assert env.complete(run.id, "frontend") == "applied"
-    assert env.engine.get_run(run.id).statuses()["pull_request"] == "pending"  # backend still running
+    assert (
+        env.engine.get_run(run.id).statuses()["pull_request"] == "pending"
+    )  # backend still running
     assert not env.executor.calls_for("pull_request")
 
     assert env.complete(run.id, "backend") == "applied"
@@ -80,7 +87,9 @@ def test_qa_and_security_run_in_parallel_and_review_waits_for_both(env: Env) -> 
     assert len(env.executor.calls_for("review")) == 1
 
 
-def test_terminal_failure_of_one_branch_cancels_siblings_and_ignores_late_completion(env: Env) -> None:
+def test_terminal_failure_of_one_branch_cancels_siblings_and_ignores_late_completion(
+    env: Env,
+) -> None:
     env.executor.script("frontend", StepOutcome(status="running"))
     env.executor.script("backend", StepOutcome(status="running"))
     run = env.start(Profile.STANDARD)
@@ -95,7 +104,9 @@ def test_terminal_failure_of_one_branch_cancels_siblings_and_ignores_late_comple
     assert "boom" in (run.failure_reason or "")
 
     # Frontend's late success must not resurrect anything.
-    res = env.engine.complete_step(run.id, "frontend", fe_attempt, StepOutcome(status="succeeded"), _agent())
+    res = env.engine.complete_step(
+        run.id, "frontend", fe_attempt, StepOutcome(status="succeeded"), _agent()
+    )
     assert res.value == "stale"
     assert env.engine.get_run(run.id).step("frontend").status == "cancelled"
     assert not env.executor.calls_for("pull_request")
@@ -115,7 +126,7 @@ def test_ledger_records_audit_events(env: Env) -> None:
     assert "step.started" in types and "step.succeeded" in types
 
 
-def _agent():  # noqa: ANN202
+def _agent():
     from tests.conftest import AGENT
 
     return AGENT

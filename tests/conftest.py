@@ -73,11 +73,15 @@ class Env:
     def webhook_pr(self, run_id: str, sha: str = SHA, number: int = 1) -> None:
         self.engine.update_git_state(run_id, pr_number=number, head_sha=sha, source="test")
 
-    def checks(self, run_id: str, names: list[str], conclusion: str = "success", sha: str = SHA) -> None:
+    def checks(
+        self, run_id: str, names: list[str], conclusion: str = "success", sha: str = SHA
+    ) -> None:
         for n in names:
             self.engine.record_check(run_id, n, sha, conclusion, source="test")  # type: ignore[arg-type]
 
-    def converge(self, app: str, revision: str = SHA, health: str = "Healthy", sync: str = "Synced") -> None:
+    def converge(
+        self, app: str, revision: str = SHA, health: str = "Healthy", sync: str = "Synced"
+    ) -> None:
         self.engine.record_deployment(app, revision, health, sync)
 
     def approve(self, run_id: str, step_key: str, principal: Principal = OWNER) -> ApprovalView:
@@ -105,7 +109,12 @@ def build_env(
     init_schema(sa)
     clock = FakeClock()
     executor = executor or ScriptedExecutor()
-    git, promoter, tracker, notifier = FakeGit(), RecordOnlyPromoter(), RecordingTracker(), RecordingNotifier()
+    git, promoter, tracker, notifier = (
+        FakeGit(),
+        RecordOnlyPromoter(),
+        RecordingTracker(),
+        RecordingNotifier(),
+    )
     static = policy if policy is not None else StaticPolicy(allow=True)
     engine = Engine(
         make_session_factory(sa),
@@ -125,7 +134,11 @@ def build_env(
         "acme",
         "Acme",
         repo_full_name=REPO,
-        argocd_apps={"preview": "acme-preview", "staging": "acme-staging", "production": "acme-prod"},
+        argocd_apps={
+            "preview": "acme-preview",
+            "staging": "acme-staging",
+            "production": "acme-prod",
+        },
     )
     issue, _ = engine.upsert_issue(project.id, "plane", "PLANE-1", "Add widget", body="please")
     return Env(
