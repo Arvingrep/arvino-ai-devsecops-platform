@@ -29,22 +29,34 @@ Status key: ✅ done & verified locally · 🟡 done, contract/mock only (live s
 ## Phase 4 — Live integrations (next) ⬜
 Each item ends with a recorded real-system verification:
 1. Temporal: deploy server, run `arvino.temporal_worker`, kill/restart worker mid-run.
-2. Gitea/GitHub: real `GitProvider` adapter (branch, PR, changed files, check
-   status); capture real webhook deliveries into fixtures.
-3. Plane: real `IssueTracker` adapter (state/comment writeback) and webhook capture.
-4. OpenHands / Claude Code: `AgentExecutor` adapter launching an isolated
+2. **n8n as integration bus**: Plane/Gitea/Nightingale webhooks → n8n workflows →
+   arvino API. n8n handles retry, auth, payload transform; arvino stays a pure engine.
+   Replace hand-coded `IssueTracker` and notification adapters with n8n workflows.
+3. Gitea/GitHub: real `GitProvider` adapter (branch, PR, changed files, check
+   status); webhook delivery via n8n relay; capture real payloads into fixtures.
+4. Plane: webhook → n8n → arvino upsert_issue; status writeback via n8n calling
+   Plane API. No separate Python Plane adapter needed.
+5. **Telegram Bot Agent Interface**: each workflow role (product, architect,
+   frontend, backend, qa, security, devops, sre) maps to a Telegram bot in the
+   Arvino group. `TelegramAgentExecutor` receives `StepRequest`, dispatches to the
+   role's bot which runs Claude Code in an isolated worktree, and posts progress +
+   results in the group. Owner approvals via `/approve` `/reject` commands.
+6. OpenHands / Claude Code: `AgentExecutor` adapter launching an isolated
    worktree + sandbox per step; credentials scoped per task, no cluster-admin.
-5. Argo CD: `GitOpsPromoter` adapter that only commits to the GitOps repo
-   (never calls sync on production); read-only status via notifications.
-6. Nightingale: capture the real alert webhook template and align the contract.
-7. Trivy: run image/IaC scans in CI, publish results as trusted check artifacts.
+   Telegram bots (item 5) are the default frontend; headless execution is fallback.
+7. Argo CD: `GitOpsPromoter` adapter that only commits to the GitOps repo
+   (never calls sync on production); read-only status via n8n webhook relay.
+8. Nightingale: alert webhook → n8n → arvino (create issue + trigger SRE workflow).
+9. Trivy: run image/IaC scans in CI, publish results as trusted check artifacts.
 
 ## Phase 5 — Hardening (after live) ⬜
 * Alembic migrations; Postgres row-level locking review under multiple replicas.
 * External Secrets / SOPS; NetworkPolicies; mTLS to OPA.
 * OIDC login instead of static bearer tokens; per-project owner mapping.
 * Metrics (Prometheus) + Grafana dashboards, Nightingale rules for the platform itself.
-* BMAD v6.12 artifact ingestion (PRD/architecture/stories) as typed artifacts.
+* **BMAD v6.12**: install into each project repo; PRD/architecture/stories ingested
+  as typed artifacts in the run ledger; workflow definitions reference BMAD phases
+  (Clarify → Plan → Build → Verify → Learn).
 
 ## Phase 6 — Portfolio features ⬜
 * Cross-project cycles/roadmap views in Plane fed by run ledger.
