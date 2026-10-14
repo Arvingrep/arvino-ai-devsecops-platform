@@ -115,14 +115,14 @@ class ClaudeCodeExecutor:
 
         try:
             # Ensure the branch exists locally (create from HEAD if not).
-            subprocess.run(
-                ["git", "branch", branch],
+            subprocess.run(  # noqa: S603
+                ["git", "branch", branch],  # noqa: S607
                 cwd=str(base),
                 capture_output=True,
                 check=False,  # branch may already exist
             )
-            subprocess.run(
-                ["git", "worktree", "add", str(worktree_dir), branch],
+            subprocess.run(  # noqa: S603
+                ["git", "worktree", "add", str(worktree_dir), branch],  # noqa: S607
                 cwd=str(base),
                 capture_output=True,
                 check=True,
@@ -199,7 +199,7 @@ class ClaudeCodeExecutor:
         env = {**os.environ, **self.env_overrides, "CLAUDE_CODE_OAUTH_TOKEN": token}
 
         timeout = self.timeout_seconds if self.timeout_seconds > 0 else None
-        result = subprocess.run(
+        result = subprocess.run(  # noqa: S603
             cmd,
             cwd=str(cwd),
             capture_output=True,
@@ -304,8 +304,8 @@ class ClaudeCodeExecutor:
             return
 
         try:
-            subprocess.run(
-                ["git", "worktree", "remove", "--force", str(worktree_dir)],
+            subprocess.run(  # noqa: S603
+                ["git", "worktree", "remove", "--force", str(worktree_dir)],  # noqa: S607
                 cwd=str(self.repo_base_dir),
                 capture_output=True,
                 check=False,

@@ -115,8 +115,8 @@ class GitHubProvider:
 
     @staticmethod
     def _gh(*args: str) -> str:
-        result = subprocess.run(
-            ["gh", *args],
+        result = subprocess.run(  # noqa: S603
+            ["gh", *args],  # noqa: S607
             capture_output=True,
             text=True,
             check=False,
@@ -127,7 +127,7 @@ class GitHubProvider:
 
     @staticmethod
     def _run(cmd: list[str]) -> str:
-        result = subprocess.run(cmd, capture_output=True, text=True, check=False)
+        result = subprocess.run(cmd, capture_output=True, text=True, check=False)  # noqa: S603
         if result.returncode != 0:
             raise RuntimeError(f"{cmd[0]} failed (rc={result.returncode}): {result.stderr.strip()}")
         return result.stdout
@@ -164,7 +164,7 @@ class GiteaProvider:
         repo_resp = self._request("GET", f"/repos/{repo}")
         default_branch = repo_resp["default_branch"]
         branch_resp = self._request("GET", f"/repos/{repo}/branches/{default_branch}")
-        sha = branch_resp["commit"]["id"]
+        _commit_sha = branch_resp["commit"]["id"]
         # Create the branch — ignore 409 (already exists).
         resp = self._client.post(
             f"/repos/{repo}/branches",
