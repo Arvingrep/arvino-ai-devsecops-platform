@@ -40,6 +40,25 @@ class Settings(BaseSettings):
     argocd_webhook_token: SecretStr | None = None
     nightingale_webhook_token: SecretStr | None = None
 
+    # Git provider selection: "github" uses gh CLI, "gitea" uses httpx REST.
+    git_provider: Literal["github", "gitea"] = "github"
+
+    # GitHub: personal access token (for API calls when gh CLI is not configured).
+    github_token: SecretStr | None = None
+
+    # Gitea: instance URL and token.
+    gitea_url: str | None = None
+    gitea_token: SecretStr | None = None
+
+    # Claude Code executor settings.
+    claude_model: str = "sonnet"
+    claude_bin: str = "claude"
+    claude_max_turns: int = 30
+    claude_timeout_seconds: int = 600
+
+    # Base directory containing the local clone that worktrees are created from.
+    repo_base_dir: str | None = None
+
     # Git accounts that must never merge (detective control; preventive is branch protection).
     agent_accounts: list[str] = []
 
