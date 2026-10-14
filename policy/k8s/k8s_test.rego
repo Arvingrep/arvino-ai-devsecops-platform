@@ -1,5 +1,7 @@
 package k8s_test
 
+import rego.v1
+
 import data.k8s.argocd
 import data.k8s.nosecrets
 import data.k8s.secrets

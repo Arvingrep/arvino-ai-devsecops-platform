@@ -2,6 +2,8 @@
 #   conftest test --policy policy/k8s --namespace k8s.workloads <rendered.yaml>
 package k8s.workloads
 
+import rego.v1
+
 pod_controllers := {"Deployment", "StatefulSet", "DaemonSet", "Job", "ReplicaSet"}
 
 pod_spec := spec if {

@@ -1,5 +1,7 @@
 package arvino.authz_test
 
+import rego.v1
+
 import data.arvino.authz
 
 owner := {"id": "owner", "kind": "human", "roles": ["owner"]}

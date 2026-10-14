@@ -3,6 +3,8 @@
 #   conftest test --policy policy/k8s --namespace k8s.nosecrets <rendered overlay>
 package k8s.secrets
 
+import rego.v1
+
 deny contains msg if {
 	input.kind == "Secret"
 	some k, v in input.stringData

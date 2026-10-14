@@ -5,6 +5,8 @@
 # the client (fail closed).
 package arvino.authz
 
+import rego.v1
+
 import data.arvino.config
 
 decision := {"allow": count(deny) == 0, "deny": sort(deny)}

@@ -2,6 +2,8 @@
 #   conftest test --policy policy/k8s --namespace k8s.argocd deploy/argocd/*.yaml
 package k8s.argocd
 
+import rego.v1
+
 is_production(app) if app.metadata.annotations["arvino.dev/environment"] == "production"
 
 is_production(app) if contains(app.metadata.name, "production")
