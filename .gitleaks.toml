@@ -1,0 +1,11 @@
+title = "arvino gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Placeholders and deterministic test values only"
+regexes = [
+  '''REPLACE_ME''',
+  '''[a-z]+-test-(secret|token)''',
+]

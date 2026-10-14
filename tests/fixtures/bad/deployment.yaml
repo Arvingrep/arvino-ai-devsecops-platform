@@ -1,0 +1,15 @@
+# Negative control: every rule in policy/k8s/workloads.rego should fire on this file.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: bad}
+spec:
+  selector: {matchLabels: {a: b}}
+  template:
+    metadata: {labels: {a: b}}
+    spec:
+      hostNetwork: true
+      volumes: [{name: h, hostPath: {path: /}}]
+      containers:
+        - name: c
+          image: nginx:latest
+          securityContext: {privileged: true, allowPrivilegeEscalation: true}

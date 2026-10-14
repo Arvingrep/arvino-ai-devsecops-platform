@@ -1,0 +1,14 @@
+extends: default
+ignore: |
+  .venv/
+  .runtime/
+  deploy/base/opa/configmap-policy.yaml
+rules:
+  line-length: disable
+  document-start: disable
+  comments: {min-spaces-from-content: 1}
+  comments-indentation: disable
+  braces: {min-spaces-inside: 0, max-spaces-inside: 1}
+  brackets: {min-spaces-inside: 0, max-spaces-inside: 1}
+  truthy: {check-keys: false}
+  indentation: {spaces: 2, indent-sequences: consistent}

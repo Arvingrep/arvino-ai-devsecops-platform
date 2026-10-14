@@ -518,9 +518,7 @@ class Engine:
                     requested_at=now,
                 )
             )
-        self._event(
-            s, run.id, "approval.requested", "system:engine", step=st.key, kind=st.approval_kind
-        )
+        self._event(s, run.id, "approval.requested", "system:engine", step=st.key)
         return True
 
     # ------------------------------------------------------------------ dispatch
