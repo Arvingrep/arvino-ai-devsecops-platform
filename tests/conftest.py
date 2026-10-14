@@ -3,10 +3,11 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 import pytest
 
-from arvino.clock import FakeClock
+from arvino.clock import Clock, FakeClock
 from arvino.db import init_schema, make_engine, make_session_factory
 from arvino.domain import ArtifactSpec, Principal, PrincipalKind, Profile
 from arvino.engine import Engine, EngineSettings
@@ -40,7 +41,7 @@ class Env:
     promoter: RecordOnlyPromoter
     tracker: RecordingTracker
     notifier: RecordingNotifier
-    clock: FakeClock
+    clock: Any
     project_id: str
     issue_id: str
     db_url: str
@@ -103,11 +104,12 @@ def build_env(
     policy: PolicyClient | None = None,
     executor: ScriptedExecutor | None = None,
     agent_accounts: frozenset[str] = frozenset(),
+    clock: Clock | None = None,
 ) -> Env:
     url = f"sqlite:///{tmp_path / 'test.db'}" if tmp_path else "sqlite://"
     sa = make_engine(url)
     init_schema(sa)
-    clock = FakeClock()
+    clock = clock or FakeClock()
     executor = executor or ScriptedExecutor()
     git, promoter, tracker, notifier = (
         FakeGit(),

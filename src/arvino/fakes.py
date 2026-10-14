@@ -6,6 +6,7 @@ smoke test). They are never selected implicitly in production configuration.
 
 from __future__ import annotations
 
+import hashlib
 import threading
 from collections import defaultdict
 from collections.abc import Callable
@@ -75,27 +76,32 @@ class QueueExecutor:
 
 
 class SandboxExecutor(ScriptedExecutor):
-    """Sandbox-mode executor: succeeds every step; opens a PR in the in-memory FakeGit for
-    `pull_request` steps so the whole pipeline can be exercised end to end without any
-    external system. The changed paths come from ``ARVINO_SANDBOX_CHANGED_PATHS`` (comma
-    separated) so smoke tests can also exercise the protected-path denial."""
+    """Sandbox-mode executor: succeeds every step and opens a PR in the in-memory FakeGit for
+    `pull_request` steps so the whole pipeline can be exercised end to end without any external
+    system. Changed paths come from a line ``sandbox-changed-paths: a,b`` in the issue body
+    (default ``src/app.py``), which lets smoke tests exercise the protected-path denial."""
+
+    MARKER = "sandbox-changed-paths:"
 
     def __init__(self, git: FakeGit) -> None:
         super().__init__()
         self._git = git
 
+    @classmethod
+    def paths_from_issue(cls, body: str) -> list[str]:
+        for line in body.splitlines():
+            if line.strip().startswith(cls.MARKER):
+                return [p.strip() for p in line.split(":", 1)[1].split(",") if p.strip()]
+        return ["src/app.py"]
+
     def execute(self, request: StepRequest) -> StepOutcome:
         if request.step_key != "pull_request" or request.repo is None:
             return super().execute(request)
-        import hashlib
-        import os
-
-        paths = [
-            p for p in os.environ.get("ARVINO_SANDBOX_CHANGED_PATHS", "src/app.py").split(",") if p
-        ]
         sha = hashlib.sha1(request.run_id.encode(), usedforsecurity=False).hexdigest()
         number = int(sha[:6], 16)
-        self._git.register_pr(request.repo, number, request.run_id, paths, sha)
+        self._git.register_pr(
+            request.repo, number, request.run_id, self.paths_from_issue(request.issue.body), sha
+        )
         return StepOutcome(
             status="succeeded",
             artifacts=[

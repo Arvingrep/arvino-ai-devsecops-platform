@@ -12,7 +12,7 @@ import contextlib
 import logging
 import threading
 from collections.abc import Coroutine
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -101,8 +101,15 @@ class TemporalNotifier:
             target=self._loop.run_forever, name="temporal-notifier", daemon=True
         ).start()
 
-    def _run(self, coro: Coroutine[Any, Any, Any]) -> Any:
-        return asyncio.run_coroutine_threadsafe(coro, self._loop).result(timeout=10)
+    def _submit(self, coro: Coroutine[Any, Any, Any]) -> None:
+        """Fire-and-forget: a Temporal outage must never block API requests (reconcile recovers)."""
+        fut = asyncio.run_coroutine_threadsafe(coro, self._loop)
+
+        def _log(f: Future[Any]) -> None:
+            if exc := f.exception():
+                log.warning("temporal poke failed: %s: %s", type(exc).__name__, exc)
+
+        fut.add_done_callback(_log)
 
     async def _poke(self, run_id: str) -> None:
         if self._client is None:
@@ -119,7 +126,7 @@ class TemporalNotifier:
             await self._client.get_workflow_handle(workflow_id(run_id)).signal("poke")
 
     def poke(self, run_id: str) -> None:
-        self._run(self._poke(run_id))
+        self._submit(self._poke(run_id))
 
 
 async def run_worker(engine: Engine, address: str, namespace: str, task_queue: str) -> None:

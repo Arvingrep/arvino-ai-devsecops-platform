@@ -12,3 +12,4 @@ htmlcov/
 *.egg-info/
 *.db
 *.sqlite3
+!.env.example

@@ -1,0 +1,78 @@
+# Local verification stack. Secrets come from your shell / an untracked .env (see .env.example).
+# Core:   docker compose up --build -d       (postgres + opa + orchestrator, sandbox adapters)
+# Smoke:  python scripts/smoke.py            (drives Fast, Standard, protected-path denial)
+# Full:   docker compose --profile full up -d (adds Temporal dev server + arvino worker)
+name: arvino
+services:
+  postgres:
+    image: postgres:16.4-alpine
+    environment:
+      POSTGRES_USER: arvino
+      POSTGRES_DB: arvino
+      POSTGRES_PASSWORD: ${ARVINO_POSTGRES_PASSWORD:?set ARVINO_POSTGRES_PASSWORD in .env}
+    volumes: ["pgdata:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U arvino -d arvino"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+  opa:
+    image: openpolicyagent/opa:1.21.2
+    command: ["run", "--server", "--addr=0.0.0.0:8181", "--log-level=info", "/policy"]
+    volumes: ["./policy:/policy:ro"]
+    ports: ["127.0.0.1:${ARVINO_OPA_HOST_PORT:-18181}:8181"]
+    restart: unless-stopped
+
+  orchestrator:
+    build: .
+    image: arvino/orchestrator:dev
+    depends_on:
+      postgres: {condition: service_healthy}
+      opa: {condition: service_started}
+    environment:
+      ARVINO_DATABASE_URL: postgresql+psycopg://arvino:${ARVINO_POSTGRES_PASSWORD:?}@postgres:5432/arvino
+      ARVINO_OPA_URL: http://opa:8181
+      # sandbox = in-process fakes for agents/Git/GitOps. LOCAL SMOKE ONLY; production uses `queue`.
+      ARVINO_ADAPTERS: ${ARVINO_ADAPTERS:-sandbox}
+      ARVINO_OWNER_TOKEN: ${ARVINO_OWNER_TOKEN:?set ARVINO_OWNER_TOKEN in .env}
+      ARVINO_AGENT_TOKEN: ${ARVINO_AGENT_TOKEN:?set ARVINO_AGENT_TOKEN in .env}
+      ARVINO_AUTOMATION_TOKEN: ${ARVINO_AUTOMATION_TOKEN:?set ARVINO_AUTOMATION_TOKEN in .env}
+      ARVINO_PLANE_WEBHOOK_SECRET: ${ARVINO_PLANE_WEBHOOK_SECRET:?}
+      ARVINO_GITEA_WEBHOOK_SECRET: ${ARVINO_GITEA_WEBHOOK_SECRET:?}
+      ARVINO_CI_WEBHOOK_TOKEN: ${ARVINO_CI_WEBHOOK_TOKEN:?}
+      ARVINO_ARGOCD_WEBHOOK_TOKEN: ${ARVINO_ARGOCD_WEBHOOK_TOKEN:?}
+      ARVINO_NIGHTINGALE_WEBHOOK_TOKEN: ${ARVINO_NIGHTINGALE_WEBHOOK_TOKEN:?}
+      ARVINO_RECONCILE_INTERVAL_SECONDS: "10"
+      # Set ARVINO_TEMPORAL_ADDRESS=temporal:7233 together with `--profile full` to enable the driver.
+      ARVINO_TEMPORAL_ADDRESS: ${ARVINO_TEMPORAL_ADDRESS:-}
+    ports: ["127.0.0.1:${ARVINO_HOST_PORT:-28080}:8080"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+    security_opt: ["no-new-privileges:true"]
+    restart: unless-stopped
+
+  temporal:
+    profiles: ["full"]
+    image: temporalio/temporal:1.5.1
+    command: ["server", "start-dev", "--ip", "0.0.0.0"]
+    ports: ["127.0.0.1:7233:7233", "127.0.0.1:8233:8233"]
+
+  worker:
+    profiles: ["full"]
+    image: arvino/orchestrator:dev
+    command: ["arvino", "worker"]
+    depends_on: [orchestrator, temporal]
+    environment:
+      ARVINO_DATABASE_URL: postgresql+psycopg://arvino:${ARVINO_POSTGRES_PASSWORD:?}@postgres:5432/arvino
+      ARVINO_OPA_URL: http://opa:8181
+      ARVINO_ADAPTERS: ${ARVINO_ADAPTERS:-sandbox}
+      ARVINO_TEMPORAL_ADDRESS: temporal:7233
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: ["ALL"]
+
+volumes:
+  pgdata:
