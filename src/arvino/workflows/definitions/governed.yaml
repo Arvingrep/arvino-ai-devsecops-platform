@@ -1,0 +1,29 @@
+# Governed: Research -> product -> ADR/architecture -> owner approval -> implementation
+#   -> QA/security/IaC review -> staging -> owner approval -> production -> post-deploy verification.
+profile: governed
+description: Architecture-affecting, infra, migration or spending changes. Two owner approvals; staging precedes production.
+steps:
+  - {key: research, title: Research options and constraints, kind: agent, role: researcher}
+  - {key: spec, title: Product requirements, kind: agent, role: product, depends_on: [research]}
+  - {key: adr, title: ADR and architecture, kind: agent, role: architect, depends_on: [spec]}
+  - {key: architecture_approval, title: Owner approves architecture/ADR, kind: approval, approval_kind: architecture, depends_on: [adr]}
+  - {key: implementation, title: Implementation, kind: agent, role: developer, depends_on: [architecture_approval]}
+  - {key: pull_request, title: Open pull request, kind: agent, role: developer, depends_on: [implementation]}
+  - key: ci
+    title: Required CI checks
+    kind: ci
+    depends_on: [pull_request]
+    required_checks: [unit-tests, lint, secret-scan, trivy, conftest]
+  - {key: qa, title: QA verification, kind: agent, role: qa, depends_on: [ci]}
+  - {key: security, title: Security review, kind: agent, role: security, depends_on: [ci]}
+  - {key: iac_review, title: IaC review, kind: agent, role: iac_review, depends_on: [ci]}
+  - {key: review, title: Code review, kind: agent, role: reviewer, depends_on: [qa, security, iac_review]}
+  - key: merge_gate
+    title: Policy gate (protected paths + required checks)
+    kind: gate
+    depends_on: [review]
+    required_checks: [unit-tests, lint, secret-scan, trivy, conftest]
+  - {key: staging, title: Deploy staging, kind: deploy, environment: staging, depends_on: [merge_gate]}
+  - {key: production_approval, title: Owner approves production deploy, kind: approval, approval_kind: production-deploy, depends_on: [staging]}
+  - {key: production, title: Deploy production via GitOps, kind: deploy, environment: production, depends_on: [production_approval]}
+  - {key: post_deploy_verification, title: Post-deploy verification, kind: agent, role: sre, depends_on: [production]}

@@ -1,0 +1,21 @@
+# Fast: Issue -> triage -> developer -> tests -> PR -> CI -> preview.
+# No approval steps: any change touching restricted/protected paths is DENIED by
+# the merge_gate and must be re-run as standard/governed.
+profile: fast
+description: Small, low-risk changes. Preview only; never reaches production.
+steps:
+  - {key: triage, title: Triage issue, kind: agent, role: triage}
+  - {key: develop, title: Implement change in isolated worktree, kind: agent, role: developer, depends_on: [triage]}
+  - {key: tests, title: Run tests in sandbox, kind: agent, role: developer, depends_on: [develop]}
+  - {key: pull_request, title: Open pull request, kind: agent, role: developer, depends_on: [tests]}
+  - key: ci
+    title: Required CI checks
+    kind: ci
+    depends_on: [pull_request]
+    required_checks: [unit-tests, lint, secret-scan]
+  - key: merge_gate
+    title: Policy gate (protected paths + required checks)
+    kind: gate
+    depends_on: [ci]
+    required_checks: [unit-tests, lint, secret-scan]
+  - {key: preview, title: Deploy preview, kind: deploy, environment: preview, depends_on: [merge_gate]}

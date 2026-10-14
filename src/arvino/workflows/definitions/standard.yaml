@@ -1,0 +1,26 @@
+# Standard: Issue -> product/spec -> architect -> frontend/backend (parallel)
+#   -> QA/security (parallel) -> review -> preview -> approval -> release.
+profile: standard
+description: Typical feature work. Parallel implementation and parallel QA/security; owner approves production release.
+steps:
+  - {key: spec, title: Product spec and acceptance criteria, kind: agent, role: product}
+  - {key: architecture, title: Architecture proposal, kind: agent, role: architect, depends_on: [spec]}
+  - {key: frontend, title: Frontend implementation, kind: agent, role: frontend, depends_on: [architecture]}
+  - {key: backend, title: Backend implementation, kind: agent, role: backend, depends_on: [architecture]}
+  - {key: pull_request, title: Integrate and open pull request, kind: agent, role: developer, depends_on: [frontend, backend]}
+  - key: ci
+    title: Required CI checks
+    kind: ci
+    depends_on: [pull_request]
+    required_checks: [unit-tests, lint, secret-scan, trivy, conftest]
+  - {key: qa, title: QA verification, kind: agent, role: qa, depends_on: [ci]}
+  - {key: security, title: Security review, kind: agent, role: security, depends_on: [ci]}
+  - {key: review, title: Code review, kind: agent, role: reviewer, depends_on: [qa, security]}
+  - key: merge_gate
+    title: Policy gate (protected paths + required checks)
+    kind: gate
+    depends_on: [review]
+    required_checks: [unit-tests, lint, secret-scan, trivy, conftest]
+  - {key: preview, title: Deploy preview, kind: deploy, environment: preview, depends_on: [merge_gate]}
+  - {key: release_approval, title: Owner approves production release, kind: approval, approval_kind: production-deploy, depends_on: [preview]}
+  - {key: release, title: Release to production via GitOps, kind: deploy, environment: production, depends_on: [release_approval]}
