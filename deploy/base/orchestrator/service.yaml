@@ -3,6 +3,10 @@ kind: Service
 metadata:
   name: arvino-orchestrator
   labels: {app.kubernetes.io/name: arvino-orchestrator}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/path: "/metrics"
+    prometheus.io/port: "80"
 spec:
   selector: {app.kubernetes.io/name: arvino-orchestrator, app.kubernetes.io/component: api}
   ports: [{name: http, port: 80, targetPort: http}]

@@ -1,0 +1,15 @@
+{
+  "sha": "cccccccccccccccccccccccccccccccccccccccc",
+  "state": "success",
+  "context": "unit-tests",
+  "description": "All 142 tests passed",
+  "target_url": "https://ci.k8shome.com/jobs/unit-tests/142",
+  "repository": {
+    "id": 200,
+    "full_name": "acme/app",
+    "name": "app",
+    "owner": {
+      "login": "acme"
+    }
+  }
+}

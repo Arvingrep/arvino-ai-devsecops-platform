@@ -1,0 +1,24 @@
+{
+  "action": "completed",
+  "check_run": {
+    "id": 5001,
+    "name": "unit-tests",
+    "head_sha": "cccccccccccccccccccccccccccccccccccccccc",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/acme/app/runs/5001",
+    "started_at": "2026-10-15T11:01:00Z",
+    "completed_at": "2026-10-15T11:03:00Z"
+  },
+  "repository": {
+    "id": 300,
+    "full_name": "acme/app",
+    "name": "app",
+    "owner": {
+      "login": "acme"
+    }
+  },
+  "sender": {
+    "login": "github-actions[bot]"
+  }
+}

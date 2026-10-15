@@ -1,0 +1,22 @@
+{
+  "repo": "acme/app",
+  "sha": "cccccccccccccccccccccccccccccccccccccccc",
+  "branch": "arvino/run-aaaaaaaaaaaa/pull_request",
+  "checks": [
+    {
+      "name": "unit-tests",
+      "conclusion": "success",
+      "url": "https://ci.k8shome.com/jobs/unit-tests/142"
+    },
+    {
+      "name": "lint",
+      "conclusion": "failure",
+      "url": "https://ci.k8shome.com/jobs/lint/143"
+    },
+    {
+      "name": "secret-scan",
+      "conclusion": "success",
+      "url": "https://ci.k8shome.com/jobs/secret-scan/144"
+    }
+  ]
+}

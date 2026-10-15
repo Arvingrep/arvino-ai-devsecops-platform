@@ -96,6 +96,9 @@ class CompletionResult(StrEnum):
 class EngineSettings:
     agent_accounts: frozenset[str] = field(default_factory=frozenset)
     max_advance_rounds: int = 50
+    # When set, a spending approval is required once a run's cumulative API cost
+    # exceeds this threshold. None means unlimited.
+    budget_usd: float | None = None
 
 
 def _failed(error: str, *, retryable: bool = False, **output: Any) -> StepOutcome:
@@ -258,6 +261,39 @@ class Engine:
             if row is None:
                 raise NotFoundError(f"issue {issue_id} not found")
             return IssueView.model_validate(row)
+
+    def list_issues(self, project_id: str) -> list[IssueView]:
+        with transaction(self._sf) as s:
+            rows = s.scalars(select(IssueRow).where(IssueRow.project_id == project_id))
+            return [IssueView.model_validate(r) for r in rows]
+
+    def record_suggestion(
+        self,
+        project_id: str,
+        title: str,
+        body: str = "",
+        phase: int | None = None,
+        requested_by: str = "user",
+    ) -> IssueView:
+        """Record a user suggestion as a backlog issue (does not start a run).
+
+        Phase labels: backlog:phase-1, backlog:phase-2, etc.
+        If no phase is given, label is just 'backlog'.
+        """
+        labels = ["backlog"]
+        if phase is not None:
+            labels.append(f"backlog:phase-{phase}")
+        issue, _ = self.upsert_issue(
+            project_id,
+            source="suggestion",
+            external_id=f"suggestion-{uuid.uuid4().hex[:12]}",
+            title=title,
+            body=body,
+            labels=labels,
+            kind="suggestion",
+            state="backlog",
+        )
+        return issue
 
     # ------------------------------------------------------------------ runs
 
@@ -921,6 +957,24 @@ class Engine:
                 st.last_error = None
                 if verified_pr is not None:
                     run.pr_number, run.head_sha = verified_pr.number, verified_pr.head_sha
+                # Accumulate cost from agent steps.
+                if st.kind == StepKind.AGENT.value:
+                    raw_cost = outcome.output.get("cost_usd")
+                    if isinstance(raw_cost, (int, float)) and raw_cost >= 0:
+                        step_cost = float(raw_cost)
+                        st.cost_usd = step_cost
+                        run.cost_usd_total = (run.cost_usd_total or 0.0) + step_cost
+                        self._event(
+                            s,
+                            run_id,
+                            "step.cost_recorded",
+                            source,
+                            step=key,
+                            cost_usd=step_cost,
+                            run_cost_usd_total=run.cost_usd_total,
+                        )
+                        # Inject spending approval if budget exceeded and not already requested.
+                        self._maybe_inject_spending_approval(s, run, now)
                 self._event(
                     s, run_id, "step.succeeded", source, step=key, attempt=attempt, step_actor=actor
                 )
@@ -1054,6 +1108,98 @@ class Engine:
 
     def _run_status(self, run_id: str) -> RunStatus:
         return RunStatus(self.get_run(run_id).status)
+
+    def _maybe_inject_spending_approval(self, s: Session, run: RunRow, now: datetime) -> None:
+        """If the run's cumulative cost exceeds the configured budget and no spending
+        approval has been requested yet, mark every still-pending agent step as blocked
+        by inserting a synthetic spending-approval step ahead of them.
+
+        Implementation: we add a new StepRow with kind=APPROVAL and approval_kind=SPENDING
+        at the position just before the first pending agent step.  Because the engine
+        is level-triggered, the approval will be opened by the next call to
+        ``_advance_once`` without any special wiring.
+        """
+        budget = self.settings.budget_usd
+        if budget is None:
+            return
+        total = run.cost_usd_total or 0.0
+        if total <= budget:
+            return
+
+        # Check whether a spending approval already exists (pending OR decided) for this run.
+        existing = s.scalar(
+            select(ApprovalRow).where(
+                ApprovalRow.run_id == run.id,
+                ApprovalRow.kind == ApprovalKind.SPENDING.value,
+            )
+        )
+        if existing is not None:
+            return  # already raised once; don't keep inserting
+
+        # Find the first pending agent step and insert a spending-approval step before it
+        # (or after the last non-pending step if there is no pending agent step to guard).
+        pending_agent_steps = [
+            st
+            for st in run.steps
+            if st.kind == StepKind.AGENT.value and st.status == StepStatus.PENDING.value
+        ]
+        if not pending_agent_steps:
+            return  # nothing pending to block; no point inserting
+
+        # Choose the insertion position: just before the earliest pending agent step.
+        insert_before_position = min(st.position for st in pending_agent_steps)
+
+        # Shift all steps from that position onward to make room.
+        for st in run.steps:
+            if st.position >= insert_before_position:
+                st.position += 1
+
+        # Build the dependency list: the spending approval must depend on all steps
+        # that the earliest pending agent step depends on (inherit its deps).
+        first_pending = min(pending_agent_steps, key=lambda st: st.position)
+
+        # The pending agent steps should also depend on this new approval.
+        spending_key = "spending_approval"
+        # Ensure uniqueness across retries / re-runs by appending a counter if the
+        # key is somehow already taken.
+        existing_keys = {st.key for st in run.steps}
+        if spending_key in existing_keys:
+            return  # already inserted (concurrent advance race)
+
+        s.add(
+            StepRow(
+                run_id=run.id,
+                key=spending_key,
+                position=insert_before_position,
+                title="Spending approval: run cost budget exceeded",
+                kind=StepKind.APPROVAL.value,
+                role=None,
+                depends_on=list(first_pending.depends_on),
+                environment=None,
+                approval_kind=ApprovalKind.SPENDING.value,
+                required_checks=[],
+                status=StepStatus.PENDING.value,
+                max_attempts=1,
+                timeout_seconds=86400,  # 24 h to decide
+                backoff_seconds=0,
+            )
+        )
+
+        # All pending agent/ci/deploy steps at or after the insertion point must
+        # depend on the spending approval so they don't start before it is decided.
+        for st in run.steps:
+            if st.position > insert_before_position and st.status == StepStatus.PENDING.value:
+                if spending_key not in st.depends_on:
+                    st.depends_on = list(st.depends_on) + [spending_key]
+
+        self._event(
+            s,
+            run.id,
+            "run.budget_exceeded",
+            "system:engine",
+            budget_usd=budget,
+            run_cost_usd_total=total,
+        )
 
     def _after_change(self, run_id: str, before: RunStatus) -> None:
         """Best-effort write-back to the issue tracker and poke of the durable driver."""

@@ -27,7 +27,7 @@ step "ruff lint"            ruff check src tests
 step "ruff format"          ruff format --check src tests
 step "mypy --strict"        mypy
 step "yamllint"             yamllint -s .
-step "workflow definitions" arvino validate-workflows
+step "workflow definitions" arvino validate-workflows --all
 step "pytest"               pytest -q --cov=arvino --cov-report=term:skip-covered --cov-fail-under=85
 step "opa check --strict"   opa check --strict policy
 step "opa fmt"              bash -c 'test -z "$(opa fmt -l policy)"'

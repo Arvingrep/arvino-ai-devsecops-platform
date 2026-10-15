@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -75,6 +75,16 @@ class Settings(BaseSettings):
     temporal_address: str | None = None
     temporal_namespace: str = "default"
     temporal_task_queue: str = "arvino-runs"
+
+    # Cost/budget control: when set, a run accumulating more than this amount in
+    # Claude API costs will pause and require a spending-change approval before
+    # any further agent steps are dispatched.  None = no limit enforced.
+    run_cost_budget_usd: float | None = None
+
+    # Telegram notification adapter. When both are set, status updates and
+    # approval pokes are sent to the configured Telegram chat.
+    tg_bot_token: str | None = Field(default=None, validation_alias="ARVINO_TG_BOT_TOKEN")
+    tg_chat_id: str | None = Field(default=None, validation_alias="ARVINO_TG_CHAT_ID")
 
 
 def secret(value: SecretStr | None) -> str | None:

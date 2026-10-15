@@ -1,0 +1,7 @@
+{
+  "app": "acme-preview",
+  "revision": "cccccccccccccccccccccccccccccccccccccccc",
+  "health": "Healthy",
+  "sync_status": "Synced",
+  "operation_phase": "Succeeded"
+}

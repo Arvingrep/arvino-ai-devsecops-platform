@@ -1,0 +1,11 @@
+{
+  "id": 4242,
+  "rule_id": 7,
+  "rule_name": "HighErrorRate",
+  "severity": 1,
+  "is_recovered": false,
+  "target_ident": "web-server-1",
+  "trigger_time": 1760000000,
+  "tags": ["project=acme", "env=production", "service=api-gateway"],
+  "rule_note": "5xx error ratio above 5% for 5 minutes on api-gateway service"
+}

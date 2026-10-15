@@ -228,6 +228,35 @@ def parse_definition(raw: dict[str, Any]) -> WorkflowDef:
         raise InvalidWorkflowError(str(exc)) from exc
 
 
+def validate_file(path: Path) -> WorkflowDef:
+    """Validate a single workflow definition YAML file.
+
+    Returns the parsed and validated definition. Raises :class:`InvalidWorkflowError`
+    on any structural, DAG, or safety-lint failure.
+    """
+    try:
+        raw = yaml.safe_load(path.read_text())
+    except yaml.YAMLError as exc:
+        raise InvalidWorkflowError(f"{path.name}: invalid YAML: {exc}") from exc
+    if not isinstance(raw, dict):
+        raise InvalidWorkflowError(f"{path.name}: must be a YAML mapping, got {type(raw).__name__}")
+    return parse_definition(raw)
+
+
+def validate_directory(directory: Path) -> dict[str, WorkflowDef]:
+    """Validate every ``*.yaml`` file in *directory* independently.
+
+    Returns a mapping of filename → validated definition. Each file is validated
+    on its own — unlike :func:`load_registry`, this does *not* require every
+    :class:`Profile` to be present, so it is suitable for user-submitted custom
+    workflow definitions.
+    """
+    results: dict[str, WorkflowDef] = {}
+    for p in sorted(directory.glob("*.yaml")):
+        results[p.name] = validate_file(p)
+    return results
+
+
 def load_registry(directory: Path | None = None) -> WorkflowRegistry:
     defs: dict[Profile, WorkflowDef] = {}
     if directory is None:

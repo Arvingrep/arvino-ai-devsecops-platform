@@ -1,0 +1,7 @@
+{
+  "app": "acme-production",
+  "revision": "dddddddddddddddddddddddddddddddddddddddd",
+  "health": "Healthy",
+  "sync_status": "Synced",
+  "operation_phase": "Succeeded"
+}

@@ -1,0 +1,21 @@
+{
+  "action": "created",
+  "check_run": {
+    "id": 5002,
+    "name": "lint",
+    "head_sha": "cccccccccccccccccccccccccccccccccccccccc",
+    "status": "queued",
+    "conclusion": null,
+    "html_url": "https://github.com/acme/app/runs/5002",
+    "started_at": null,
+    "completed_at": null
+  },
+  "repository": {
+    "id": 300,
+    "full_name": "acme/app",
+    "name": "app"
+  },
+  "sender": {
+    "login": "github-actions[bot]"
+  }
+}

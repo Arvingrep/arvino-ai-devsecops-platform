@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -15,6 +16,16 @@ from arvino.webhooks.events import (
     PullRequestUpdated,
 )
 from tests import payloads as P
+
+FIXTURES = Path(__file__).parent / "fixtures" / "webhooks"
+
+
+def _load(name: str) -> bytes:
+    return (FIXTURES / name).read_bytes()
+
+
+def _raw(d: dict) -> bytes:
+    return json.dumps(d, separators=(",", ":")).encode()
 
 
 def test_hmac_accepts_valid_and_rejects_everything_else() -> None:
@@ -150,3 +161,135 @@ def test_nightingale_contract() -> None:
     bad["severity"] = 9
     with pytest.raises(parsers.PayloadError):
         parsers.parse_nightingale(json.dumps(bad).encode())
+
+
+# ---------------------------------------------------------------------------
+# Fixture-based tests: each real fixture is parsed and verified.
+# ---------------------------------------------------------------------------
+
+
+def test_fixture_plane_issue_created() -> None:
+    [ev] = parsers.parse_plane(_load("plane_issue_created.json"))
+    assert isinstance(ev, IssueUpserted)
+    assert ev.external_id == "22222222-bbbb-cccc-dddd-eeeeeeeeeeee"
+    assert ev.plane_project_id == "proj-staging-deployments"
+    assert "arvino:fast" in ev.labels
+    assert ev.state_group == "unstarted"
+    assert "Deploy authentication service" in ev.title
+
+
+def test_fixture_plane_issue_updated() -> None:
+    [ev] = parsers.parse_plane(_load("plane_issue_updated.json"))
+    assert isinstance(ev, IssueUpserted)
+    assert ev.external_id == "33333333-cccc-dddd-eeee-ffffffffffff"
+    assert "arvino:standard" in ev.labels
+    assert ev.state_group == "started"
+
+
+def test_fixture_plane_cycle_ignored() -> None:
+    assert parsers.parse_plane(_load("plane_cycle_created.json")) == []
+
+
+def test_fixture_gitea_pr_opened() -> None:
+    [ev] = parsers.parse_git("gitea", "pull_request", _load("gitea_pr_opened.json"))
+    assert isinstance(ev, PullRequestUpdated)
+    assert ev.source == "gitea"
+    assert ev.repo == "acme/app"
+    assert ev.number == 42
+    assert ev.action == "opened"
+    assert ev.merged is False
+    assert ev.head_ref == "arvino/run-aaaaaaaaaaaa/pull_request"
+    assert ev.head_sha == "cccccccccccccccccccccccccccccccccccccccc"
+
+
+def test_fixture_gitea_pr_merged() -> None:
+    [ev] = parsers.parse_git("gitea", "pull_request", _load("gitea_pr_merged.json"))
+    assert isinstance(ev, PullRequestUpdated)
+    assert ev.merged is True
+    assert ev.merged_by == "owner"
+    assert ev.merge_sha == "dddddddddddddddddddddddddddddddddddddddd"
+    assert ev.action == "closed"
+
+
+def test_fixture_gitea_status_success() -> None:
+    [ev] = parsers.parse_git("gitea", "status", _load("gitea_status_success.json"))
+    assert isinstance(ev, CheckCompleted)
+    assert ev.conclusion == "success"
+    assert ev.name == "unit-tests"
+    assert ev.sha == "cccccccccccccccccccccccccccccccccccccccc"
+
+
+def test_fixture_gitea_status_failure() -> None:
+    [ev] = parsers.parse_git("gitea", "status", _load("gitea_status_failure.json"))
+    assert isinstance(ev, CheckCompleted)
+    assert ev.conclusion == "failure"
+    assert ev.name == "lint"
+
+
+def test_fixture_github_check_run_success() -> None:
+    [ev] = parsers.parse_git("github", "check_run", _load("github_check_run_success.json"))
+    assert isinstance(ev, CheckCompleted)
+    assert ev.conclusion == "success"
+    assert ev.name == "unit-tests"
+
+
+def test_fixture_github_check_run_pending() -> None:
+    [ev] = parsers.parse_git("github", "check_run", _load("github_check_run_pending.json"))
+    assert isinstance(ev, CheckCompleted)
+    assert ev.conclusion == "pending"
+    assert ev.name == "lint"
+
+
+def test_fixture_ci_completion_mixed() -> None:
+    evs = parsers.parse_ci(_load("ci_completion_mixed.json"))
+    checks = {e.name: e.conclusion for e in evs if isinstance(e, CheckCompleted)}
+    assert checks == {"unit-tests": "success", "lint": "failure", "secret-scan": "success"}
+    assert len(evs) == 3
+
+
+def test_fixture_ci_completion_all_success() -> None:
+    evs = parsers.parse_ci(_load("ci_completion_all_success.json"))
+    for e in evs:
+        assert isinstance(e, CheckCompleted) and e.conclusion == "success"
+    assert len(evs) == 5
+
+
+def test_fixture_argocd_status_healthy() -> None:
+    [ev] = parsers.parse_argocd(_load("argocd_status_healthy.json"))
+    assert isinstance(ev, DeploymentStatus)
+    assert ev.app == "acme-preview"
+    assert ev.health == "Healthy"
+    assert ev.sync_status == "Synced"
+
+
+def test_fixture_argocd_status_production() -> None:
+    [ev] = parsers.parse_argocd(_load("argocd_status_production.json"))
+    assert isinstance(ev, DeploymentStatus)
+    assert ev.app == "acme-production"
+    assert ev.health == "Healthy"
+
+
+def test_fixture_argocd_status_degraded() -> None:
+    [ev] = parsers.parse_argocd(_load("argocd_status_degraded.json"))
+    assert isinstance(ev, DeploymentStatus)
+    assert ev.health == "Degraded"
+    assert ev.sync_status == "OutOfSync"
+
+
+def test_fixture_nightingale_alert_critical() -> None:
+    [ev] = parsers.parse_nightingale(_load("nightingale_alert_critical.json"))
+    assert isinstance(ev, AlertReceived)
+    assert ev.alert_id == "4242"
+    assert ev.project_key == "acme"
+    assert ev.severity == 1
+    assert ev.recovered is False
+    assert ev.rule_name == "HighErrorRate"
+
+
+def test_fixture_nightingale_alert_recovered() -> None:
+    [ev] = parsers.parse_nightingale(_load("nightingale_alert_recovered.json"))
+    assert isinstance(ev, AlertReceived)
+    assert ev.alert_id == "5001"
+    assert ev.severity == 2
+    assert ev.recovered is True
+    assert ev.rule_name == "HighMemoryUsage"

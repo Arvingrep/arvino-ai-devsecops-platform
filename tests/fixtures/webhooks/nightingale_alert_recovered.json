@@ -1,0 +1,11 @@
+{
+  "id": 5001,
+  "rule_id": 12,
+  "rule_name": "HighMemoryUsage",
+  "severity": 2,
+  "is_recovered": true,
+  "target_ident": "db-primary-1",
+  "trigger_time": 1760000100,
+  "tags": ["project=acme", "env=production", "service=postgres"],
+  "rule_note": "Memory usage above 90% for 10 minutes, now recovered"
+}
