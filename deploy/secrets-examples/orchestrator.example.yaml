@@ -6,4 +6,24 @@ metadata:
   name: arvino-orchestrator-secrets
 type: Opaque
 stringData:
-  ARVINO_DATABASE_URL ARVINO_OWNER_TOKEN ARVINO_AGENT_TOKEN ARVINO_AUTOMATION_TOKEN ARVINO_PLANE_WEBHOOK_SECRET ARVINO_GITEA_WEBHOOK_SECRET ARVINO_GITHUB_WEBHOOK_SECRET ARVINO_CI_WEBHOOK_TOKEN ARVINO_ARGOCD_WEBHOOK_TOKEN ARVINO_NIGHTINGALE_WEBHOOK_TOKEN: REPLACE_ME
+  # Database
+  ARVINO_DATABASE_URL: REPLACE_ME_postgres://arvino:PASSWORD@postgres:5432/arvino
+
+  # Static bearer tokens (kept for backward-compat; remove once all callers use OIDC).
+  ARVINO_OWNER_TOKEN: REPLACE_ME_long_random_secret
+  ARVINO_AGENT_TOKEN: REPLACE_ME_long_random_secret
+  ARVINO_AUTOMATION_TOKEN: REPLACE_ME_long_random_secret
+
+  # Webhook HMAC / shared secrets
+  ARVINO_PLANE_WEBHOOK_SECRET: REPLACE_ME_plane_hmac_secret
+  ARVINO_GITEA_WEBHOOK_SECRET: REPLACE_ME_gitea_hmac_secret
+  ARVINO_GITHUB_WEBHOOK_SECRET: REPLACE_ME_github_hmac_secret
+  ARVINO_CI_WEBHOOK_TOKEN: REPLACE_ME_ci_token
+  ARVINO_ARGOCD_WEBHOOK_TOKEN: REPLACE_ME_argocd_token
+  ARVINO_NIGHTINGALE_WEBHOOK_TOKEN: REPLACE_ME_nightingale_token
+
+  # OIDC / Authentik (ADR-0008). Optional — leave empty to disable OIDC.
+  # ARVINO_OIDC_ISSUER: https://auth.k8shome.com/application/o/arvino/
+  # ARVINO_OIDC_AUDIENCE: arvino-api
+  # ARVINO_OIDC_JWKS_URL: (optional; auto-derived as {issuer}jwks/ when absent)
+  # ARVINO_OIDC_ROLE_CLAIM: arvino_role

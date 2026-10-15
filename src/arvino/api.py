@@ -12,9 +12,12 @@ from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from typing import Annotated, Any, Literal
 
+import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse
+from jose import ExpiredSignatureError, JWTError, jwt
+from jose.exceptions import JWKError
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
@@ -89,6 +92,31 @@ class DecisionIn(BaseModel):
     reason: str | None = Field(default=None, max_length=1000)
 
 
+class JwksCache:
+    """Fetch and cache JWKS keys; refresh on unknown ``kid``."""
+
+    def __init__(self, jwks_url: str, _seed_keys: list[dict[str, Any]] | None = None) -> None:
+        self._url = jwks_url
+        self._keys: list[dict[str, Any]] = list(_seed_keys) if _seed_keys else []
+        self._lock = threading.Lock()
+
+    def _fetch(self) -> None:
+        resp = httpx.get(self._url, timeout=10)
+        resp.raise_for_status()
+        self._keys = resp.json()["keys"]
+
+    def keys(self, kid: str | None = None) -> list[dict[str, Any]]:
+        """Return all keys, refreshing once if ``kid`` is not found."""
+        if not self._keys:
+            with self._lock:
+                if not self._keys:
+                    self._fetch()
+        if kid and not any(k.get("kid") == kid for k in self._keys):
+            with self._lock:
+                self._fetch()
+        return self._keys
+
+
 class Authenticator:
     def __init__(self, settings: Settings) -> None:
         self._creds: list[tuple[str, Principal]] = []
@@ -108,10 +136,85 @@ class Authenticator:
                 )
             )
 
+        # OIDC / JWT path
+        self._oidc_issuer = settings.oidc_issuer
+        self._oidc_audience = settings.oidc_audience
+        self._oidc_role_claim = settings.oidc_role_claim
+        self._jwks: JwksCache | None = None
+        if settings.oidc_issuer:
+            jwks_url = settings.oidc_jwks_url or settings.oidc_issuer.rstrip("/") + "/jwks/"
+            self._jwks = JwksCache(jwks_url)
+
+    # ---------------------------------------------------------------------- helpers
+
+    @staticmethod
+    def _looks_like_jwt(value: str) -> bool:
+        parts = value.split(".")
+        return len(parts) == 3 and all(parts)
+
+    def _principal_from_jwt(self, token: str) -> Principal:
+        """Validate a JWT and return the principal it represents."""
+        if self._jwks is None:
+            raise HTTPException(401, "OIDC not configured", headers={"WWW-Authenticate": "Bearer"})
+
+        try:
+            # Peek at the header to extract kid for targeted key lookup.
+            unverified_header = jwt.get_unverified_header(token)
+        except JWTError as exc:
+            raise HTTPException(
+                401, "malformed JWT", headers={"WWW-Authenticate": "Bearer"}
+            ) from exc
+
+        keys = self._jwks.keys(kid=unverified_header.get("kid"))
+
+        options: dict[str, Any] = {}
+        if not self._oidc_audience:
+            options["verify_aud"] = False
+
+        try:
+            claims = jwt.decode(
+                token,
+                keys,  # type: ignore[arg-type]  # python-jose accepts JWKS key list at runtime
+                algorithms=["RS256", "RS384", "RS512", "ES256", "ES384", "ES512"],
+                audience=self._oidc_audience,
+                issuer=self._oidc_issuer,
+                options=options,
+            )
+        except ExpiredSignatureError as exc:
+            raise HTTPException(
+                401, "token expired", headers={"WWW-Authenticate": "Bearer"}
+            ) from exc
+        except (JWTError, JWKError) as exc:
+            raise HTTPException(
+                401, "invalid JWT", headers={"WWW-Authenticate": "Bearer"}
+            ) from exc
+
+        role: str = claims.get(self._oidc_role_claim, "")
+        subject: str = claims.get("sub", "oidc:unknown")
+
+        if role == "owner":
+            return Principal(id=subject, kind=PrincipalKind.HUMAN, roles=("owner",))
+        if role == "agent":
+            return Principal(id=subject, kind=PrincipalKind.AGENT)
+        if role == "system":
+            return Principal(id=subject, kind=PrincipalKind.SYSTEM, roles=("orchestrator",))
+
+        raise HTTPException(
+            401,
+            f"JWT claim '{self._oidc_role_claim}' value '{role}' is not a recognised role",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
     def authenticate(self, header: str | None) -> Principal:
         if not header or not header.lower().startswith("bearer "):
             raise HTTPException(401, "missing bearer token", headers={"WWW-Authenticate": "Bearer"})
-        presented = hashlib.sha256(header[7:].strip().encode()).digest()
+        raw = header[7:].strip()
+
+        if self._looks_like_jwt(raw):
+            return self._principal_from_jwt(raw)
+
+        # Static-token path: constant-time compare against all configured tokens.
+        presented = hashlib.sha256(raw.encode()).digest()
         found: Principal | None = None
         for token, principal in self._creds:  # no early exit: constant work per request
             if hmac.compare_digest(hashlib.sha256(token.encode()).digest(), presented):

@@ -8,6 +8,7 @@
 | [0004](0004-policy-as-code-and-gates.md) | OPA policy-as-code, fail-closed gates, defence in depth | Accepted |
 | [0005](0005-webhook-contracts.md) | Webhook adapters normalise to typed inbound events | Accepted |
 | [0006](0006-gitops-deployment-and-secrets.md) | Kustomize GitOps layout; placeholder-only secrets | Accepted |
+| [0008](0008-oidc-authentication.md) | Replace static Bearer tokens with OIDC (Authentik) | Accepted |
 
 Format: context, decision, consequences, status. Superseding an ADR requires a new
 ADR; do not edit accepted decisions in place except to fix typos.

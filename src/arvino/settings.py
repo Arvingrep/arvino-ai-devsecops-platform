@@ -32,6 +32,14 @@ class Settings(BaseSettings):
     agent_token: SecretStr | None = None
     automation_token: SecretStr | None = None
 
+    # OIDC authentication (Authentik or any OIDC-compliant issuer).
+    # When oidc_issuer is set, JWTs are accepted alongside static tokens.
+    # jwks_url defaults to "{oidc_issuer}jwks/" when absent.
+    oidc_issuer: str | None = None
+    oidc_jwks_url: str | None = None
+    oidc_audience: str | None = None
+    oidc_role_claim: str = "arvino_role"
+
     # Webhook credentials. Unset -> that source is rejected.
     plane_webhook_secret: SecretStr | None = None
     gitea_webhook_secret: SecretStr | None = None
