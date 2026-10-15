@@ -52,6 +52,8 @@ class StepView(_View):
     actor: str | None
     output: dict[str, Any]
     last_error: str | None
+    cost_usd: float | None = None
+    position: int = 0
 
 
 class ApprovalView(_View):
@@ -100,6 +102,7 @@ class RunView(_View):
     merge_sha: str | None
     created_at: datetime
     updated_at: datetime
+    cost_usd_total: float = 0.0
     steps: list[StepView] = []
     approvals: list[ApprovalView] = []
     artifacts: list[ArtifactView] = []

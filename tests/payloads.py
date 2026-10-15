@@ -1,11 +1,17 @@
-"""Webhook payload builders. Shapes follow vendor documentation (NOT captured from live systems)."""
+"""Webhook payload builders. Base shapes loaded from real fixtures in tests/fixtures/webhooks/.
+
+Factory functions accept overrides for test parametrisation; defaults match the fixture files.
+"""
 
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from arvino.webhooks.auth import sign
+
+FIXTURES = Path(__file__).parent / "fixtures" / "webhooks"
 
 PLANE_SECRET = "plane-test-secret"
 GITEA_SECRET = "gitea-test-secret"
@@ -15,6 +21,10 @@ ARGO_TOKEN = "argo-test-token"
 N9E_TOKEN = "n9e-test-token"
 OWNER_TOKEN = "owner-test-token"
 AGENT_TOKEN = "agent-test-token"
+
+
+def _load_json(name: str) -> dict[str, Any]:
+    return json.loads((FIXTURES / name).read_bytes())
 
 
 def raw(payload: dict[str, Any]) -> bytes:
@@ -28,21 +38,15 @@ def plane_issue(
     action: str = "created",
     state_group: str = "unstarted",
 ) -> dict[str, Any]:
-    return {
-        "event": "issue",
-        "action": action,
-        "webhook_id": "wh-1",
-        "workspace_id": "ws-1",
-        "data": {
-            "id": issue,
-            "name": "Add widget endpoint",
-            "description_stripped": "As a user I want a widget",
-            "project": project,
-            "state": {"id": "st-1", "name": "Todo", "group": state_group},
-            "labels": [{"id": f"l{i}", "name": n} for i, n in enumerate(labels or [])],
-        },
-        "activity": {"actor": {"id": "u-1", "display_name": "arvin"}},
-    }
+    base = _load_json("plane_issue_created.json")
+    data = base["data"]
+    data["id"] = issue
+    data["project"] = project
+    data["state"]["group"] = state_group
+    if labels is not None:
+        data["labels"] = [{"id": f"l{i}", "name": n} for i, n in enumerate(labels)]
+    base["action"] = action
+    return base
 
 
 def git_pr(
@@ -55,91 +59,85 @@ def git_pr(
     merged_by: str | None = None,
     merge_sha: str | None = None,
 ) -> dict[str, Any]:
-    return {
-        "action": action,
-        "number": number,
-        "pull_request": {
-            "number": number,
-            "head": {"ref": run_branch, "sha": sha},
-            "base": {"ref": "main"},
-            "merged": merged,
-            "merge_commit_sha": merge_sha,
-            "merged_by": {"login": merged_by} if merged_by else None,
-        },
-        "repository": {"full_name": repo},
-        "sender": {"login": "arvino-bot"},
-    }
+    base = _load_json("gitea_pr_opened.json")
+    base["action"] = action
+    base["number"] = number
+    base["repository"]["full_name"] = repo
+    pr = base["pull_request"]
+    pr["number"] = number
+    pr["head"]["ref"] = run_branch
+    pr["head"]["sha"] = sha
+    pr["merged"] = merged
+    if merge_sha:
+        pr["merge_commit_sha"] = merge_sha
+    else:
+        pr["merge_commit_sha"] = None
+    if merged_by:
+        pr["merged_by"] = {"login": merged_by}
+    else:
+        pr["merged_by"] = None
+    return base
 
 
 def git_status(
     sha: str, context: str, state: str = "success", repo: str = "acme/app"
 ) -> dict[str, Any]:
-    return {
-        "sha": sha,
-        "state": state,
-        "context": context,
-        "target_url": f"https://ci.example/{context}/1",
-        "repository": {"full_name": repo},
-    }
+    base = _load_json("gitea_status_success.json")
+    base["sha"] = sha
+    base["context"] = context
+    base["state"] = state
+    base["repository"]["full_name"] = repo
+    return base
 
 
 def github_check_run(
     sha: str, name: str, conclusion: str = "success", repo: str = "acme/app"
 ) -> dict[str, Any]:
-    return {
-        "action": "completed",
-        "check_run": {
-            "name": name,
-            "head_sha": sha,
-            "conclusion": conclusion,
-            "html_url": "https://gh/x",
-        },
-        "repository": {"full_name": repo},
-    }
+    base = _load_json("github_check_run_success.json")
+    base["check_run"]["head_sha"] = sha
+    base["check_run"]["name"] = name
+    base["check_run"]["conclusion"] = conclusion
+    base["repository"]["full_name"] = repo
+    return base
 
 
 def ci_completion(
     sha: str, checks: dict[str, str], repo: str = "acme/app", branch: str | None = None
 ) -> dict[str, Any]:
-    p: dict[str, Any] = {
-        "repo": repo,
-        "sha": sha,
-        "checks": [
-            {"name": n, "conclusion": c, "url": f"https://ci.example/{n}"}
-            for n, c in checks.items()
-        ],
-    }
+    base = _load_json("ci_completion_mixed.json")
+    base["repo"] = repo
+    base["sha"] = sha
+    base["checks"] = [
+        {"name": n, "conclusion": c, "url": f"https://ci.example/{n}"}
+        for n, c in checks.items()
+    ]
     if branch:
-        p["branch"] = branch
-    return p
+        base["branch"] = branch
+    else:
+        base.pop("branch", None)
+    return base
 
 
 def argocd_status(
     app: str, revision: str, health: str = "Healthy", sync: str = "Synced"
 ) -> dict[str, Any]:
-    return {
-        "app": app,
-        "revision": revision,
-        "health": health,
-        "sync_status": sync,
-        "operation_phase": "Succeeded",
-    }
+    base = _load_json("argocd_status_healthy.json")
+    base["app"] = app
+    base["revision"] = revision
+    base["health"] = health
+    base["sync_status"] = sync
+    return base
 
 
 def nightingale_alert(
     alert_id: int = 4242, project: str = "acme", recovered: bool = False, severity: int = 1
 ) -> dict[str, Any]:
-    return {
-        "id": alert_id,
-        "rule_id": 7,
-        "rule_name": "HighErrorRate",
-        "severity": severity,
-        "is_recovered": recovered,
-        "target_ident": "web-1",
-        "trigger_time": 1_760_000_000,
-        "tags": [f"project={project}", "env=production"],
-        "rule_note": "5xx ratio above 5% for 5m",
-    }
+    base = _load_json("nightingale_alert_critical.json")
+    base["id"] = alert_id
+    base["severity"] = severity
+    base["is_recovered"] = recovered
+    base["tags"] = [f"project={project}", "env=production"]
+    return base
 
 
 def hmac_headers(secret: str, body: bytes, header: str, prefix: str = "") -> dict[str, str]:

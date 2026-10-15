@@ -267,9 +267,22 @@ class ClaudeCodeExecutor:
             )
         )
 
+        # Extract cost from the JSON output (Claude Code emits "cost_usd" in --output-format json).
+        cost_usd: float | None = None
+        raw_cost = raw.get("cost_usd")
+        if isinstance(raw_cost, (int, float)) and raw_cost >= 0:
+            cost_usd = float(raw_cost)
+
+        output = dict(raw)
+        if cost_usd is not None:
+            output["cost_usd"] = cost_usd
+        else:
+            # Drop invalid or absent cost values so callers see a clean output.
+            output.pop("cost_usd", None)
+
         return StepOutcome(
             status="succeeded",
-            output=raw,
+            output=output,
             artifacts=artifacts,
             actor=request.actor,
         )

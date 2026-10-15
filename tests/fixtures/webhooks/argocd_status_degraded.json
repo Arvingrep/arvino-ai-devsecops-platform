@@ -1,0 +1,7 @@
+{
+  "app": "acme-preview",
+  "revision": "cccccccccccccccccccccccccccccccccccccccc",
+  "health": "Degraded",
+  "sync_status": "OutOfSync",
+  "operation_phase": "Error"
+}

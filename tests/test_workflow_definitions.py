@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -145,3 +146,99 @@ def test_lint_rejects_governed_implementation_without_architecture_approval() ->
             s["depends_on"] = ["adr"]
     with pytest.raises(InvalidWorkflowError, match="architecture approval"):
         parse_definition(raw)
+
+
+# ---- validate_file / validate_directory (custom user-submitted workflows)
+
+
+def test_validate_file_rejects_deploy_without_gate(tmp_path: Path) -> None:
+    p = tmp_path / "bad.yaml"
+    p.write_text(
+        """\
+profile: fast
+description: deploy without gate
+steps:
+  - {key: a, title: a, kind: agent, role: triage}
+  - {key: b, title: b, kind: deploy, environment: preview, depends_on: [a]}
+"""
+    )
+    with pytest.raises(InvalidWorkflowError, match="gate"):
+        from arvino.workflows.model import validate_file
+
+        validate_file(p)
+
+
+def test_validate_file_rejects_bad_yaml(tmp_path: Path) -> None:
+    p = tmp_path / "bad.yaml"
+    p.write_text(": : :")
+    with pytest.raises(InvalidWorkflowError, match="invalid YAML"):
+        from arvino.workflows.model import validate_file
+
+        validate_file(p)
+
+
+def test_validate_file_rejects_non_mapping(tmp_path: Path) -> None:
+    p = tmp_path / "bad.yaml"
+    p.write_text("- not a mapping")
+    with pytest.raises(InvalidWorkflowError, match="YAML mapping"):
+        from arvino.workflows.model import validate_file
+
+        validate_file(p)
+
+
+def test_validate_file_accepts_valid_workflow(tmp_path: Path) -> None:
+    p = tmp_path / "good.yaml"
+    p.write_text(
+        """\
+profile: fast
+description: valid workflow
+steps:
+  - {key: a, title: a, kind: agent, role: triage}
+"""
+    )
+    from arvino.workflows.model import validate_file
+
+    wf = validate_file(p)
+    assert wf.profile.value == "fast"
+    assert len(wf.steps) == 1
+
+
+def test_validate_directory_skips_non_yaml(tmp_path: Path) -> None:
+    (tmp_path / "readme.md").write_text("not yaml")
+    p = tmp_path / "good.yaml"
+    p.write_text(
+        """\
+profile: fast
+description: valid
+steps:
+  - {key: a, title: a, kind: agent, role: triage}
+"""
+    )
+    from arvino.workflows.model import validate_directory
+
+    results = validate_directory(tmp_path)
+    assert list(results.keys()) == ["good.yaml"]
+    assert results["good.yaml"].profile.value == "fast"
+
+
+def test_validate_directory_rejects_any_invalid(tmp_path: Path) -> None:
+    (tmp_path / "good.yaml").write_text(
+        """\
+profile: fast
+description: valid
+steps:
+  - {key: a, title: a, kind: agent, role: triage}
+"""
+    )
+    (tmp_path / "bad.yaml").write_text(
+        """\
+profile: fast
+description: deploy without gate
+steps:
+  - {key: a, title: a, kind: deploy, environment: preview}
+"""
+    )
+    from arvino.workflows.model import validate_directory
+
+    with pytest.raises(InvalidWorkflowError, match="gate"):
+        validate_directory(tmp_path)

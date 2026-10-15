@@ -49,7 +49,7 @@ jobs:
         run: uv run yamllint -s .
 
       - name: Validate workflow definitions
-        run: uv run arvino validate-workflows
+        run: uv run arvino validate-workflows --all
 
       - name: pytest
         run: uv run pytest -q --tb=short

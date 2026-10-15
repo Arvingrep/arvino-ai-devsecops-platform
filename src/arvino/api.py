@@ -15,14 +15,14 @@ from typing import Annotated, Any, Literal
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from jose import ExpiredSignatureError, JWTError, jwt
 from jose.exceptions import JWKError
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from arvino import __version__
-from arvino.db import transaction
+from arvino.db import SessionFactory, transaction
 from arvino.domain import (
     ApprovalStatus,
     ArtifactSpec,
@@ -32,6 +32,7 @@ from arvino.domain import (
     Profile,
 )
 from arvino.engine import Engine
+from arvino.metrics import MetricsMiddleware, collect as metrics_collect
 from arvino.ports import StepOutcome
 from arvino.settings import Settings, secret
 from arvino.views import (
@@ -75,6 +76,12 @@ class RunIn(BaseModel):
     issue_id: str
     profile: Profile
     idempotency_key: str | None = None
+
+
+class SuggestionIn(BaseModel):
+    title: str
+    body: str = ""
+    phase: int | None = None
 
 
 class CompleteIn(BaseModel):
@@ -250,6 +257,7 @@ def create_app(engine: Engine, settings: Settings) -> FastAPI:
             thread.join(timeout=5)
 
     app = FastAPI(title="Arvino orchestration service", version=__version__, lifespan=lifespan)
+    app.add_middleware(MetricsMiddleware)
 
     @app.exception_handler(OrchestrationError)
     async def _domain_error(_: Request, exc: OrchestrationError) -> JSONResponse:
@@ -290,6 +298,10 @@ def create_app(engine: Engine, settings: Settings) -> FastAPI:
             raise HTTPException(503, "database unavailable") from exc
         return {"status": "ready", "adapters": settings.adapters}
 
+    @app.get("/metrics")
+    def metrics() -> Response:
+        return Response(content=metrics_collect(engine._sf), media_type="text/plain")
+
     # ------------------------------------------------------------------ catalog
 
     @app.get("/workflows", dependencies=[any_auth])
@@ -324,6 +336,12 @@ def create_app(engine: Engine, settings: Settings) -> FastAPI:
     @app.get("/issues/{issue_id}", dependencies=[any_auth])
     def get_issue(issue_id: str) -> IssueView:
         return engine.get_issue(issue_id)
+
+    @app.post("/projects/{project_id}/suggestions", status_code=201, dependencies=[operator])
+    def create_suggestion(project_id: str, body: SuggestionIn) -> IssueView:
+        return engine.record_suggestion(
+            project_id, body.title, body=body.body, phase=body.phase
+        )
 
     # ------------------------------------------------------------------ runs
 

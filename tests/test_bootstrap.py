@@ -143,7 +143,10 @@ def test_build_engine_queue_default() -> None:
     from arvino.adapters.git_provider import GitHubProvider
 
     assert isinstance(engine.ports.git, GitHubProvider)
-    assert isinstance(engine.ports.executor, QueueExecutor)
+    from arvino.adapters.role_router import RoleRouter
+
+    assert isinstance(engine.ports.executor, RoleRouter)
+    assert isinstance(engine.ports.executor.adapters["claude_code"], QueueExecutor)
 
 
 def test_build_engine_queue_claude_code(tmp_path: Path) -> None:
@@ -157,9 +160,12 @@ def test_build_engine_queue_claude_code(tmp_path: Path) -> None:
     engine = build_engine(settings)
     from arvino.adapters.claude_code import ClaudeCodeExecutor
     from arvino.adapters.git_provider import GitHubProvider
+    from arvino.adapters.role_router import RoleRouter
 
-    assert isinstance(engine.ports.executor, ClaudeCodeExecutor)
-    assert engine.ports.executor.model == "opus"
+    assert isinstance(engine.ports.executor, RoleRouter)
+    inner = engine.ports.executor.adapters["claude_code"]
+    assert isinstance(inner, ClaudeCodeExecutor)
+    assert inner.model == "opus"
     assert isinstance(engine.ports.git, GitHubProvider)
 
 
@@ -176,9 +182,11 @@ def test_build_engine_queue_gitea(tmp_path: Path) -> None:
     engine = build_engine(settings)
     from arvino.adapters.claude_code import ClaudeCodeExecutor
     from arvino.adapters.git_provider import GiteaProvider
+    from arvino.adapters.role_router import RoleRouter
 
     assert isinstance(engine.ports.git, GiteaProvider)
-    assert isinstance(engine.ports.executor, ClaudeCodeExecutor)
+    assert isinstance(engine.ports.executor, RoleRouter)
+    assert isinstance(engine.ports.executor.adapters["claude_code"], ClaudeCodeExecutor)
     engine.ports.git.close()
 
 

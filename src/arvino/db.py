@@ -10,6 +10,7 @@ from typing import Any
 from sqlalchemy import (
     JSON,
     DateTime,
+    Float,
     ForeignKey,
     Integer,
     String,
@@ -102,6 +103,8 @@ class RunRow(Base):
     merge_sha: Mapped[str | None] = mapped_column(String(64), nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime)
     updated_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    # Accumulated Claude API cost across all agent steps in this run (USD).
+    cost_usd_total: Mapped[float] = mapped_column(Float, default=0.0, server_default="0")
 
     steps: Mapped[list[StepRow]] = relationship(back_populates="run", order_by="StepRow.position")
 
@@ -132,6 +135,8 @@ class StepRow(Base):
     actor: Mapped[str | None] = mapped_column(String(200), nullable=True)
     output: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Cost reported by the executor (e.g. Claude API) for this step attempt.
+    cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     run: Mapped[RunRow] = relationship(back_populates="steps")
 
@@ -245,7 +250,24 @@ def make_engine(url: str) -> SAEngine:
 
 
 def init_schema(engine: SAEngine) -> None:
-    Base.metadata.create_all(engine)
+    """Apply all pending Alembic migrations (upgrade to head).
+
+    Replaces the old ``Base.metadata.create_all`` call so schema changes are
+    always managed through versioned migrations rather than DDL reflection.
+    """
+    from pathlib import Path
+
+    from alembic import command as alembic_command
+    from alembic.config import Config as AlembicConfig
+
+    # Locate alembic.ini relative to this file: src/arvino/db.py -> project root
+    _root = Path(__file__).resolve().parent.parent.parent
+    alembic_cfg = AlembicConfig(str(_root / "alembic.ini"))
+    # Override the connection to use the engine we already have, not the ini URL.
+    alembic_cfg.attributes["connection"] = engine.connect()
+    with engine.connect() as conn:
+        alembic_cfg.attributes["connection"] = conn
+        alembic_command.upgrade(alembic_cfg, "head")
 
 
 def make_session_factory(engine: SAEngine) -> sessionmaker[Session]:

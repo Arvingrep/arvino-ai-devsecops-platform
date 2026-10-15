@@ -1,0 +1,52 @@
+{
+  "action": "closed",
+  "number": 42,
+  "pull_request": {
+    "id": 1001,
+    "number": 42,
+    "title": "feat: add OIDC authentication middleware",
+    "state": "closed",
+    "draft": false,
+    "merged": true,
+    "mergeable": true,
+    "merged_by": {
+      "id": 5,
+      "login": "owner",
+      "full_name": "Repo Owner"
+    },
+    "merge_commit_sha": "dddddddddddddddddddddddddddddddddddddddd",
+    "head": {
+      "ref": "arvino/run-aaaaaaaaaaaa/pull_request",
+      "sha": "cccccccccccccccccccccccccccccccccccccccc",
+      "repo": {
+        "id": 200,
+        "full_name": "acme/app"
+      }
+    },
+    "base": {
+      "ref": "main",
+      "sha": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "repo": {
+        "id": 200,
+        "full_name": "acme/app"
+      }
+    },
+    "html_url": "https://git.k8shome.com/acme/app/pulls/42",
+    "created_at": "2026-10-15T11:00:00Z",
+    "updated_at": "2026-10-15T12:30:00Z",
+    "closed_at": "2026-10-15T12:30:00Z"
+  },
+  "repository": {
+    "id": 200,
+    "full_name": "acme/app",
+    "name": "app",
+    "owner": {
+      "login": "acme"
+    }
+  },
+  "sender": {
+    "id": 5,
+    "login": "owner",
+    "full_name": "Repo Owner"
+  }
+}

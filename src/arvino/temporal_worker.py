@@ -33,6 +33,9 @@ MAX_IDLE_POLL_SECONDS = 300
 CONTINUE_AS_NEW_AFTER = 200
 TERMINAL = {"succeeded", "failed", "cancelled"}
 
+RECONCILE_WORKFLOW_NAME = "ArvinoReconcileDriver"
+RECONCILE_INTERVAL_SECONDS = 60
+
 
 @dataclass
 class AdvanceResult:
@@ -56,6 +59,11 @@ class Activities:
         if view.next_wakeup_at is not None:
             wake = max(0.0, (view.next_wakeup_at - datetime.now(UTC)).total_seconds())
         return AdvanceResult(status=view.status, wake_in_seconds=wake)
+
+    @activity.defn(name="reconcile_all")
+    def reconcile_all(self) -> list[str]:
+        """Reap timeouts and advance all active runs. Returns list of advanced run IDs."""
+        return self._engine.reconcile()
 
 
 @workflow.defn(name=WORKFLOW_NAME)
@@ -88,6 +96,35 @@ class RunDriver:
                 await workflow.wait_condition(lambda: self._poked, timeout=timedelta(seconds=wait))
         workflow.continue_as_new(run_id)
         return "continued"  # pragma: no cover - continue_as_new raises
+
+
+@workflow.defn(name=RECONCILE_WORKFLOW_NAME)
+class ReconcileDriver:
+    def __init__(self) -> None:
+        self._poked = False
+
+    @workflow.signal
+    def poke(self) -> None:
+        self._poked = True
+
+    @workflow.run
+    async def run(self) -> str:
+        for _ in range(500):
+            self._poked = False
+            await workflow.execute_activity(
+                "reconcile_all",
+                result_type=list,
+                start_to_close_timeout=timedelta(seconds=180),
+                retry_policy=RetryPolicy(
+                    initial_interval=timedelta(seconds=5), maximum_attempts=5
+                ),
+            )
+            with contextlib.suppress(TimeoutError):
+                await workflow.wait_condition(
+                    lambda: self._poked, timeout=timedelta(seconds=RECONCILE_INTERVAL_SECONDS)
+                )
+        workflow.continue_as_new()
+        return "continued"
 
 
 class TemporalNotifier:
@@ -129,6 +166,43 @@ class TemporalNotifier:
         self._submit(self._poke(run_id))
 
 
+class ReconcileNotifier:
+    """Poke the reconcile driver (e.g. when a new issue arrives)."""
+
+    def __init__(self, address: str, namespace: str, task_queue: str) -> None:
+        self._address, self._namespace, self._task_queue = address, namespace, task_queue
+        self._client: Client | None = None
+        self._loop = asyncio.new_event_loop()
+        threading.Thread(
+            target=self._loop.run_forever, name="reconcile-notifier", daemon=True
+        ).start()
+
+    def _submit(self, coro: Coroutine[Any, Any, Any]) -> None:
+        fut = asyncio.run_coroutine_threadsafe(coro, self._loop)
+
+        def _log(f: Future[Any]) -> None:
+            if exc := f.exception():
+                log.warning("reconcile poke failed: %s: %s", type(exc).__name__, exc)
+
+        fut.add_done_callback(_log)
+
+    async def _poke(self) -> None:
+        if self._client is None:
+            self._client = await Client.connect(self._address, namespace=self._namespace)
+        try:
+            await self._client.start_workflow(
+                RECONCILE_WORKFLOW_NAME,
+                id="arvino-reconcile-driver",
+                task_queue=self._task_queue,
+                start_signal="poke",
+            )
+        except WorkflowAlreadyStartedError:
+            await self._client.get_workflow_handle("arvino-reconcile-driver").signal("poke")
+
+    def poke_reconcile(self) -> None:
+        self._submit(self._poke())
+
+
 async def run_worker(engine: Engine, address: str, namespace: str, task_queue: str) -> None:
     client = await Client.connect(address, namespace=namespace)
     acts = Activities(engine)
@@ -136,8 +210,8 @@ async def run_worker(engine: Engine, address: str, namespace: str, task_queue: s
         worker = Worker(
             client,
             task_queue=task_queue,
-            workflows=[RunDriver],
-            activities=[acts.advance_run],
+            workflows=[RunDriver, ReconcileDriver],
+            activities=[acts.advance_run, acts.reconcile_all],
             activity_executor=pool,
         )
         log.info("temporal worker started on %s/%s queue=%s", address, namespace, task_queue)

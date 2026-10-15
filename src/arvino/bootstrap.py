@@ -11,6 +11,7 @@ from arvino.engine import Engine, EngineSettings
 from arvino.fakes import (
     FakeGit,
     QueueExecutor,
+    RecordingNotifier,
     RecordingTracker,
     RecordOnlyPromoter,
     SandboxExecutor,
@@ -128,18 +129,44 @@ def build_engine(settings: Settings, *, init_db: bool = True) -> Engine:
         # Production mode: wire real adapters.
         git = build_git_provider(settings)
         executor = build_executor(settings)
-    ports = Ports(
-        executor=executor,
-        tracker=RecordingTracker(),
-        git=git,
-        promoter=RecordOnlyPromoter(),
-        policy=policy,
-        notifier=build_notifier(settings),
-    )
+        from arvino.adapters.role_router import RoleRouter
+
+        executor = RoleRouter({"claude_code": executor})
+    # Build the underlying notifier (Temporal or no-op) first.
+    base_notifier = build_notifier(settings)
+    # When Telegram is configured, wrap both tracker and notifier through it.
+    tg_token = settings.tg_bot_token
+    tg_chat = settings.tg_chat_id
+    if tg_token and tg_chat:
+        from arvino.adapters.telegram_notifier import TelegramRunNotifier
+
+        log.info("TelegramRunNotifier: token configured, enabling Telegram status updates")
+        tg = TelegramRunNotifier(tg_token, tg_chat, poke_fn=base_notifier.poke)
+        ports = Ports(
+            executor=executor,
+            tracker=tg,
+            git=git,
+            promoter=RecordOnlyPromoter(),
+            policy=policy,
+            notifier=tg,
+        )
+    else:
+        log.debug("TelegramRunNotifier: not configured, using RecordingTracker / base notifier")
+        ports = Ports(
+            executor=executor,
+            tracker=RecordingTracker(),
+            git=git,
+            promoter=RecordOnlyPromoter(),
+            policy=policy,
+            notifier=base_notifier,
+        )
     return Engine(
         make_session_factory(sa),
         load_registry(),
         ports,
         SystemClock(),
-        EngineSettings(agent_accounts=frozenset(settings.agent_accounts)),
+        EngineSettings(
+            agent_accounts=frozenset(settings.agent_accounts),
+            budget_usd=settings.run_cost_budget_usd,
+        ),
     )

@@ -1,0 +1,15 @@
+{
+  "sha": "cccccccccccccccccccccccccccccccccccccccc",
+  "state": "failure",
+  "context": "lint",
+  "description": "ESLint found 3 errors and 12 warnings",
+  "target_url": "https://ci.k8shome.com/jobs/lint/143",
+  "repository": {
+    "id": 200,
+    "full_name": "acme/app",
+    "name": "app",
+    "owner": {
+      "login": "acme"
+    }
+  }
+}

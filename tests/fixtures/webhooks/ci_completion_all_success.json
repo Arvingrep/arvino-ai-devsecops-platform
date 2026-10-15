@@ -1,0 +1,31 @@
+{
+  "repo": "acme/app",
+  "sha": "cccccccccccccccccccccccccccccccccccccccc",
+  "checks": [
+    {
+      "name": "unit-tests",
+      "conclusion": "success",
+      "url": "https://ci.k8shome.com/jobs/unit-tests/142"
+    },
+    {
+      "name": "lint",
+      "conclusion": "success",
+      "url": "https://ci.k8shome.com/jobs/lint/143"
+    },
+    {
+      "name": "secret-scan",
+      "conclusion": "success",
+      "url": "https://ci.k8shome.com/jobs/secret-scan/144"
+    },
+    {
+      "name": "trivy-image",
+      "conclusion": "success",
+      "url": "https://ci.k8shome.com/jobs/trivy/145"
+    },
+    {
+      "name": "conftest",
+      "conclusion": "success",
+      "url": "https://ci.k8shome.com/jobs/conftest/146"
+    }
+  ]
+}

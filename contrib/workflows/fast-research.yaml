@@ -1,0 +1,20 @@
+# Custom profile: fast variant with research step
+profile: fast
+description: Fast path with pre-research — research before triage
+steps:
+  - {key: research, title: Quick research, kind: agent, role: researcher}
+  - {key: triage, title: Triage issue, kind: agent, role: triage, depends_on: [research]}
+  - {key: develop, title: Implement, kind: agent, role: developer, depends_on: [triage]}
+  - {key: tests, title: Run tests, kind: agent, role: developer, depends_on: [develop]}
+  - {key: pull_request, title: Open PR, kind: agent, role: developer, depends_on: [tests]}
+  - key: ci
+    title: CI checks
+    kind: ci
+    depends_on: [pull_request]
+    required_checks: [unit-tests, lint]
+  - key: merge_gate
+    title: Policy gate
+    kind: gate
+    depends_on: [ci]
+    required_checks: [unit-tests, lint]
+  - {key: preview, title: Deploy preview, kind: deploy, environment: preview, depends_on: [merge_gate]}
