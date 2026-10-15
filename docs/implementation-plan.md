@@ -49,8 +49,18 @@ Each item ends with a recorded real-system verification:
 8. Nightingale: alert webhook → n8n → arvino (create issue + trigger SRE workflow).
 9. Trivy: run image/IaC scans in CI, publish results as trusted check artifacts.
 
+## Phase 5 — BMAD artifact integration ✅
+* `BmadArtifactKind` enum in `arvino.domain` (bmad-prd, bmad-architecture, bmad-story, bmad-brief).
+* `arvino.bmad` module: `prd_artifact`, `architecture_artifact`, `story_artifact`, `brief_artifact`,
+  `filter_bmad`, `sha256_of_text`.
+* `Engine._upstream_artifacts` changed to transitive ancestor traversal so BMAD artifacts
+  cross APPROVAL/CI/GATE steps without loss.
+* 20 new tests in `tests/test_bmad_artifacts.py`; all 358 tests pass.
+* ADR 0008 documents naming convention and design rationale.
+
 ## Phase 5 — Hardening (after live) ⬜
-* Alembic migrations; Postgres row-level locking review under multiple replicas.
+* ~~Alembic migrations~~ ✅ alembic initialised; initial migration (rev a4387efe1c44) covers all 10 tables; `init_schema` now runs `alembic upgrade head` instead of `create_all`; upgrade/downgrade verified against SQLite; all 309 tests green.
+* Postgres row-level locking review under multiple replicas.
 * External Secrets / SOPS; NetworkPolicies; mTLS to OPA.
 * OIDC login instead of static bearer tokens; per-project owner mapping.
 * Metrics (Prometheus) + Grafana dashboards, Nightingale rules for the platform itself.

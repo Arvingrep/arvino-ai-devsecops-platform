@@ -573,14 +573,32 @@ class Engine:
         return _failed(f"cannot dispatch step kind {kind}")
 
     def _upstream_artifacts(self, s: Session, run: RunRow, st: StepRow) -> list[ArtifactSpec]:
-        wanted = set(st.depends_on)
+        """Return artifacts from all transitive ancestor steps.
+
+        Direct-dep-only filtering would silently drop BMAD artifacts produced by
+        ``spec``/``adr`` steps whenever a non-agent step (APPROVAL, CI, GATE)
+        sits between them and the consumer.  Passing all ancestor artifacts ensures
+        every step sees the full BMAD context it needs, regardless of how many
+        gating steps are in between.
+        """
+        by_key = {step.key: step for step in run.steps}
+        # Compute transitive ancestor keys (same traversal as WorkflowDef.ancestors)
+        ancestor_keys: set[str] = set()
+        stack = list(st.depends_on)
+        while stack:
+            k = stack.pop()
+            if k not in ancestor_keys:
+                ancestor_keys.add(k)
+                dep_step = by_key.get(k)
+                if dep_step:
+                    stack.extend(dep_step.depends_on)
         rows = s.scalars(
             select(ArtifactRow).where(ArtifactRow.run_id == run.id).order_by(ArtifactRow.id)
         )
         return [
             ArtifactSpec(kind=a.kind, name=a.name, uri=a.uri, sha256=a.sha256, metadata=a.extra)
             for a in rows
-            if a.step_key in wanted
+            if a.step_key in ancestor_keys
         ]
 
     # -- gate

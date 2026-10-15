@@ -125,6 +125,22 @@ class Principal(BaseModel):
 SYSTEM_PRINCIPAL = Principal(id="system:engine", kind=PrincipalKind.SYSTEM, roles=("orchestrator",))
 
 
+class BmadArtifactKind(StrEnum):
+    """Typed artifact kind tokens for BMAD v6.12 planning and implementation outputs.
+
+    Registered in the run ledger when a product or architect step completes so
+    that downstream steps can reference them via ``StepRequest.upstream_artifacts``.
+
+    URI convention: ``git://<repo_full_name>/<git_ref>/<path_in_repo>``
+    (e.g. ``git://Arvingrep/firebird-sea/main/_bmad-output/planning-artifacts/prds/prd.md``).
+    """
+
+    PRD = "bmad-prd"                    # Product Requirements Document
+    ARCHITECTURE = "bmad-architecture"  # Architecture spine / ADR
+    STORY = "bmad-story"                # Individual user story / acceptance criteria
+    BRIEF = "bmad-brief"                # Project brief / discovery document
+
+
 class ArtifactSpec(BaseModel):
     """An immutable pointer to a machine-readable artifact (Git object, report, ...)."""
 
