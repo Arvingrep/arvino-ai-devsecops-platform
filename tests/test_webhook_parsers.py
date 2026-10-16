@@ -12,7 +12,6 @@ from arvino.webhooks.events import (
     AlertReceived,
     CheckCompleted,
     DeploymentStatus,
-    IssueUpserted,
     PullRequestUpdated,
 )
 from tests import payloads as P
@@ -56,25 +55,6 @@ def test_shared_token() -> None:
     for bad in ("tok2", "", None):
         with pytest.raises(auth.WebhookAuthError):
             auth.verify_shared_token("tok", bad)
-
-
-def test_plane_issue_parsed() -> None:
-    [ev] = parsers.parse_plane(P.raw(P.plane_issue(labels=["arvino:fast", "bug"])))
-    assert isinstance(ev, IssueUpserted)
-    assert (ev.external_id, ev.plane_project_id, ev.labels, ev.state_group) == (
-        "11111111-aaaa",
-        "plane-proj-1",
-        ["arvino:fast", "bug"],
-        "unstarted",
-    )
-
-
-def test_plane_other_events_are_ignored_and_garbage_rejected() -> None:
-    assert parsers.parse_plane(P.raw({"event": "cycle", "action": "created", "data": {}})) == []
-    with pytest.raises(parsers.PayloadError):
-        parsers.parse_plane(b"not json")
-    with pytest.raises(parsers.PayloadError):
-        parsers.parse_plane(P.raw({"event": "issue", "action": "created", "data": {"id": "x"}}))
 
 
 def test_git_pull_request_gitea_and_github_shapes() -> None:
@@ -166,28 +146,6 @@ def test_nightingale_contract() -> None:
 # ---------------------------------------------------------------------------
 # Fixture-based tests: each real fixture is parsed and verified.
 # ---------------------------------------------------------------------------
-
-
-def test_fixture_plane_issue_created() -> None:
-    [ev] = parsers.parse_plane(_load("plane_issue_created.json"))
-    assert isinstance(ev, IssueUpserted)
-    assert ev.external_id == "22222222-bbbb-cccc-dddd-eeeeeeeeeeee"
-    assert ev.plane_project_id == "proj-staging-deployments"
-    assert "arvino:fast" in ev.labels
-    assert ev.state_group == "unstarted"
-    assert "Deploy authentication service" in ev.title
-
-
-def test_fixture_plane_issue_updated() -> None:
-    [ev] = parsers.parse_plane(_load("plane_issue_updated.json"))
-    assert isinstance(ev, IssueUpserted)
-    assert ev.external_id == "33333333-cccc-dddd-eeee-ffffffffffff"
-    assert "arvino:standard" in ev.labels
-    assert ev.state_group == "started"
-
-
-def test_fixture_plane_cycle_ignored() -> None:
-    assert parsers.parse_plane(_load("plane_cycle_created.json")) == []
 
 
 def test_fixture_gitea_pr_opened() -> None:

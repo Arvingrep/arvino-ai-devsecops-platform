@@ -142,7 +142,7 @@ def build_env(
             "production": "acme-prod",
         },
     )
-    issue, _ = engine.upsert_issue(project.id, "plane", "PLANE-1", "Add widget", body="please")
+    issue, _ = engine.upsert_issue(project.id, "github", "GH-1", "Add widget", body="please")
     return Env(
         engine=engine,
         executor=executor,

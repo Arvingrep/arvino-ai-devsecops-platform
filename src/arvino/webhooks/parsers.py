@@ -55,41 +55,6 @@ def normalise_conclusion(raw: str | None) -> str:
     return "failure"  # failure/error/cancelled/timed_out/skipped/neutral/unknown
 
 
-# ------------------------------------------------------------------------------------ Plane
-
-
-def parse_plane(body: bytes) -> list[InboundEvent]:
-    """Plane webhook: {"event": "issue", "action": "created|updated", "data": {...}}."""
-    payload = _json(body)
-    if payload.get("event") != "issue":
-        return []  # other Plane events (cycle, project, ...) are not consumed
-    action = str(_get(payload, "action"))
-    data = _get(payload, "data")
-    if not isinstance(data, dict):
-        raise PayloadError("data must be an object")
-    labels: list[str] = []
-    for lab in data.get("labels") or []:
-        name = lab.get("name") if isinstance(lab, dict) else lab
-        if isinstance(name, str):
-            labels.append(name)
-    state = data.get("state")
-    group = state.get("group") if isinstance(state, dict) else None
-    try:
-        return [
-            IssueUpserted(
-                action=action,
-                external_id=str(_get(data, "id")),
-                plane_project_id=str(_get(data, "project")),
-                title=str(data.get("name") or ""),
-                body=str(data.get("description_stripped") or data.get("description") or ""),
-                labels=labels,
-                state_group=group,
-            )
-        ]
-    except ValidationError as exc:
-        raise PayloadError(str(exc)) from exc
-
-
 # ------------------------------------------------------------------------------------ Gitea / GitHub
 
 

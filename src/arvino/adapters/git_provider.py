@@ -45,7 +45,7 @@ class GitHubProvider:
         # We actually need to ensure the ref exists on the remote.  The engine
         # assumes a local commit was already made; push_branch is "make sure
         # the remote has it".  We create the ref via the API if it doesn't exist
-        # or let git push handle it.  Since this adapter is for the control plane
+        # or let git push handle it.  Since this adapter is for the orchestrator
         # (not the coding agent), we just push the current HEAD of that branch.
         self._run(
             ["git", "push", f"https://github.com/{repo}.git", f"{branch}:{branch}", "--force"],
@@ -160,7 +160,7 @@ class GiteaProvider:
         # Resolve the default branch's HEAD to create a ref.
         # In real usage the coding agent already pushed the commit; this
         # creates the branch ref from the repo's current default-branch HEAD
-        # so the control plane can reference it.
+        # so the orchestrator can reference it.
         repo_resp = self._request("GET", f"/repos/{repo}")
         default_branch = repo_resp["default_branch"]
         branch_resp = self._request("GET", f"/repos/{repo}/branches/{default_branch}")

@@ -10,12 +10,10 @@ PROFILE_LABEL_PREFIX = "arvino:"
 
 
 class IssueUpserted(BaseModel):
-    source: Literal["plane", "github", "gitea"] = "plane"
+    source: Literal["github", "gitea"] = "github"
     action: str
     external_id: str
-    # Plane-originated issues carry a plane_project_id; GitHub/Gitea carry repo.
-    plane_project_id: str | None = None
-    repo: str | None = None  # "owner/repo" for GitHub/Gitea sources
+    repo: str | None = None  # "owner/repo"
     title: str
     body: str = ""
     labels: list[str] = Field(default_factory=list)

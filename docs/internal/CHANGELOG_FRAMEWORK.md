@@ -18,6 +18,7 @@
 | 2026-10-16 | 修复 | 告警通道从群-5351926143(从未真正送达)改为telegram DM 2057618975(@wcd_admin_bot,已用curl验证message_id真实送达) | 总监会话 | ⬜ 待审 |
 | 2026-10-16 | 待办 | @wcd_admin_bot 尚未加入Arvino群,群内角色动态播报功能未激活,需Arvin手动拉群 | — | ⬜ 待办 |
 | 2026-10-16 | 修复 | PR#17(CI lint修复)、PR#19(CI全部lint修复)已合并;PR#115/#116/#117(firebird-sea QA门禁+canary路由修复+/shop 500修复)待Arvin审 | 总监会话 | ⬜ 待审 |
+| 2026-10-17 | 废弃 | 移除 Plane 集成:删除 Plane webhook 解析/路由/事件、PLANE_* 配置、deploy/helm-values/plane.yaml、deploy/secrets-examples/plane-*、plane_project_id 列(alembic c3d4e5f6a7b8)、测试 fixtures 与 payloads。IssueTracker 端口保留,默认实现改为 GitHub。文档(README/ADRs/实现计划/系统状态)已更新 | chore/remove-plane | ⬜ 待审 |
 
 ## 变更规则(后续所有LLM/Agent必须遵守,写入skill同步生效)
 

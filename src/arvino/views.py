@@ -16,7 +16,6 @@ class ProjectView(_View):
     id: str
     key: str
     name: str
-    plane_project_id: str | None
     repo_full_name: str | None
     default_branch: str
     argocd_apps: dict[str, str]

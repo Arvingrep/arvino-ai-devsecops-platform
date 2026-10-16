@@ -29,7 +29,7 @@ def env(name: str) -> str:
 
 
 OWNER, AGENT = env("ARVINO_OWNER_TOKEN"), env("ARVINO_AGENT_TOKEN")
-PLANE, GITEA = env("ARVINO_PLANE_WEBHOOK_SECRET"), env("ARVINO_GITEA_WEBHOOK_SECRET")
+GITHUB, GITEA = env("ARVINO_GITHUB_WEBHOOK_SECRET"), env("ARVINO_GITEA_WEBHOOK_SECRET")
 CI, ARGO = env("ARVINO_CI_WEBHOOK_TOKEN"), env("ARVINO_ARGOCD_WEBHOOK_TOKEN")
 SUFFIX = uuid.uuid4().hex[:6]
 FAILURES: list[str] = []
@@ -61,10 +61,11 @@ def api(method: str, path: str, token: str, payload: object | None = None) -> tu
 
 
 def hook_hmac(
-    path: str, secret: str, payload: dict, header: str, extra: dict[str, str] | None = None
+    path: str, secret: str, payload: dict, header: str, extra: dict[str, str] | None = None,
+    *, prefix: str = "",
 ) -> tuple[int, object]:
     body = json.dumps(payload, separators=(",", ":")).encode()
-    sig = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    sig = prefix + hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
     return call(
         "POST", path, body, {header: sig, "Content-Type": "application/json", **(extra or {})}
     )
@@ -104,25 +105,26 @@ def step(run: dict, key: str) -> dict:
     return next(s for s in run["steps"] if s["key"] == key)
 
 
-def start_plane_run(label: str, plane_issue: str, body: str = "") -> str:
+def start_github_run(label: str, github_issue: str, body: str = "") -> str:
     payload = {
-        "event": "issue",
-        "action": "created",
-        "data": {
-            "id": plane_issue,
-            "name": f"smoke {label}",
-            "description_stripped": body,
-            "project": f"plane-{SUFFIX}",
-            "state": {"group": "unstarted"},
+        "action": "opened",
+        "issue": {
+            "number": int(github_issue.split("-")[-1]) if "-" in github_issue else 1,
+            "title": f"smoke {label}",
+            "body": body,
+            "state": "open",
             "labels": [{"name": f"arvino:{label}"}],
         },
+        "repository": {"full_name": f"acme/smoke-{SUFFIX}"},
+        "sender": {"login": "arvin"},
     }
     code, res = hook_hmac(
-        "/webhooks/plane",
-        PLANE,
+        "/webhooks/github",
+        GITHUB,
         payload,
-        "X-Plane-Signature",
-        {"X-Plane-Delivery": f"smoke-{plane_issue}"},
+        "X-Hub-Signature-256",
+        prefix="sha256=",
+        extra={"X-GitHub-Delivery": f"smoke-{github_issue}", "X-GitHub-Event": "issues"},
     )
     assert code == 200, (code, res)
     return res["results"][0]["run_ids"][0]  # type: ignore[index]
@@ -190,13 +192,12 @@ def recovery_prepare() -> int:
         {
             "key": f"rec-{SUFFIX}",
             "name": "Recovery",
-            "plane_project_id": f"plane-{SUFFIX}",
             "repo_full_name": repo,
             "argocd_apps": {"preview": f"rec-{SUFFIX}-preview", "production": f"rec-{SUFFIX}-prod"},
         },
     )
     assert code == 201, proj
-    rid = start_plane_run("standard", f"rec-{SUFFIX}")
+    rid = start_github_run("standard", f"rec-{SUFFIX}")
     sha = pipeline_to_ci(rid, repo)
     ci_green(sha, repo, ["unit-tests", "lint", "secret-scan", "trivy", "conftest"])
     hook_token(
@@ -301,7 +302,6 @@ def main() -> int:
         {
             "key": f"smoke-{SUFFIX}",
             "name": "Smoke",
-            "plane_project_id": f"plane-{SUFFIX}",
             "repo_full_name": repo,
             "argocd_apps": {
                 "preview": f"smoke-{SUFFIX}-preview",
@@ -316,10 +316,10 @@ def main() -> int:
         api("POST", "/projects", AGENT, {"key": "x", "name": "x"})[0] == 403,
     )
     check("anonymous request rejected", call("GET", "/projects")[0] == 401)
-    check("unsigned webhook rejected", call("POST", "/webhooks/plane", b"{}")[0] == 401)
+    check("unsigned webhook rejected", call("POST", "/webhooks/github", b"{}")[0] == 401)
 
     # ---- Fast ------------------------------------------------------------------------
-    rid = start_plane_run("fast", f"fast-{SUFFIX}")
+    rid = start_github_run("fast", f"fast-{SUFFIX}")
     sha = pipeline_to_ci(rid, repo)
     ci_green(sha, repo, ["unit-tests", "lint", "secret-scan"])
     run = get_run(rid)
@@ -344,21 +344,23 @@ def main() -> int:
         wait_status(rid, "succeeded")["status"] == "succeeded",
     )
     dup = hook_hmac(
-        "/webhooks/plane",
-        PLANE,
+        "/webhooks/github",
+        GITHUB,
         {
-            "event": "issue",
-            "action": "updated",
-            "data": {
-                "id": f"fast-{SUFFIX}",
-                "name": "smoke fast",
-                "project": f"plane-{SUFFIX}",
-                "state": {"group": "unstarted"},
+            "action": "opened",
+            "issue": {
+                "number": int(f"fast-{SUFFIX}".split("-")[-1]) if "-" in f"fast-{SUFFIX}" else 1,
+                "title": "smoke fast",
+                "body": "",
+                "state": "open",
                 "labels": [{"name": "arvino:fast"}],
             },
+            "repository": {"full_name": repo},
+            "sender": {"login": "arvin"},
         },
-        "X-Plane-Signature",
-        {"X-Plane-Delivery": f"other-{SUFFIX}"},
+        "X-Hub-Signature-256",
+        prefix="sha256=",
+        extra={"X-GitHub-Delivery": f"dup-{SUFFIX}", "X-GitHub-Event": "issues"},
     )
     check(
         "fast: replayed business event does not create a second run",
@@ -366,9 +368,7 @@ def main() -> int:
     )  # type: ignore[index]
 
     # ---- Protected path denial -------------------------------------------------------
-    rid2 = start_plane_run(
-        "fast", f"deny-{SUFFIX}", body="sandbox-changed-paths: src/app.py,policy/authz.rego"
-    )
+    rid2 = start_github_run("fast", f"deny-{SUFFIX}", body="sandbox-changed-paths: src/app.py,policy/authz.rego")
     sha2 = pipeline_to_ci(rid2, repo)
     ci_green(sha2, repo, ["unit-tests", "lint", "secret-scan"])
     run2 = wait_status(rid2, "failed")
@@ -381,7 +381,7 @@ def main() -> int:
     check("denied run never requested a deployment", step(run2, "preview")["status"] == "cancelled")
 
     # ---- Standard + approval -----------------------------------------------------------
-    rid3 = start_plane_run("standard", f"std-{SUFFIX}")
+    rid3 = start_github_run("standard", f"std-{SUFFIX}")
     sha3 = pipeline_to_ci(rid3, repo)
     ci_green(sha3, repo, ["unit-tests", "lint", "secret-scan", "trivy", "conftest"])
     hook_token(
