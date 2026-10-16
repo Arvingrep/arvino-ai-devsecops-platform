@@ -6,6 +6,7 @@ Covers:
   3. Dispatcher.handle: end-to-end from IssueUpserted -> Run created in engine
   4. /webhooks/github HTTP endpoint: issues event delivery creates a Run
 """
+
 from __future__ import annotations
 
 import pytest
