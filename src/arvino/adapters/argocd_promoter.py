@@ -246,11 +246,9 @@ def _set_image_tag(manifest_path: Path, revision: str) -> None:
     ``ValueError``.
     """
     raw = manifest_path.read_text()
-    doc: dict[str, Any] = yaml.load(raw, Loader=_Loader)
+    doc: dict[str, Any] = yaml.load(raw, Loader=_Loader)  # noqa: S506 - _Loader is SafeLoader/CSafeLoader
 
-    if _patch_kustomization(doc, revision):
-        pass
-    elif _patch_deployment(doc, revision):
+    if _patch_kustomization(doc, revision) or _patch_deployment(doc, revision):
         pass
     elif _patch_helm_values(doc, revision):
         pass
