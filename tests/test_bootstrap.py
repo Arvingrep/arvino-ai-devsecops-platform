@@ -212,3 +212,99 @@ def test_settings_env_vars() -> None:
         assert s.claude_max_turns == 50
         assert s.claude_timeout_seconds == 900
         assert s.repo_base_dir == "/repos"
+
+
+# --------------------------------------------------------------------------- #
+# OpenHands executor — new paths (t_df434a0c)
+# --------------------------------------------------------------------------- #
+
+
+def test_build_executor_openhands() -> None:
+    """With openhands_base_url set, executor is OpenHandsExecutor."""
+    settings = Settings(
+        adapters="queue",
+        openhands_base_url="https://agent-canvas.k8shome.com",
+        openhands_timeout_seconds=900,
+    )
+    executor = build_executor(settings)
+    from arvino.adapters.openhands import OpenHandsExecutor
+
+    assert isinstance(executor, OpenHandsExecutor)
+    assert executor.base_url == "https://agent-canvas.k8shome.com"
+    assert executor.timeout_seconds == 900
+
+
+def test_build_executor_openhands_priority_over_claude_code(tmp_path: Path) -> None:
+    """openhands_base_url takes priority over repo_base_dir (ClaudeCodeExecutor)."""
+    settings = Settings(
+        adapters="queue",
+        openhands_base_url="https://agent-canvas.k8shome.com",
+        repo_base_dir=str(tmp_path),
+    )
+    executor = build_executor(settings)
+    from arvino.adapters.openhands import OpenHandsExecutor
+
+    assert isinstance(executor, OpenHandsExecutor)
+
+
+def test_build_engine_openhands_registers_both_keys() -> None:
+    """With openhands_base_url, RoleRouter has both 'openhands' and 'claude_code' keys."""
+    settings = Settings(
+        adapters="queue",
+        database_url="sqlite://",
+        openhands_base_url="https://agent-canvas.k8shome.com",
+    )
+    engine = build_engine(settings)
+    from arvino.adapters.openhands import OpenHandsExecutor
+    from arvino.adapters.role_router import RoleRouter
+    from arvino.fakes import QueueExecutor as _QueueExecutor
+
+    assert isinstance(engine.ports.executor, RoleRouter)
+    adapters = engine.ports.executor.adapters
+    assert "openhands" in adapters
+    assert "claude_code" in adapters
+    assert isinstance(adapters["openhands"], OpenHandsExecutor)
+    # claude_code falls back to QueueExecutor (agent-harness.sh compatibility)
+    assert isinstance(adapters["claude_code"], _QueueExecutor)
+
+
+def test_build_engine_openhands_timeout_propagated() -> None:
+    """openhands_timeout_seconds is forwarded to OpenHandsExecutor."""
+    settings = Settings(
+        adapters="queue",
+        database_url="sqlite://",
+        openhands_base_url="https://agent-canvas.example.com",
+        openhands_timeout_seconds=3600,
+    )
+    engine = build_engine(settings)
+    from arvino.adapters.openhands import OpenHandsExecutor
+    from arvino.adapters.role_router import RoleRouter
+
+    assert isinstance(engine.ports.executor, RoleRouter)
+    oh_exec = engine.ports.executor.adapters["openhands"]
+    assert isinstance(oh_exec, OpenHandsExecutor)
+    assert oh_exec.timeout_seconds == 3600
+
+
+def test_settings_openhands_env_vars() -> None:
+    """ARVINO_OPENHANDS_* env vars map to the right settings fields."""
+    env = {
+        "ARVINO_OPENHANDS_BASE_URL": "https://oh.example.com",
+        "ARVINO_OPENHANDS_TIMEOUT_SECONDS": "2700",
+    }
+    with patch.dict("os.environ", env, clear=False):
+        s = Settings(adapters="queue")  # type: ignore[call-arg]
+        assert s.openhands_base_url == "https://oh.example.com"
+        assert s.openhands_timeout_seconds == 2700
+
+
+def test_build_engine_no_openhands_unchanged() -> None:
+    """Without openhands_base_url the old behaviour (single claude_code key) is preserved."""
+    settings = Settings(adapters="queue", database_url="sqlite://")
+    engine = build_engine(settings)
+    from arvino.adapters.role_router import RoleRouter
+
+    assert isinstance(engine.ports.executor, RoleRouter)
+    adapters = engine.ports.executor.adapters
+    assert "claude_code" in adapters
+    assert "openhands" not in adapters
