@@ -10,7 +10,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from datetime import datetime
-from typing import cast
+from typing import Any
 
 from prometheus_client import (
     CollectorRegistry,
@@ -148,7 +148,7 @@ def collect(sf: SessionFactory) -> bytes:
         "Time to collect metrics from the database",
         registry=REGISTRY,
     ).observe(time.monotonic() - start)
-    return generate_latest(REGISTRY)
+    return generate_latest(REGISTRY)  # type: ignore[no-any-return]
 
 
 def _collect_runs(s: Session) -> None:
@@ -160,10 +160,10 @@ def _collect_runs(s: Session) -> None:
     RUNS_TOTAL.clear()
     RUNS_ACTIVE.set(0)
     for row in rows:
-        profile: str = cast(str, row[0])
-        project_id: str = cast(str, row[1])
-        status: str = cast(str, row[2])
-        count: int = cast(int, row[3])
+        profile = row[0]
+        project_id = row[1]
+        status = row[2]
+        count = row[3]
         RUNS_TOTAL.labels(profile=profile, project_id=project_id, status=status).set(count)
         if status in ("pending", "running", "waiting_approval"):
             RUNS_ACTIVE.inc(count)
@@ -175,11 +175,11 @@ def _collect_runs(s: Session) -> None:
         .where(RunRow.status.in_(["pending", "running", "waiting_approval"]))
         .group_by(RunRow.status)
     ).all()
-    for row in earliest_rows:
-        status: str = cast(str, row[0])
-        earliest: datetime = cast(datetime, row[1])
+    for row in earliest_rows:  # type: ignore[assignment]
+        earliest_status = row[0]
+        earliest: datetime = row[1]  # type: ignore[assignment]
         if earliest is not None:
-            RUNS_STARTED_AT_SECONDS.labels(status=status).set(earliest.timestamp())
+            RUNS_STARTED_AT_SECONDS.labels(status=earliest_status).set(earliest.timestamp())
 
 
 def _collect_steps(s: Session) -> None:
@@ -191,10 +191,10 @@ def _collect_steps(s: Session) -> None:
     STEPS_TOTAL.clear()
     STEPS_ACTIVE.set(0)
     for row in rows:
-        kind: str = cast(str, row[0])
-        status: str = cast(str, row[1])
-        role: str | None = cast(str | None, row[2])
-        count: int = cast(int, row[3])
+        kind = row[0]
+        status = row[1]
+        role = row[2]
+        count = row[3]
         role_label = role or "none"
         STEPS_TOTAL.labels(kind=kind, status=status, role=role_label).set(count)
         if status in ("running", "waiting_approval"):
@@ -206,11 +206,11 @@ def _collect_steps(s: Session) -> None:
             StepRow.finished_at.isnot(None), StepRow.started_at.isnot(None)
         )
     ).all()
-    for row in dur_rows:
-        kind = cast(str, row[0])
-        status = cast(str, row[1])
-        started = row[2]
-        finished = row[3]
+    for dur_row in dur_rows:
+        kind = dur_row[0]
+        status = dur_row[1]
+        started = dur_row[2]
+        finished = dur_row[3]
         if started is not None and finished is not None:
             STEP_DURATION_SECONDS.labels(kind=kind, status=status).observe(
                 (finished - started).total_seconds()
@@ -226,8 +226,8 @@ def _collect_approvals(s: Session) -> None:
     ).all()
     APPROVALS_PENDING.clear()
     for row in pending_rows:
-        kind: str = cast(str, row[0])
-        count: int = cast(int, row[1])
+        kind = row[0]
+        count = row[1]
         APPROVALS_PENDING.labels(kind=kind).set(count)
 
     # Wait time histogram for decided approvals
@@ -239,11 +239,11 @@ def _collect_approvals(s: Session) -> None:
             ApprovalRow.decided_at,
         ).where(ApprovalRow.decided_at.isnot(None), ApprovalRow.requested_at.isnot(None))
     ).all()
-    for row in decided_rows:
-        kind = cast(str, row[0])
-        decision = cast(str, row[1])
-        requested = row[2]
-        decided = row[3]
+    for decided_row in decided_rows:
+        kind = decided_row[0]
+        decision = decided_row[1]
+        requested = decided_row[2]
+        decided = decided_row[3]
         if requested is not None and decided is not None:
             APPROVAL_WAIT_SECONDS.labels(kind=kind, decision=decision).observe(
                 (decided - requested).total_seconds()
@@ -270,8 +270,8 @@ def _collect_errors(s: Session) -> None:
     ).all()
     ERRORS_TOTAL.clear()
     for row in rows:
-        event_type: str = cast(str, row[0])
-        count: int = cast(int, row[1])
+        event_type = row[0]
+        count = row[1]
         ERRORS_TOTAL.labels(type=event_type).set(count)
 
 
@@ -283,9 +283,9 @@ def _collect_issues(s: Session) -> None:
     ).all()
     ISSUES_OPEN.clear()
     for row in rows:
-        kind: str = cast(str, row[0])
-        source: str = cast(str, row[1])
-        count: int = cast(int, row[2])
+        kind = row[0]
+        source = row[1]
+        count = row[2]
         ISSUES_OPEN.labels(kind=kind, source=source).set(count)
 
 
@@ -310,10 +310,15 @@ class MetricsMiddleware:
 
     SKIP_PATHS = frozenset({"/metrics", "/healthz", "/readyz"})
 
-    def __init__(self, app: Callable) -> None:
+    def __init__(self, app: Callable[..., Any]) -> None:
         self._app = app
 
-    async def __call__(self, scope: dict, receive: Callable, send: Callable) -> None:
+    async def __call__(
+        self,
+        scope: dict[str, Any],
+        receive: Callable[..., Any],
+        send: Callable[..., Any],
+    ) -> None:
         if scope["type"] != "http":
             await self._app(scope, receive, send)
             return
@@ -331,7 +336,7 @@ class MetricsMiddleware:
         start = time.monotonic()
         status_code = 500
 
-        async def _send(message: dict) -> None:
+        async def _send(message: dict[str, Any]) -> None:
             nonlocal status_code
             if message["type"] == "http.response.start":
                 status_code = message.get("status", 500)

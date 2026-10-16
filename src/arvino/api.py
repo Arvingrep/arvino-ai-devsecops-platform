@@ -16,8 +16,8 @@ import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import JSONResponse, Response
-from jose import ExpiredSignatureError, JWTError, jwt
-from jose.exceptions import JWKError
+from jose import ExpiredSignatureError, JWTError, jwt  # type: ignore[import-untyped]
+from jose.exceptions import JWKError  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
 from sqlalchemy import text
 
@@ -182,7 +182,7 @@ class Authenticator:
         try:
             claims = jwt.decode(
                 token,
-                keys,  # type: ignore[arg-type]  # python-jose accepts JWKS key list at runtime
+                keys,  # python-jose accepts JWKS key list at runtime
                 algorithms=["RS256", "RS384", "RS512", "ES256", "ES384", "ES512"],
                 audience=self._oidc_audience,
                 issuer=self._oidc_issuer,

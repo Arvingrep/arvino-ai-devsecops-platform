@@ -158,7 +158,7 @@ class ArgoCDPromoter:
 
     def _clone_cached(self) -> Path:
         """Return a worktree from a cached bare clone (fast path)."""
-        bare = self._cache_dir / "bare"  # type: ignore[union-attr]
+        bare = self._cache_dir / "bare"  # type: ignore[operator]
         if not (bare / "HEAD").exists():
             _git(
                 "clone",
@@ -225,7 +225,7 @@ class ArgoCDPromoter:
         )
         if diff.returncode == 0:
             # No diff — return HEAD SHA.
-            return _git("-C", str(repo_path), "rev-parse", "HEAD").strip()
+            return _git("-C", str(repo_path), "rev-parse", "HEAD").strip()  # type: ignore[no-any-return]
 
         _git(
             "-C",
@@ -240,7 +240,7 @@ class ArgoCDPromoter:
 
         sha = _git("-C", str(repo_path), "rev-parse", "HEAD").strip()
         logger.info("committed %s -> %s/%s", sha[:8], self._repo_url, self._branch)
-        return sha
+        return sha  # type: ignore[no-any-return]
 
 
 # ---------------------------------------------------------------------------

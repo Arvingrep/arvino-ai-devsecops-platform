@@ -193,7 +193,7 @@ class TelegramAgentExecutor:
                 if not data.get("ok"):
                     logger.error("telegram getUpdates error: %s", data.get("description"))
                     return []
-                return data.get("result", [])
+                return data.get("result", [])  # type: ignore[no-any-return]
         except httpx.HTTPError as exc:
             logger.error("telegram getUpdates failed: %s", exc)
             return []
