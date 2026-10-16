@@ -34,7 +34,10 @@ def main() -> int:
     text = render()
     if "--check" in sys.argv:
         if not OUT.exists() or OUT.read_text() != text:
-            print(f"{OUT.relative_to(ROOT)} is stale; run scripts/gen_opa_configmap.py", file=sys.stderr)
+            print(
+                f"{OUT.relative_to(ROOT)} is stale; run scripts/gen_opa_configmap.py",
+                file=sys.stderr,
+            )
             return 1
         return 0
     OUT.write_text(text)

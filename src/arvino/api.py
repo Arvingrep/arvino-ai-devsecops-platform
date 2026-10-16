@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from arvino import __version__
-from arvino.db import SessionFactory, transaction
+from arvino.db import transaction
 from arvino.domain import (
     ApprovalStatus,
     ArtifactSpec,
@@ -32,7 +32,8 @@ from arvino.domain import (
     Profile,
 )
 from arvino.engine import Engine
-from arvino.metrics import MetricsMiddleware, collect as metrics_collect
+from arvino.metrics import MetricsMiddleware
+from arvino.metrics import collect as metrics_collect
 from arvino.ports import StepOutcome
 from arvino.settings import Settings, secret
 from arvino.views import (
@@ -192,9 +193,7 @@ class Authenticator:
                 401, "token expired", headers={"WWW-Authenticate": "Bearer"}
             ) from exc
         except (JWTError, JWKError) as exc:
-            raise HTTPException(
-                401, "invalid JWT", headers={"WWW-Authenticate": "Bearer"}
-            ) from exc
+            raise HTTPException(401, "invalid JWT", headers={"WWW-Authenticate": "Bearer"}) from exc
 
         role: str = claims.get(self._oidc_role_claim, "")
         subject: str = claims.get("sub", "oidc:unknown")
@@ -339,9 +338,7 @@ def create_app(engine: Engine, settings: Settings) -> FastAPI:
 
     @app.post("/projects/{project_id}/suggestions", status_code=201, dependencies=[operator])
     def create_suggestion(project_id: str, body: SuggestionIn) -> IssueView:
-        return engine.record_suggestion(
-            project_id, body.title, body=body.body, phase=body.phase
-        )
+        return engine.record_suggestion(project_id, body.title, body=body.body, phase=body.phase)
 
     # ------------------------------------------------------------------ runs
 
@@ -470,6 +467,7 @@ def create_app(engine: Engine, settings: Settings) -> FastAPI:
                 raise wauth.WebhookAuthError("bearer token mismatch")
             # HMAC signature auth (direct Plane-to-arvino path)
             wauth.verify_hmac_sha256(plane_secret, body, x_plane_signature)
+
         return verify
 
     @app.post("/webhooks/plane")

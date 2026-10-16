@@ -7,34 +7,31 @@ retry behaviour, slot management, YAML/JSON parsing, CLI, and output files.
 from __future__ import annotations
 
 import json
-import os
 import sys
 import textwrap
 import time
 from pathlib import Path
-from unittest.mock import patch as mock_patch
 
 import pytest
 
 # Ensure the scripts directory is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-import director  # noqa: E402
+import director
 from director import (
+    DirectorController,
     Task,
     TaskRegistry,
-    DirectorController,
-    _parse_simple_yaml,
-    _elapsed_human,
     _detect_terminal_status,
+    _elapsed_human,
     _now_iso,
-    VALID_STATUSES,
+    _parse_simple_yaml,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def tmp_dir(tmp_path: Path) -> Path:
@@ -45,14 +42,34 @@ def tmp_dir(tmp_path: Path) -> Path:
 @pytest.fixture
 def sample_tasks() -> list[dict]:
     return [
-        {"task_id": "t1", "goal": "Build API", "context": "REST endpoints",
-         "dependencies": [], "status": "pending"},
-        {"task_id": "t2", "goal": "Build UI", "context": "React frontend",
-         "dependencies": ["t1"], "status": "pending"},
-        {"task_id": "t3", "goal": "Write tests", "context": "pytest",
-         "dependencies": ["t1"], "status": "pending"},
-        {"task_id": "t4", "goal": "Deploy", "context": "K8s",
-         "dependencies": ["t2", "t3"], "status": "pending"},
+        {
+            "task_id": "t1",
+            "goal": "Build API",
+            "context": "REST endpoints",
+            "dependencies": [],
+            "status": "pending",
+        },
+        {
+            "task_id": "t2",
+            "goal": "Build UI",
+            "context": "React frontend",
+            "dependencies": ["t1"],
+            "status": "pending",
+        },
+        {
+            "task_id": "t3",
+            "goal": "Write tests",
+            "context": "pytest",
+            "dependencies": ["t1"],
+            "status": "pending",
+        },
+        {
+            "task_id": "t4",
+            "goal": "Deploy",
+            "context": "K8s",
+            "dependencies": ["t2", "t3"],
+            "status": "pending",
+        },
     ]
 
 
@@ -84,6 +101,7 @@ def controller(registry: TaskRegistry, tmp_dir: Path) -> DirectorController:
 # Task model tests
 # ---------------------------------------------------------------------------
 
+
 class TestTask:
     def test_from_dict_defaults(self):
         t = Task.from_dict({"task_id": "x", "goal": "test"})
@@ -109,8 +127,9 @@ class TestTask:
         assert "transcript_path" not in d
 
     def test_roundtrip(self):
-        original = Task(task_id="r", goal="roundtrip", context="ctx",
-                        dependencies=["a", "b"], max_retries=5)
+        original = Task(
+            task_id="r", goal="roundtrip", context="ctx", dependencies=["a", "b"], max_retries=5
+        )
         d = original.to_dict()
         restored = Task.from_dict(d)
         assert restored.task_id == original.task_id
@@ -122,6 +141,7 @@ class TestTask:
 # ---------------------------------------------------------------------------
 # YAML parser tests
 # ---------------------------------------------------------------------------
+
 
 class TestYAMLParser:
     def test_simple_list(self):
@@ -184,6 +204,7 @@ class TestYAMLParser:
 # TaskRegistry tests
 # ---------------------------------------------------------------------------
 
+
 class TestTaskRegistry:
     def test_load_json(self, tmp_dir: Path, sample_tasks: list[dict]):
         p = tmp_dir / "tasks.json"
@@ -196,11 +217,13 @@ class TestTaskRegistry:
 
     def test_load_yaml(self, tmp_dir: Path):
         p = tmp_dir / "tasks.yaml"
-        p.write_text(textwrap.dedent("""\
+        p.write_text(
+            textwrap.dedent("""\
         - task_id: y1
           goal: YAML task
           status: pending
-        """))
+        """)
+        )
         reg = TaskRegistry(p)
         reg.load()
         assert len(reg.tasks) == 1
@@ -258,10 +281,14 @@ class TestTaskRegistry:
     def test_load_json_list_format(self, tmp_dir: Path):
         """JSON file that's a plain list (not wrapped in {tasks: ...})."""
         p = tmp_dir / "list.json"
-        p.write_text(json.dumps([
-            {"task_id": "a", "goal": "task a"},
-            {"task_id": "b", "goal": "task b"},
-        ]))
+        p.write_text(
+            json.dumps(
+                [
+                    {"task_id": "a", "goal": "task a"},
+                    {"task_id": "b", "goal": "task b"},
+                ]
+            )
+        )
         reg = TaskRegistry(p)
         reg.load()
         assert len(reg.tasks) == 2
@@ -270,6 +297,7 @@ class TestTaskRegistry:
 # ---------------------------------------------------------------------------
 # DirectorController — dispatch tests
 # ---------------------------------------------------------------------------
+
 
 class TestDispatch:
     def test_dispatch_root_tasks(self, controller: DirectorController):
@@ -304,7 +332,8 @@ class TestDispatch:
             reg.add_task(goal=f"task {i}", task_id=f"s{i}")
 
         ctrl = DirectorController(
-            reg, max_slots=2,
+            reg,
+            max_slots=2,
             status_path=tmp_dir / "status.json",
             log_path=tmp_dir / "events.log",
             dispatch_queue_path=tmp_dir / "dq.json",
@@ -318,8 +347,7 @@ class TestDispatch:
         batch2 = ctrl.dispatch_batch()
         assert len(batch2) == 0
 
-    def test_dispatch_queue_written(self, controller: DirectorController,
-                                     tmp_dir: Path):
+    def test_dispatch_queue_written(self, controller: DirectorController, tmp_dir: Path):
         controller.dispatch_batch()
         assert controller.dispatch_queue_path.exists()
         data = json.loads(controller.dispatch_queue_path.read_text())
@@ -342,17 +370,16 @@ class TestDispatch:
 # DirectorController — monitoring tests
 # ---------------------------------------------------------------------------
 
+
 class TestMonitor:
-    def _make_transcript(self, live_dir: Path, deleg_id: str,
-                          content: str) -> Path:
+    def _make_transcript(self, live_dir: Path, deleg_id: str, content: str) -> Path:
         d = live_dir / deleg_id
         d.mkdir(parents=True, exist_ok=True)
         log = d / "task-main.log"
         log.write_text(content)
         return log
 
-    def test_detects_completed(self, controller: DirectorController,
-                                tmp_dir: Path):
+    def test_detects_completed(self, controller: DirectorController, tmp_dir: Path):
         task = controller.registry.get("t1")
         task.status = "running"
         task.agent_id = "deleg_t1"
@@ -361,14 +388,12 @@ class TestMonitor:
 
         live_dir = tmp_dir / "live"
         controller.live_dir = live_dir
-        self._make_transcript(live_dir, "deleg_t1",
-                               "working...\nstatus=completed\n")
+        self._make_transcript(live_dir, "deleg_t1", "working...\nstatus=completed\n")
 
         controller.monitor_tick()
         assert task.status == "completed"
 
-    def test_detects_failed(self, controller: DirectorController,
-                             tmp_dir: Path):
+    def test_detects_failed(self, controller: DirectorController, tmp_dir: Path):
         task = controller.registry.get("t1")
         task.status = "running"
         task.agent_id = "deleg_t1"
@@ -377,15 +402,13 @@ class TestMonitor:
 
         live_dir = tmp_dir / "live"
         controller.live_dir = live_dir
-        self._make_transcript(live_dir, "deleg_t1",
-                               "error!\nstatus=failed\n")
+        self._make_transcript(live_dir, "deleg_t1", "error!\nstatus=failed\n")
 
         controller.monitor_tick()
         assert task.status == "failed"
         assert task.fail_reason == "agent_failed"
 
-    def test_detects_stuck_and_retries(self, controller: DirectorController,
-                                        tmp_dir: Path):
+    def test_detects_stuck_and_retries(self, controller: DirectorController, tmp_dir: Path):
         task = controller.registry.get("t1")
         task.status = "running"
         task.agent_id = "deleg_t1"
@@ -395,16 +418,14 @@ class TestMonitor:
 
         live_dir = tmp_dir / "live"
         controller.live_dir = live_dir
-        self._make_transcript(live_dir, "deleg_t1",
-                               "line1\nline2\nline3\nline4\nline5\n")
+        self._make_transcript(live_dir, "deleg_t1", "line1\nline2\nline3\nline4\nline5\n")
 
         controller.monitor_tick()
         # Should retry since retry_count < max_retries
         assert task.status in ("pending", "dispatched")
         assert task.retry_count == 1
 
-    def test_stuck_exhausted_fails(self, controller: DirectorController,
-                                    tmp_dir: Path):
+    def test_stuck_exhausted_fails(self, controller: DirectorController, tmp_dir: Path):
         task = controller.registry.get("t1")
         task.status = "running"
         task.agent_id = "deleg_t1"
@@ -416,15 +437,13 @@ class TestMonitor:
 
         live_dir = tmp_dir / "live"
         controller.live_dir = live_dir
-        self._make_transcript(live_dir, "deleg_t1",
-                               "line1\nline2\nline3\nline4\nline5\n")
+        self._make_transcript(live_dir, "deleg_t1", "line1\nline2\nline3\nline4\nline5\n")
 
         controller.monitor_tick()
         assert task.status == "failed"
         assert task.fail_reason == "stuck_exhausted"
 
-    def test_cascading_failure(self, controller: DirectorController,
-                                tmp_dir: Path):
+    def test_cascading_failure(self, controller: DirectorController, tmp_dir: Path):
         """When t1 fails, downstream t2/t3 should also fail."""
         controller.registry.get("t1").status = "failed"
         controller.registry.get("t1").fail_reason = "agent_failed"
@@ -436,8 +455,7 @@ class TestMonitor:
         assert controller.registry.get("t2").status == "failed"
         assert controller.registry.get("t3").status == "failed"
 
-    def test_status_file_written(self, controller: DirectorController,
-                                  tmp_dir: Path):
+    def test_status_file_written(self, controller: DirectorController, tmp_dir: Path):
         controller.live_dir = tmp_dir / "live"
         controller.monitor_tick()
         assert controller.status_path.exists()
@@ -446,16 +464,14 @@ class TestMonitor:
         assert "summary" in data
         assert data["max_slots"] == 10
 
-    def test_event_log_written(self, controller: DirectorController,
-                                tmp_dir: Path):
+    def test_event_log_written(self, controller: DirectorController, tmp_dir: Path):
         controller.live_dir = tmp_dir / "live"
         controller.dispatch_batch()
         assert controller.log_path.exists()
         content = controller.log_path.read_text()
         assert "DISPATCH" in content
 
-    def test_dispatched_transitions_to_running(self, controller: DirectorController,
-                                                tmp_dir: Path):
+    def test_dispatched_transitions_to_running(self, controller: DirectorController, tmp_dir: Path):
         task = controller.registry.get("t1")
         task.status = "dispatched"
         task.agent_id = "deleg_t1"
@@ -473,6 +489,7 @@ class TestMonitor:
 # Slot management edge cases
 # ---------------------------------------------------------------------------
 
+
 class TestSlotManagement:
     def test_slots_freed_on_completion(self, tmp_dir: Path):
         reg = TaskRegistry()
@@ -480,7 +497,8 @@ class TestSlotManagement:
             reg.add_task(goal=f"task {i}", task_id=f"q{i}")
 
         ctrl = DirectorController(
-            reg, max_slots=3,
+            reg,
+            max_slots=3,
             status_path=tmp_dir / "status.json",
             log_path=tmp_dir / "events.log",
             dispatch_queue_path=tmp_dir / "dq.json",
@@ -505,7 +523,8 @@ class TestSlotManagement:
             reg.add_task(goal=f"task {i}", task_id=f"m{i}")
 
         ctrl = DirectorController(
-            reg, max_slots=5,
+            reg,
+            max_slots=5,
             status_path=tmp_dir / "status.json",
             log_path=tmp_dir / "events.log",
             dispatch_queue_path=tmp_dir / "dq.json",
@@ -518,6 +537,7 @@ class TestSlotManagement:
 # ---------------------------------------------------------------------------
 # Helper function tests
 # ---------------------------------------------------------------------------
+
 
 class TestHelpers:
     def test_elapsed_human_seconds(self):
@@ -550,6 +570,7 @@ class TestHelpers:
 # CLI parser tests
 # ---------------------------------------------------------------------------
 
+
 class TestCLI:
     def test_run_parser(self):
         parser = director.build_parser()
@@ -565,11 +586,21 @@ class TestCLI:
 
     def test_add_parser(self):
         parser = director.build_parser()
-        args = parser.parse_args([
-            "add", "--tasks", "tasks.yaml",
-            "--goal", "Build it", "--context", "ctx",
-            "--deps", "t1,t2", "--id", "t99",
-        ])
+        args = parser.parse_args(
+            [
+                "add",
+                "--tasks",
+                "tasks.yaml",
+                "--goal",
+                "Build it",
+                "--context",
+                "ctx",
+                "--deps",
+                "t1,t2",
+                "--id",
+                "t99",
+            ]
+        )
         assert args.command == "add"
         assert args.goal == "Build it"
         assert args.deps == "t1,t2"
@@ -578,10 +609,17 @@ class TestCLI:
     def test_cmd_add(self, tmp_dir: Path):
         tasks_path = tmp_dir / "tasks.json"
         parser = director.build_parser()
-        args = parser.parse_args([
-            "add", "--tasks", str(tasks_path),
-            "--goal", "New task", "--id", "new1",
-        ])
+        args = parser.parse_args(
+            [
+                "add",
+                "--tasks",
+                str(tasks_path),
+                "--goal",
+                "New task",
+                "--id",
+                "new1",
+            ]
+        )
         director.cmd_add(args)
         assert tasks_path.exists()
         data = json.loads(tasks_path.read_text())
@@ -602,9 +640,9 @@ class TestCLI:
 # Integration: full tick cycle
 # ---------------------------------------------------------------------------
 
+
 class TestIntegration:
-    def _make_transcript(self, live_dir: Path, deleg_id: str,
-                          content: str) -> Path:
+    def _make_transcript(self, live_dir: Path, deleg_id: str, content: str) -> Path:
         d = live_dir / deleg_id
         d.mkdir(parents=True, exist_ok=True)
         log = d / "task-main.log"
@@ -620,7 +658,8 @@ class TestIntegration:
 
         live_dir = tmp_dir / "live"
         ctrl = DirectorController(
-            reg, max_slots=10,
+            reg,
+            max_slots=10,
             stuck_threshold=5,
             status_path=tmp_dir / "status.json",
             log_path=tmp_dir / "events.log",
@@ -642,8 +681,7 @@ class TestIntegration:
         assert reg.get("s1").status == "running"
 
         # Simulate completion
-        self._make_transcript(live_dir, "deleg_s1",
-                               "starting...\nworking\nstatus=completed\n")
+        self._make_transcript(live_dir, "deleg_s1", "starting...\nworking\nstatus=completed\n")
 
         # Tick 3: s1 → completed, s2 → dispatched
         ctrl.monitor_tick()
@@ -669,7 +707,8 @@ class TestIntegration:
         reg.save()
 
         ctrl = DirectorController(
-            reg, max_slots=10,
+            reg,
+            max_slots=10,
             status_path=tmp_dir / "status.json",
             log_path=tmp_dir / "events.log",
             dispatch_queue_path=tmp_dir / "dq.json",

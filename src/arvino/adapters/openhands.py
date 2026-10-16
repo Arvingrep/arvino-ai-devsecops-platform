@@ -33,8 +33,8 @@ logger = logging.getLogger(__name__)
 
 _DEFAULT_BASE_URL = "https://agent-canvas.k8shome.com"
 _DEFAULT_WORKSPACE = "/home/node/workspace"
-_DEFAULT_POLL_INTERVAL = 5.0   # seconds between status polls
-_DEFAULT_TIMEOUT = 1800        # 30 minutes hard cap
+_DEFAULT_POLL_INTERVAL = 5.0  # seconds between status polls
+_DEFAULT_TIMEOUT = 1800  # 30 minutes hard cap
 _TERMINAL_STATUSES = frozenset({"completed", "error", "paused", "stopped"})
 
 
@@ -108,7 +108,9 @@ class OpenHandsExecutor:
             return self._build_outcome(request, conv_id, final_info, final_response, git_diff)
 
         except OpenHandsError as exc:
-            logger.exception("openhands executor failed for %s/%s", request.run_id, request.step_key)
+            logger.exception(
+                "openhands executor failed for %s/%s", request.run_id, request.step_key
+            )
             return StepOutcome(status="failed", error=str(exc), retryable=True)
         except httpx.TimeoutException:
             logger.warning(
@@ -239,9 +241,14 @@ class OpenHandsExecutor:
         if oh_status == "error":
             return StepOutcome(
                 status="failed",
-                error=final_info.get("error") or f"OpenHands conversation {conv_id} ended with status 'error'",
+                error=final_info.get("error")
+                or f"OpenHands conversation {conv_id} ended with status 'error'",
                 retryable=True,
-                output={"conversation_id": conv_id, "openhands_status": oh_status, "final_response": final_response},
+                output={
+                    "conversation_id": conv_id,
+                    "openhands_status": oh_status,
+                    "final_response": final_response,
+                },
             )
 
         artifacts: list[ArtifactSpec] = []
@@ -287,7 +294,9 @@ class OpenHandsExecutor:
     @staticmethod
     def _extract_pr_number(response: dict[str, Any]) -> int | None:
         """Best-effort extraction of a PR number from the agent's final response."""
-        text = str(response.get("content") or response.get("result") or response.get("message") or "")
+        text = str(
+            response.get("content") or response.get("result") or response.get("message") or ""
+        )
         if not text:
             return None
         for pattern in (r"#(\d+)", r"pull/(\d+)", r"pull request (?:#)?(\d+)"):
@@ -302,6 +311,5 @@ class OpenHandsExecutor:
         if resp.is_error:
             body = resp.text[:500]
             raise OpenHandsError(
-                f"OpenHands API error during {operation!r}: "
-                f"HTTP {resp.status_code} — {body}"
+                f"OpenHands API error during {operation!r}: HTTP {resp.status_code} — {body}"
             )

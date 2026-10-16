@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -16,7 +15,6 @@ from arvino.adapters.argocd_promoter import (
     _set_image_tag,
 )
 from arvino.ports import PromotionRequest
-
 
 # ---------------------------------------------------------------------------
 # _inject_token
@@ -178,11 +176,13 @@ def test_patch_helm_values_no_tag_returns_false() -> None:
 def test_set_image_tag_kustomization(tmp_path: Path) -> None:
     manifest = tmp_path / "kustomization.yaml"
     manifest.write_text(
-        yaml.dump({
-            "apiVersion": "kustomize.config.k8s.io/v1beta1",
-            "kind": "Kustomization",
-            "images": [{"name": "app", "newTag": "old"}],
-        })
+        yaml.dump(
+            {
+                "apiVersion": "kustomize.config.k8s.io/v1beta1",
+                "kind": "Kustomization",
+                "images": [{"name": "app", "newTag": "old"}],
+            }
+        )
     )
     _set_image_tag(manifest, "v3.0.0")
     doc = yaml.safe_load(manifest.read_text())
@@ -192,17 +192,19 @@ def test_set_image_tag_kustomization(tmp_path: Path) -> None:
 def test_set_image_tag_deployment(tmp_path: Path) -> None:
     manifest = tmp_path / "deployment.yaml"
     manifest.write_text(
-        yaml.dump({
-            "apiVersion": "apps/v1",
-            "kind": "Deployment",
-            "spec": {
-                "template": {
-                    "spec": {
-                        "containers": [{"image": "reg/app:old", "name": "app"}],
+        yaml.dump(
+            {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "spec": {
+                    "template": {
+                        "spec": {
+                            "containers": [{"image": "reg/app:old", "name": "app"}],
+                        }
                     }
-                }
-            },
-        })
+                },
+            }
+        )
     )
     _set_image_tag(manifest, "v3.0.0")
     doc = yaml.safe_load(manifest.read_text())
@@ -211,9 +213,7 @@ def test_set_image_tag_deployment(tmp_path: Path) -> None:
 
 def test_set_image_tag_helm_values(tmp_path: Path) -> None:
     manifest = tmp_path / "values.yaml"
-    manifest.write_text(
-        yaml.dump({"image": {"repository": "reg/app", "tag": "old"}})
-    )
+    manifest.write_text(yaml.dump({"image": {"repository": "reg/app", "tag": "old"}}))
     _set_image_tag(manifest, "v3.0.0")
     doc = yaml.safe_load(manifest.read_text())
     assert doc["image"]["tag"] == "v3.0.0"

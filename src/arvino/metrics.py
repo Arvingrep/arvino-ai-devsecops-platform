@@ -10,8 +10,6 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from datetime import datetime
-
-from fastapi import Request, Response
 from typing import cast
 
 from prometheus_client import (
@@ -154,13 +152,11 @@ def collect(sf: SessionFactory) -> bytes:
 
 
 def _collect_runs(s: Session) -> None:
-    rows = (
-        s.execute(
-            select(RunRow.profile, RunRow.project_id, RunRow.status, func.count())
-            .group_by(RunRow.profile, RunRow.project_id, RunRow.status)
+    rows = s.execute(
+        select(RunRow.profile, RunRow.project_id, RunRow.status, func.count()).group_by(
+            RunRow.profile, RunRow.project_id, RunRow.status
         )
-        .all()
-    )
+    ).all()
     RUNS_TOTAL.clear()
     RUNS_ACTIVE.set(0)
     for row in rows:
@@ -174,14 +170,11 @@ def _collect_runs(s: Session) -> None:
 
     # Oldest created_at per active status for stuck-run alerting
     RUNS_STARTED_AT_SECONDS.clear()
-    earliest_rows = (
-        s.execute(
-            select(RunRow.status, func.min(RunRow.created_at))
-            .where(RunRow.status.in_(["pending", "running", "waiting_approval"]))
-            .group_by(RunRow.status)
-        )
-        .all()
-    )
+    earliest_rows = s.execute(
+        select(RunRow.status, func.min(RunRow.created_at))
+        .where(RunRow.status.in_(["pending", "running", "waiting_approval"]))
+        .group_by(RunRow.status)
+    ).all()
     for row in earliest_rows:
         status: str = cast(str, row[0])
         earliest: datetime = cast(datetime, row[1])
@@ -190,13 +183,11 @@ def _collect_runs(s: Session) -> None:
 
 
 def _collect_steps(s: Session) -> None:
-    rows = (
-        s.execute(
-            select(StepRow.kind, StepRow.status, StepRow.role, func.count())
-            .group_by(StepRow.kind, StepRow.status, StepRow.role)
+    rows = s.execute(
+        select(StepRow.kind, StepRow.status, StepRow.role, func.count()).group_by(
+            StepRow.kind, StepRow.status, StepRow.role
         )
-        .all()
-    )
+    ).all()
     STEPS_TOTAL.clear()
     STEPS_ACTIVE.set(0)
     for row in rows:
@@ -210,14 +201,11 @@ def _collect_steps(s: Session) -> None:
             STEPS_ACTIVE.inc(count)
 
     # Step duration histogram: all terminal steps with both timestamps
-    dur_rows = (
-        s.execute(
-            select(StepRow.kind, StepRow.status, StepRow.started_at, StepRow.finished_at).where(
-                StepRow.finished_at.isnot(None), StepRow.started_at.isnot(None)
-            )
+    dur_rows = s.execute(
+        select(StepRow.kind, StepRow.status, StepRow.started_at, StepRow.finished_at).where(
+            StepRow.finished_at.isnot(None), StepRow.started_at.isnot(None)
         )
-        .all()
-    )
+    ).all()
     for row in dur_rows:
         kind = cast(str, row[0])
         status = cast(str, row[1])
@@ -231,14 +219,11 @@ def _collect_steps(s: Session) -> None:
 
 def _collect_approvals(s: Session) -> None:
     # Pending count by kind
-    pending_rows = (
-        s.execute(
-            select(ApprovalRow.kind, func.count())
-            .where(ApprovalRow.status == "pending")
-            .group_by(ApprovalRow.kind)
-        )
-        .all()
-    )
+    pending_rows = s.execute(
+        select(ApprovalRow.kind, func.count())
+        .where(ApprovalRow.status == "pending")
+        .group_by(ApprovalRow.kind)
+    ).all()
     APPROVALS_PENDING.clear()
     for row in pending_rows:
         kind: str = cast(str, row[0])
@@ -246,18 +231,14 @@ def _collect_approvals(s: Session) -> None:
         APPROVALS_PENDING.labels(kind=kind).set(count)
 
     # Wait time histogram for decided approvals
-    decided_rows = (
-        s.execute(
-            select(
-                ApprovalRow.kind,
-                ApprovalRow.status,
-                ApprovalRow.requested_at,
-                ApprovalRow.decided_at,
-            )
-            .where(ApprovalRow.decided_at.isnot(None), ApprovalRow.requested_at.isnot(None))
-        )
-        .all()
-    )
+    decided_rows = s.execute(
+        select(
+            ApprovalRow.kind,
+            ApprovalRow.status,
+            ApprovalRow.requested_at,
+            ApprovalRow.decided_at,
+        ).where(ApprovalRow.decided_at.isnot(None), ApprovalRow.requested_at.isnot(None))
+    ).all()
     for row in decided_rows:
         kind = cast(str, row[0])
         decision = cast(str, row[1])
@@ -270,26 +251,23 @@ def _collect_approvals(s: Session) -> None:
 
 
 def _collect_errors(s: Session) -> None:
-    rows = (
-        s.execute(
-            select(EventRow.type, func.count())
-            .where(
-                EventRow.type.in_(
-                    [
-                        "run.failed",
-                        "step.failed",
-                        "step.stale_completion_ignored",
-                        "approval.denied",
-                        "approval.rejected",
-                        "policy.denied",
-                        "webhook.failed",
-                    ]
-                )
+    rows = s.execute(
+        select(EventRow.type, func.count())
+        .where(
+            EventRow.type.in_(
+                [
+                    "run.failed",
+                    "step.failed",
+                    "step.stale_completion_ignored",
+                    "approval.denied",
+                    "approval.rejected",
+                    "policy.denied",
+                    "webhook.failed",
+                ]
             )
-            .group_by(EventRow.type)
         )
-        .all()
-    )
+        .group_by(EventRow.type)
+    ).all()
     ERRORS_TOTAL.clear()
     for row in rows:
         event_type: str = cast(str, row[0])
@@ -298,14 +276,11 @@ def _collect_errors(s: Session) -> None:
 
 
 def _collect_issues(s: Session) -> None:
-    rows = (
-        s.execute(
-            select(IssueRow.kind, IssueRow.source, func.count())
-            .where(IssueRow.state == "open")
-            .group_by(IssueRow.kind, IssueRow.source)
-        )
-        .all()
-    )
+    rows = s.execute(
+        select(IssueRow.kind, IssueRow.source, func.count())
+        .where(IssueRow.state == "open")
+        .group_by(IssueRow.kind, IssueRow.source)
+    ).all()
     ISSUES_OPEN.clear()
     for row in rows:
         kind: str = cast(str, row[0])
@@ -378,13 +353,11 @@ def _normalise_path(path: str) -> str:
     normalised: list[str] = []
     for p in parts:
         # UUIDs (36 chars, 8-4-4-4-12)
-        if re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", p):
-            normalised.append("*")
-        # arvino short ids (e.g. "iss-xxx", "run-xxx")
-        elif re.fullmatch(r"[a-z]{3,4}-[0-9a-f]+", p):
-            normalised.append("*")
-        # plain integers
-        elif p.isdigit():
+        if (
+            re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", p)
+            or re.fullmatch(r"[a-z]{3,4}-[0-9a-f]+", p)
+            or p.isdigit()
+        ):
             normalised.append("*")
         else:
             normalised.append(p)
