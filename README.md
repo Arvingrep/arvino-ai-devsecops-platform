@@ -2,12 +2,12 @@
 
 Multi-project agile AI development, operations, and maintenance platform for a solo DevOps/Kubernetes architect.
 
-**Not another AI company wrapper.** This is a thin orchestration layer that coordinates Plane, Temporal, OpenHands/Claude Code, Gitea/GitHub, OPA, Trivy, Argo CD and Nightingale — it only owns what no existing tool owns: workflow DAGs, the cross-tool run ledger, and the invariants between them.
+**Not another AI company wrapper.** This is a thin orchestration layer that coordinates Temporal, OpenHands/Claude Code, Gitea/GitHub, OPA, Trivy, Argo CD and Nightingale — it only owns what no existing tool owns: workflow DAGs, the cross-tool run ledger, and the invariants between them.
 
 ## Architecture
 
 ```
-Plane / Gitea / Nightingale  →  Webhooks  →  arvino (FastAPI)
+Gitea / GitHub / Nightingale  →  Webhooks  →  arvino (FastAPI)
                                                  │
                             ┌────────────────────┤
                             ▼                    ▼

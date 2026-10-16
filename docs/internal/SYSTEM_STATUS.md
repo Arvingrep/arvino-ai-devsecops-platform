@@ -12,7 +12,6 @@
 | arvino API/Worker/OPA/Postgres (GKE) | `curl healthz` + authenticated `GET /projects` + pod status | 2026-10-16 20:04 | 🟡 healthz 200、4 pods Running 0 restarts；现有巡检token访问`/projects`为401，t_6d0dfca1修复中 | arvino-devops |
 | Temporal (GKE) | pods + `temporal operator namespace describe default` | 2026-10-16 20:04 | ✅ 7 pods Running；namespace `default` Registered/Normal | arvino-devops |
 | n8n webhook relay | `curl /healthz` | 2026-10-16 20:04 | ✅ 200 `{"status":"ok"}` | arvino-devops |
-| Plane CE | 根路径 + 登录功能探针 | 2026-10-16 20:04 | 🟡 根路径200；本次curl登录探针CSRF失败，尚不能确认登录功能 | arvino-devops |
 
 ## 已废弃,不再维护
 
@@ -50,7 +49,6 @@
 
 ## 巡检更新 2026-10-16 20:45
 - ArgoCD 隧道仍不可达 (connection refused)。
-- Plane 登录 CSRF 验证仍失败，无法登录。
 - arvino 实时dashboard `/dashboard` 与 `/ui` 仍返回 404，未恢复。
 - arvino API `/projects` 访问仍返回 401，当前 token 失效。
 - OpenHands agent-canvas 页面返回 200，未出现 503，已恢复。

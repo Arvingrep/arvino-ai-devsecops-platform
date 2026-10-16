@@ -41,7 +41,6 @@ class Settings(BaseSettings):
     oidc_role_claim: str = "arvino_role"
 
     # Webhook credentials. Unset -> that source is rejected.
-    plane_webhook_secret: SecretStr | None = None
     gitea_webhook_secret: SecretStr | None = None
     github_webhook_secret: SecretStr | None = None
     ci_webhook_token: SecretStr | None = None

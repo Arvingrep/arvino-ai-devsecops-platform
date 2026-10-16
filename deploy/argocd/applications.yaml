@@ -70,24 +70,3 @@ spec:
   syncPolicy:
     syncOptions: [CreateNamespace=true]
 ---
-# Plane (Community Edition) from the upstream Helm chart.
-apiVersion: argoproj.io/v1alpha1
-kind: Application
-metadata:
-  name: plane
-  namespace: argocd
-spec:
-  project: arvino
-  sources:
-    - repoURL: https://helm.plane.so/
-      chart: plane-ce
-      targetRevision: 1.8.5
-      helm:
-        releaseName: plane-app
-        valueFiles: [$values/deploy/helm-values/plane.yaml]
-    - repoURL: https://git.example.invalid/arvino/ai-devsecops-platform.git # REPLACE
-      targetRevision: main
-      ref: values
-  destination: {server: https://kubernetes.default.svc, namespace: plane}
-  syncPolicy:
-    syncOptions: [CreateNamespace=true]
