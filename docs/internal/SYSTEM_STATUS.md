@@ -42,8 +42,21 @@
 | #116 | canary模块路由404根因修复(6/7路径已验证200) | Open,待Arvin审 |
 | #117 | /shop 500 PHP根因修复 | 2026-10-16 19:46 已合并；运行时独立复验中(t_5d19f7a9)，未先判已修 |
 
-真实未认领业务backlog: 25个Issue,0个被自动认领(2026-10-16查)。
+## 真实未认领业务backlog: 25个Issue,0个被自动认领(2026-10-16查)。
 
 ## 巡检历史（追加，不覆盖）
 
 - 2026-10-16 20:04 PST：dispatch无遗留blocked；发现#117已合并（状态变化），但外部DNS无法解析，已派独立canary验收。发现t_a6c8a486虽为done，实时dashboard三个候选路径仍全部404，纠正为未完成并派修复。ArgoCD隧道仍拒绝连接。API healthz正常但现有巡检token访问`/projects`为401。新建并启动4个任务：t_7fdf1373、t_7bb13686、t_6d0dfca1、t_5d19f7a9；全部订阅唯一有效DM `2057618975`。
+
+## 巡检更新 2026-10-16 20:45
+- ArgoCD 隧道仍不可达 (connection refused)。
+- Plane 登录 CSRF 验证仍失败，无法登录。
+- arvino 实时dashboard `/dashboard` 与 `/ui` 仍返回 404，未恢复。
+- arvino API `/projects` 访问仍返回 401，当前 token 失效。
+- OpenHands agent-canvas 页面返回 200，未出现 503，已恢复。
+- n8n webhook、Temporal、所有 GKE pods 状态正常。
+- 任务 t_7fdf1373、t_7bb13686、t_5d19f7a9、t_6d0dfca1 已完成并在 DM 2057618975 订阅。
+
+---
+
+(记录完毕)
