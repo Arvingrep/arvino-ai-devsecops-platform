@@ -22,7 +22,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import text
 
 from arvino import __version__
-from arvino.db import SessionFactory, transaction
+from arvino.db import transaction
 from arvino.domain import (
     ApprovalStatus,
     ArtifactSpec,
@@ -32,7 +32,8 @@ from arvino.domain import (
     Profile,
 )
 from arvino.engine import Engine
-from arvino.metrics import MetricsMiddleware, collect as metrics_collect
+from arvino.metrics import MetricsMiddleware
+from arvino.metrics import collect as metrics_collect
 from arvino.ports import StepOutcome
 from arvino.settings import Settings, secret
 from arvino.views import (

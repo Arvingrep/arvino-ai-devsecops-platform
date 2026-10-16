@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import tempfile
 from pathlib import Path
 
 import pytest
@@ -16,7 +15,6 @@ from arvino.adapters.argocd_promoter import (
     _set_image_tag,
 )
 from arvino.ports import PromotionRequest
-
 
 # ---------------------------------------------------------------------------
 # _inject_token

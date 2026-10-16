@@ -6,11 +6,8 @@ import logging
 import urllib.error
 from unittest.mock import MagicMock, patch
 
-import pytest
-
 from arvino.adapters.telegram_notifier import TelegramRunNotifier
 from arvino.ports import IssueRef
-
 
 # -- Test 1: no token -> no-op (no HTTP call made) ----------------------------
 
@@ -87,16 +84,17 @@ def test_poke_noop_when_no_poke_fn() -> None:
 
 
 def test_http_failure_caught_and_logged() -> None:
-    import logging
     import urllib.request as urllib_request
 
     notifier = TelegramRunNotifier(bot_token="tok", chat_id="123")
 
     # Directly mock the module's logger to verify the warning is emitted
-    with patch.object(logging.getLogger("arvino.adapters.telegram_notifier"), "warning") as mock_warning:
-        with patch.object(urllib_request, "urlopen", side_effect=urllib.error.URLError("connection refused")):
-            # Should not raise
-            notifier._send("test message")
+    with (
+        patch.object(logging.getLogger("arvino.adapters.telegram_notifier"), "warning") as mock_warning,
+        patch.object(urllib_request, "urlopen", side_effect=urllib.error.URLError("connection refused")),
+    ):
+        # Should not raise
+        notifier._send("test message")
 
     # Verify the warning was logged
     mock_warning.assert_called_once()

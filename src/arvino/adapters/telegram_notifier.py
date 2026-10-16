@@ -19,7 +19,7 @@ import ssl
 import urllib.request
 from typing import Any
 
-from arvino.ports import IssueRef, RunNotifier
+from arvino.ports import IssueRef
 
 log = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ class TelegramRunNotifier:
         req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
         try:
             ctx = ssl.create_default_context()
-            with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:
+            with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:  # noqa: S310
                 if resp.status != 200:
                     log.warning("telegram API %d", resp.status)
         except Exception as exc:

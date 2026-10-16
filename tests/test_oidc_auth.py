@@ -94,7 +94,7 @@ def _make_settings(jwks_url: str = "https://auth.k8shome.com/application/o/arvin
 
 
 def _make_settings_with_static_tokens(jwks_url: str) -> Settings:
-    from tests.payloads import OWNER_TOKEN, AGENT_TOKEN
+    from tests.payloads import AGENT_TOKEN, OWNER_TOKEN
 
     return Settings(
         database_url="sqlite://",
@@ -124,8 +124,9 @@ def test_looks_like_jwt_helper() -> None:
 
 def test_static_token_path_unchanged(rsa_key: rsa.RSAPrivateKey, jwks: dict[str, Any]) -> None:
     """Static tokens still work even when OIDC is configured."""
-    from tests.payloads import OWNER_TOKEN, AGENT_TOKEN
     import httpx as _httpx
+
+    from tests.payloads import AGENT_TOKEN, OWNER_TOKEN
 
     jwks_url = "https://auth.k8shome.com/application/o/arvino/jwks/"
     settings = _make_settings_with_static_tokens(jwks_url)
@@ -137,7 +138,6 @@ def test_static_token_path_unchanged(rsa_key: rsa.RSAPrivateKey, jwks: dict[str,
 
     import arvino.api as api_mod
 
-    orig = _httpx.get
 
     def _fake_get(url: str, **kw: Any) -> _httpx.Response:
         return _httpx.Client(transport=_FakeTransport()).get(url, **kw)

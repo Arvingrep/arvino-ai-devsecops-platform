@@ -1,4 +1,4 @@
-"""Tests for Phase 6 – cost/budget tracking and spending-change approval.
+"""Tests for Phase 6 - cost/budget tracking and spending-change approval.
 
 Coverage:
 - ClaudeCodeExecutor extracts cost_usd from JSON output and includes it in StepOutcome.output
@@ -22,9 +22,15 @@ from unittest.mock import patch
 import pytest
 
 from arvino.adapters.claude_code import ClaudeCodeExecutor
-from arvino.domain import ApprovalKind, ApprovalStatus, StepKind, StepStatus
+from arvino.domain import ApprovalKind, ApprovalStatus, StepStatus
 from arvino.engine import Engine, EngineSettings
-from arvino.fakes import FakeGit, RecordingNotifier, RecordingTracker, RecordOnlyPromoter, StaticPolicy
+from arvino.fakes import (
+    FakeGit,
+    RecordingNotifier,
+    RecordingTracker,
+    RecordOnlyPromoter,
+    StaticPolicy,
+)
 from arvino.ports import IssueRef, StepRequest
 
 # ---------------------------------------------------------------------------
@@ -195,7 +201,7 @@ class _CostExecutor:
 
     COST_PER_STEP: float = 0.10
 
-    def execute(self, request: StepRequest):  # noqa: ANN201
+    def execute(self, request: StepRequest):
         from arvino.domain import ArtifactSpec
         from arvino.ports import StepOutcome
 
@@ -243,7 +249,6 @@ class TestCostAccumulationInViews:
         """Runs using a no-cost executor accumulate 0.0."""
         from arvino.db import init_schema, make_engine, make_session_factory
         from arvino.fakes import ScriptedExecutor
-        from arvino.domain import ArtifactSpec
         from arvino.ports import Ports, StepOutcome
         from arvino.workflows.model import load_registry
 
@@ -274,7 +279,7 @@ class TestBudgetEnforcement:
         engine = engine_factory(budget_usd=None)
         run = _make_run(engine)
         run = engine.advance(run.id)
-        kinds = {s.kind for s in run.steps}
+        {s.kind for s in run.steps}
         # approval steps exist only for the APPROVAL kind
         spending = [
             s for s in run.steps

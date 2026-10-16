@@ -16,8 +16,8 @@ from __future__ import annotations
 
 from arvino.bmad import (
     architecture_artifact,
-    brief_artifact,
     bmad_uri,
+    brief_artifact,
     filter_bmad,
     prd_artifact,
     sha256_of_text,
@@ -25,7 +25,7 @@ from arvino.bmad import (
 )
 from arvino.domain import ArtifactSpec, BmadArtifactKind, Profile
 from arvino.ports import StepOutcome, StepRequest
-from tests.conftest import Env, build_env
+from tests.conftest import Env
 
 _REPO = "Arvingrep/firebird-sea"
 _REF = "main"
@@ -106,7 +106,7 @@ def test_sha256_of_text_returns_64_hex_chars() -> None:
 
 def test_artifactspec_rejects_bad_sha256() -> None:
     import pytest
-    with pytest.raises(Exception):
+    with pytest.raises(ValueError):
         ArtifactSpec(kind="bmad-prd", name="prd", uri="git://x/y", sha256="tooshort")
 
 

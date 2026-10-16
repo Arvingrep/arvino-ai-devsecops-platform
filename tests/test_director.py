@@ -7,30 +7,26 @@ retry behaviour, slot management, YAML/JSON parsing, CLI, and output files.
 from __future__ import annotations
 
 import json
-import os
 import sys
 import textwrap
 import time
 from pathlib import Path
-from unittest.mock import patch as mock_patch
 
 import pytest
 
 # Ensure the scripts directory is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 
-import director  # noqa: E402
+import director
 from director import (
+    DirectorController,
     Task,
     TaskRegistry,
-    DirectorController,
-    _parse_simple_yaml,
-    _elapsed_human,
     _detect_terminal_status,
+    _elapsed_human,
     _now_iso,
-    VALID_STATUSES,
+    _parse_simple_yaml,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures

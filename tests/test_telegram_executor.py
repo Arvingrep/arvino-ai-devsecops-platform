@@ -468,9 +468,11 @@ class TestExecuteErrors:
     ) -> None:
         ex = TelegramAgentExecutor(group_id=GROUP_ID)
         req = _make_request(repo=None)
-        with patch.dict(os.environ, {"BOT_BACKEND": "tok-be"}):
-            with patch.object(ex, "_send_message", MagicMock(return_value=42)):
-                outcome = ex.execute(req)
+        with (
+            patch.dict(os.environ, {"BOT_BACKEND": "tok-be"}),
+            patch.object(ex, "_send_message", MagicMock(return_value=42)),
+        ):
+            outcome = ex.execute(req)
         assert outcome.status == "failed"
         assert "repo" in (outcome.error or "").lower()
 
@@ -486,9 +488,11 @@ class TestApprovalPolling:
             group_id=GROUP_ID, enable_approval_polling=False
         )
         req = _make_request()
-        with patch.dict(os.environ, bot_env):
-            with patch.object(ex, "_send_message", MagicMock(return_value=42)):
-                outcome = ex.request_approval(req, "tok-orch")
+        with (
+            patch.dict(os.environ, bot_env),
+            patch.object(ex, "_send_message", MagicMock(return_value=42)),
+        ):
+            outcome = ex.request_approval(req, "tok-orch")
         assert outcome.status == "running"
         assert outcome.output["approval"] == "pending"
 
@@ -513,10 +517,12 @@ class TestApprovalPolling:
             },
         }
 
-        with patch.dict(os.environ, bot_env):
-            with patch.object(ex, "_send_message", MagicMock(return_value=42)):
-                with patch.object(ex, "_get_updates", return_value=[approve_update]):
-                    outcome = ex.request_approval(req, "tok-orch")
+        with (
+            patch.dict(os.environ, bot_env),
+            patch.object(ex, "_send_message", MagicMock(return_value=42)),
+            patch.object(ex, "_get_updates", return_value=[approve_update]),
+        ):
+            outcome = ex.request_approval(req, "tok-orch")
 
         assert outcome.status == "succeeded"
         assert outcome.output["approval"] == "approved"
@@ -541,10 +547,12 @@ class TestApprovalPolling:
             },
         }
 
-        with patch.dict(os.environ, bot_env):
-            with patch.object(ex, "_send_message", MagicMock(return_value=42)):
-                with patch.object(ex, "_get_updates", return_value=[reject_update]):
-                    outcome = ex.request_approval(req, "tok-orch")
+        with (
+            patch.dict(os.environ, bot_env),
+            patch.object(ex, "_send_message", MagicMock(return_value=42)),
+            patch.object(ex, "_get_updates", return_value=[reject_update]),
+        ):
+            outcome = ex.request_approval(req, "tok-orch")
 
         assert outcome.status == "failed"
         assert outcome.output["approval"] == "rejected"
@@ -579,10 +587,12 @@ class TestApprovalPolling:
                 return calls.pop(0)
             return []
 
-        with patch.dict(os.environ, bot_env):
-            with patch.object(ex, "_send_message", MagicMock(return_value=42)):
-                with patch.object(ex, "_get_updates", side_effect=fake_updates):
-                    outcome = ex.request_approval(req, "tok-orch")
+        with (
+            patch.dict(os.environ, bot_env),
+            patch.object(ex, "_send_message", MagicMock(return_value=42)),
+            patch.object(ex, "_get_updates", side_effect=fake_updates),
+        ):
+            outcome = ex.request_approval(req, "tok-orch")
 
         assert outcome.status == "failed"
         assert "timed out" in (outcome.error or "")
@@ -615,10 +625,12 @@ class TestApprovalPolling:
                 return calls.pop(0)
             return []
 
-        with patch.dict(os.environ, bot_env):
-            with patch.object(ex, "_send_message", MagicMock(return_value=42)):
-                with patch.object(ex, "_get_updates", side_effect=fake_updates):
-                    outcome = ex.request_approval(req, "tok-orch")
+        with (
+            patch.dict(os.environ, bot_env),
+            patch.object(ex, "_send_message", MagicMock(return_value=42)),
+            patch.object(ex, "_get_updates", side_effect=fake_updates),
+        ):
+            outcome = ex.request_approval(req, "tok-orch")
 
         assert outcome.status == "failed"
         assert "timed out" in (outcome.error or "")
@@ -632,10 +644,12 @@ class TestApprovalPolling:
         )
         req = _make_request()
 
-        with patch.dict(os.environ, bot_env):
-            with patch.object(ex, "_send_message", MagicMock(return_value=42)):
-                with patch.object(ex, "_get_updates", return_value=[]):
-                    outcome = ex.request_approval(req, "tok-orch")
+        with (
+            patch.dict(os.environ, bot_env),
+            patch.object(ex, "_send_message", MagicMock(return_value=42)),
+            patch.object(ex, "_get_updates", return_value=[]),
+        ):
+            outcome = ex.request_approval(req, "tok-orch")
 
         assert outcome.status == "failed"
         assert "timed out" in (outcome.error or "")
@@ -650,9 +664,11 @@ class TestApprovalPolling:
 class TestBroadcast:
     def test_broadcast_sends_message(self, bot_env: dict[str, str]) -> None:
         ex = TelegramAgentExecutor(group_id=GROUP_ID)
-        with patch.dict(os.environ, bot_env):
-            with patch.object(ex, "_send_message", MagicMock(return_value=55)) as mock:
-                result = ex.broadcast("architect", "Hello group!")
+        with (
+            patch.dict(os.environ, bot_env),
+            patch.object(ex, "_send_message", MagicMock(return_value=55)) as mock,
+        ):
+            result = ex.broadcast("architect", "Hello group!")
         assert result == 55
         mock.assert_called_once_with("tok-arch", "Hello group!")
 

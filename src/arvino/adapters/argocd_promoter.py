@@ -246,13 +246,9 @@ def _set_image_tag(manifest_path: Path, revision: str) -> None:
     ``ValueError``.
     """
     raw = manifest_path.read_text()
-    doc: dict[str, Any] = yaml.load(raw, Loader=_Loader)
+    doc: dict[str, Any] = yaml.load(raw, Loader=_Loader)  # noqa: S506
 
-    if _patch_kustomization(doc, revision):
-        pass
-    elif _patch_deployment(doc, revision):
-        pass
-    elif _patch_helm_values(doc, revision):
+    if _patch_kustomization(doc, revision) or _patch_deployment(doc, revision) or _patch_helm_values(doc, revision):
         pass
     else:
         raise ValueError(
@@ -341,8 +337,8 @@ def _patch_helm_values(doc: dict[str, Any], revision: str) -> bool:
 def _git(*args: str, check: bool = True) -> Any:
     """Run ``git`` and return stdout, or a CompletedProcess when check=False."""
     env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "Never"}
-    result = subprocess.run(
-        ["git", *args],
+    result = subprocess.run(  # noqa: S603
+        ["git", *args],  # noqa: S607
         capture_output=True,
         text=True,
         check=False,

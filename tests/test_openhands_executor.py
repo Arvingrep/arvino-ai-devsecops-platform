@@ -22,10 +22,9 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from arvino.adapters.openhands import OpenHandsExecutor, OpenHandsError
+from arvino.adapters.openhands import OpenHandsError, OpenHandsExecutor
 from arvino.domain import ArtifactSpec
-from arvino.ports import IssueRef, StepOutcome, StepRequest
-
+from arvino.ports import IssueRef, StepRequest
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -186,7 +185,7 @@ def _build_client_mock(
     # GET /api/conversations/{id}/git/diff
     diff = _mock_response(200, git_diff or {"diff": ""})
 
-    client.get.side_effect = polls + [final, diff]
+    client.get.side_effect = [*polls, final, diff]
 
     return client
 

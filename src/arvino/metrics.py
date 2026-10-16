@@ -10,8 +10,6 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 from datetime import datetime
-
-from fastapi import Request, Response
 from typing import cast
 
 from prometheus_client import (
@@ -378,13 +376,7 @@ def _normalise_path(path: str) -> str:
     normalised: list[str] = []
     for p in parts:
         # UUIDs (36 chars, 8-4-4-4-12)
-        if re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", p):
-            normalised.append("*")
-        # arvino short ids (e.g. "iss-xxx", "run-xxx")
-        elif re.fullmatch(r"[a-z]{3,4}-[0-9a-f]+", p):
-            normalised.append("*")
-        # plain integers
-        elif p.isdigit():
+        if re.fullmatch(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", p) or re.fullmatch(r"[a-z]{3,4}-[0-9a-f]+", p) or p.isdigit():
             normalised.append("*")
         else:
             normalised.append(p)
