@@ -40,7 +40,7 @@ build-backend = "setuptools.build_meta"
 where = ["src"]
 
 [tool.setuptools.package-data]
-arvino = ["workflows/definitions/*.yaml"]
+arvino = ["workflows/definitions/*.yaml", "static/*.html"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

@@ -15,7 +15,7 @@ from typing import Annotated, Any, Literal
 import httpx
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from jose import ExpiredSignatureError, JWTError, jwt  # type: ignore[import-untyped]
 from jose.exceptions import JWKError  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field
@@ -550,4 +550,29 @@ def create_app(engine: Engine, settings: Settings) -> FastAPI:
             parsers.parse_nightingale,
         )
     )
+
+    # ------------------------------------------------------------------ static UI
+
+    import pathlib
+
+    _static_dir = pathlib.Path(__file__).resolve().parent / "static"
+
+    def _read_html(filename: str) -> str:
+        path = _static_dir / filename
+        if not path.is_file():
+            raise HTTPException(404, f"static file not found: {filename}")
+        return path.read_text(encoding="utf-8")
+
+    @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+    def root_redirect() -> RedirectResponse:
+        return RedirectResponse(url="/dashboard")
+
+    @app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
+    def dashboard() -> HTMLResponse:
+        return HTMLResponse(_read_html("dashboard.html"))
+
+    @app.get("/ui", response_class=HTMLResponse, include_in_schema=False)
+    def ui() -> HTMLResponse:
+        return HTMLResponse(_read_html("cycle-roadmap.html"))
+
     return app
