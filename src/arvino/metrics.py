@@ -148,7 +148,7 @@ def collect(sf: SessionFactory) -> bytes:
         "Time to collect metrics from the database",
         registry=REGISTRY,
     ).observe(time.monotonic() - start)
-    return generate_latest(REGISTRY)  # type: ignore[no-any-return]
+    return generate_latest(REGISTRY)
 
 
 def _collect_runs(s: Session) -> None:
