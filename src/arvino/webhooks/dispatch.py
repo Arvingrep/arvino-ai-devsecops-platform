@@ -44,7 +44,7 @@ def _infer_profile(labels: list[str], title: str) -> Profile:
     - bug/fix/hotfix label or title keyword -> Fast
     - fallback -> Standard
     """
-    label_set = {l.lower() for l in labels}
+    label_set = {lbl.lower() for lbl in labels}
     if "bmad:story" in label_set:
         return Profile.STANDARD
     if label_set & _GOVERNED_KEYWORDS:

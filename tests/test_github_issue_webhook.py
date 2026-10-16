@@ -8,8 +8,6 @@ Covers:
 """
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from arvino.domain import Profile
@@ -18,7 +16,6 @@ from arvino.webhooks.dispatch import Dispatcher, _infer_profile
 from arvino.webhooks.events import IssueUpserted
 from tests import payloads as P
 from tests.conftest import build_env
-
 
 # ---------------------------------------------------------------------------
 # parsers.parse_git — issues event
@@ -114,7 +111,7 @@ def _make_env_with_github_project():
 
 
 def test_dispatch_github_issue_creates_fast_run() -> None:
-    env, project = _make_env_with_github_project()
+    env, _project = _make_env_with_github_project()
     dispatcher = Dispatcher(env.engine)
 
     ev = IssueUpserted(
@@ -134,7 +131,7 @@ def test_dispatch_github_issue_creates_fast_run() -> None:
 
 
 def test_dispatch_github_issue_creates_standard_run_for_story() -> None:
-    env, project = _make_env_with_github_project()
+    env, _project = _make_env_with_github_project()
     dispatcher = Dispatcher(env.engine)
 
     ev = IssueUpserted(
@@ -153,7 +150,7 @@ def test_dispatch_github_issue_creates_standard_run_for_story() -> None:
 
 
 def test_dispatch_github_issue_creates_governed_run_for_arch() -> None:
-    env, project = _make_env_with_github_project()
+    env, _project = _make_env_with_github_project()
     dispatcher = Dispatcher(env.engine)
 
     ev = IssueUpserted(
@@ -172,7 +169,7 @@ def test_dispatch_github_issue_creates_governed_run_for_arch() -> None:
 
 
 def test_dispatch_github_closed_issue_does_not_create_run() -> None:
-    env, project = _make_env_with_github_project()
+    env, _project = _make_env_with_github_project()
     dispatcher = Dispatcher(env.engine)
 
     ev = IssueUpserted(
@@ -206,7 +203,7 @@ def test_dispatch_github_issue_unknown_repo_ignored() -> None:
 
 
 def test_dispatch_idempotent_second_open_returns_existing_run() -> None:
-    env, project = _make_env_with_github_project()
+    env, _project = _make_env_with_github_project()
     dispatcher = Dispatcher(env.engine)
 
     ev = IssueUpserted(
