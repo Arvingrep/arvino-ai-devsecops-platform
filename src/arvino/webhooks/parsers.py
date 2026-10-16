@@ -98,6 +98,35 @@ def parse_git(provider: str, event: str | None, body: bytes) -> list[InboundEven
     payload = _json(body)
     repo = str(_get(payload, "repository", "full_name"))
     src = "github" if provider == "github" else "gitea"
+    if event == "issues":  # GitHub/Gitea issues.opened / issues.edited / issues.closed
+        action = str(payload.get("action", ""))
+        issue = _get(payload, "issue")
+        if not isinstance(issue, dict):
+            raise PayloadError("issue must be an object")
+        labels: list[str] = []
+        for lab in issue.get("labels") or []:
+            name = lab.get("name") if isinstance(lab, dict) else lab
+            if isinstance(name, str):
+                labels.append(name)
+        body_text = str(issue.get("body") or "")
+        state = str(issue.get("state") or "open")
+        # Map GitHub states to state_group vocab expected by dispatch
+        state_group = "completed" if state == "closed" else "started"
+        try:
+            return [
+                IssueUpserted(
+                    source=src,
+                    action=action,
+                    external_id=str(_get(issue, "number")),
+                    repo=repo,
+                    title=str(issue.get("title") or ""),
+                    body=body_text,
+                    labels=labels,
+                    state_group=state_group,
+                )
+            ]
+        except ValidationError as exc:
+            raise PayloadError(str(exc)) from exc
     if event == "pull_request":
         pr = _get(payload, "pull_request")
         merged_by = (pr.get("merged_by") or {}).get("login") if isinstance(pr, dict) else None
