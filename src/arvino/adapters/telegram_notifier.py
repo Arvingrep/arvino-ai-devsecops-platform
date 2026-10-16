@@ -19,7 +19,7 @@ import ssl
 import urllib.request
 from typing import Any
 
-from arvino.ports import IssueRef, RunNotifier
+from arvino.ports import IssueRef
 
 log = logging.getLogger(__name__)
 
@@ -51,11 +51,15 @@ class TelegramRunNotifier:
             log.debug("telegram: not configured, skipping message")
             return
         url = f"https://api.telegram.org/bot{self._token}/sendMessage"
-        payload = json.dumps({"chat_id": self._chat_id, "text": text, "parse_mode": "HTML"}).encode()
-        req = urllib.request.Request(url, data=payload, headers={"Content-Type": "application/json"})
+        payload = json.dumps(
+            {"chat_id": self._chat_id, "text": text, "parse_mode": "HTML"}
+        ).encode()
+        req = urllib.request.Request(
+            url, data=payload, headers={"Content-Type": "application/json"}
+        )
         try:
             ctx = ssl.create_default_context()
-            with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:
+            with urllib.request.urlopen(req, timeout=5, context=ctx) as resp:  # noqa: S310
                 if resp.status != 200:
                     log.warning("telegram API %d", resp.status)
         except Exception as exc:

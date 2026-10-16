@@ -82,7 +82,9 @@ def _make_token(
     return jwt.encode(claims, pem.decode(), algorithm="RS256", headers={"kid": kid})
 
 
-def _make_settings(jwks_url: str = "https://auth.k8shome.com/application/o/arvino/jwks/") -> Settings:
+def _make_settings(
+    jwks_url: str = "https://auth.k8shome.com/application/o/arvino/jwks/",
+) -> Settings:
     return Settings(
         database_url="sqlite://",
         oidc_issuer=ISSUER,
@@ -94,7 +96,7 @@ def _make_settings(jwks_url: str = "https://auth.k8shome.com/application/o/arvin
 
 
 def _make_settings_with_static_tokens(jwks_url: str) -> Settings:
-    from tests.payloads import OWNER_TOKEN, AGENT_TOKEN
+    from tests.payloads import AGENT_TOKEN, OWNER_TOKEN
 
     return Settings(
         database_url="sqlite://",
@@ -124,8 +126,9 @@ def test_looks_like_jwt_helper() -> None:
 
 def test_static_token_path_unchanged(rsa_key: rsa.RSAPrivateKey, jwks: dict[str, Any]) -> None:
     """Static tokens still work even when OIDC is configured."""
-    from tests.payloads import OWNER_TOKEN, AGENT_TOKEN
     import httpx as _httpx
+
+    from tests.payloads import AGENT_TOKEN, OWNER_TOKEN
 
     jwks_url = "https://auth.k8shome.com/application/o/arvino/jwks/"
     settings = _make_settings_with_static_tokens(jwks_url)
@@ -136,8 +139,6 @@ def test_static_token_path_unchanged(rsa_key: rsa.RSAPrivateKey, jwks: dict[str,
             return _httpx.Response(200, json=jwks)
 
     import arvino.api as api_mod
-
-    orig = _httpx.get
 
     def _fake_get(url: str, **kw: Any) -> _httpx.Response:
         return _httpx.Client(transport=_FakeTransport()).get(url, **kw)
@@ -156,9 +157,7 @@ def test_static_token_path_unchanged(rsa_key: rsa.RSAPrivateKey, jwks: dict[str,
 
 
 @pytest.fixture
-def oidc_client(
-    rsa_key: rsa.RSAPrivateKey, jwks: dict[str, Any], env: Any
-) -> TestClient:
+def oidc_client(rsa_key: rsa.RSAPrivateKey, jwks: dict[str, Any], env: Any) -> TestClient:
     """TestClient with OIDC Authenticator pre-loaded with test JWKS keys (no network)."""
     import arvino.api as api_mod
 
@@ -209,33 +208,25 @@ def test_oidc_agent_cannot_create_project(
     assert r.status_code == 403
 
 
-def test_oidc_expired_token_is_401(
-    oidc_client: TestClient, rsa_key: rsa.RSAPrivateKey
-) -> None:
+def test_oidc_expired_token_is_401(oidc_client: TestClient, rsa_key: rsa.RSAPrivateKey) -> None:
     h = _jwt_header(rsa_key, "owner", expired=True)
     r = oidc_client.get("/projects", headers=h)
     assert r.status_code == 401
 
 
-def test_oidc_unknown_role_is_401(
-    oidc_client: TestClient, rsa_key: rsa.RSAPrivateKey
-) -> None:
+def test_oidc_unknown_role_is_401(oidc_client: TestClient, rsa_key: rsa.RSAPrivateKey) -> None:
     h = _jwt_header(rsa_key, "villain")
     r = oidc_client.get("/projects", headers=h)
     assert r.status_code == 401
 
 
-def test_oidc_wrong_issuer_is_401(
-    oidc_client: TestClient, rsa_key: rsa.RSAPrivateKey
-) -> None:
+def test_oidc_wrong_issuer_is_401(oidc_client: TestClient, rsa_key: rsa.RSAPrivateKey) -> None:
     h = _jwt_header(rsa_key, "owner", issuer="https://evil.example.com/")
     r = oidc_client.get("/projects", headers=h)
     assert r.status_code == 401
 
 
-def test_oidc_wrong_audience_is_401(
-    oidc_client: TestClient, rsa_key: rsa.RSAPrivateKey
-) -> None:
+def test_oidc_wrong_audience_is_401(oidc_client: TestClient, rsa_key: rsa.RSAPrivateKey) -> None:
     h = _jwt_header(rsa_key, "owner", audience="wrong-audience")
     r = oidc_client.get("/projects", headers=h)
     assert r.status_code == 401

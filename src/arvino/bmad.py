@@ -114,7 +114,9 @@ def story_artifact(
     """
     stem = PurePosixPath(path_in_repo).name
     m = _STORY_RE.search(stem)
-    resolved_name: str = name if name is not None else (m.group(1) if m else PurePosixPath(path_in_repo).stem)
+    resolved_name: str = (
+        name if name is not None else (m.group(1) if m else PurePosixPath(path_in_repo).stem)
+    )
     return ArtifactSpec(
         kind=BmadArtifactKind.STORY,
         name=resolved_name,

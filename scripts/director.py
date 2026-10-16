@@ -18,7 +18,6 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import copy
 import glob
 import json
 import os
@@ -26,10 +25,10 @@ import signal
 import sys
 import time
 import uuid
-from dataclasses import dataclass, field, asdict
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 # ---------------------------------------------------------------------------
 # Config
@@ -56,8 +55,9 @@ ACTIVE_STATUSES = {"dispatched", "running", "stuck"}
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _elapsed_human(seconds: float) -> str:
@@ -93,7 +93,7 @@ def _read_last_line(path: str) -> tuple[str, int]:
         return ("", 0)
 
 
-def _detect_terminal_status(last_line: str) -> Optional[str]:
+def _detect_terminal_status(last_line: str) -> str | None:
     """If the transcript shows a final status, return it."""
     ll = last_line.lower()
     if "status=completed" in ll or "exit_reason=completed" in ll:
@@ -105,8 +105,7 @@ def _detect_terminal_status(last_line: str) -> Optional[str]:
     return None
 
 
-def _log_event(event: str, subject: str, detail: str = "",
-               log_path: Path = LOG_PATH) -> None:
+def _log_event(event: str, subject: str, detail: str = "", log_path: Path = LOG_PATH) -> None:
     """Append a single event line to the log file."""
     ts = _now_iso()
     line = f"{ts}  {event:<14}  {subject}"
@@ -165,8 +164,9 @@ def _parse_simple_yaml(text: str) -> list[dict[str, Any]]:
             key = key.strip()
             val = val.strip()
             # Remove quotes
-            if (val.startswith('"') and val.endswith('"')) or \
-               (val.startswith("'") and val.endswith("'")):
+            if (val.startswith('"') and val.endswith('"')) or (
+                val.startswith("'") and val.endswith("'")
+            ):
                 val = val[1:-1]
             # Inline list [a, b, c]
             if val.startswith("[") and val.endswith("]"):
@@ -192,25 +192,27 @@ def _parse_simple_yaml(text: str) -> list[dict[str, Any]]:
 # Task model
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class Task:
     """A single task in the registry."""
+
     task_id: str
     goal: str
     context: str = ""
     dependencies: list[str] = field(default_factory=list)
     status: str = "pending"
-    agent_id: Optional[str] = None
+    agent_id: str | None = None
     max_retries: int = DEFAULT_MAX_RETRIES
     retry_count: int = 0
     timeout_seconds: int = DEFAULT_TIMEOUT
     # Runtime fields
-    dispatched_at: Optional[str] = None
-    completed_at: Optional[str] = None
-    fail_reason: Optional[str] = None
+    dispatched_at: str | None = None
+    completed_at: str | None = None
+    fail_reason: str | None = None
     last_line_count: int = 0
     last_change_ts: float = 0.0
-    transcript_path: Optional[str] = None
+    transcript_path: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
@@ -243,14 +245,15 @@ class Task:
 # Task Registry
 # ---------------------------------------------------------------------------
 
+
 class TaskRegistry:
     """Manages the task list: load, save, query, update."""
 
-    def __init__(self, path: Optional[Path] = None):
+    def __init__(self, path: Path | None = None):
         self.path = path
         self.tasks: dict[str, Task] = {}
 
-    def load(self, path: Optional[Path] = None) -> None:
+    def load(self, path: Path | None = None) -> None:
         p = path or self.path
         if not p or not p.exists():
             return
@@ -260,7 +263,7 @@ class TaskRegistry:
             task = Task.from_dict(item)
             self.tasks[task.task_id] = task
 
-    def save(self, path: Optional[Path] = None) -> None:
+    def save(self, path: Path | None = None) -> None:
         p = path or self.path
         if not p:
             return
@@ -272,11 +275,15 @@ class TaskRegistry:
             f.write("\n")
         os.replace(str(tmp), str(p))
 
-    def add_task(self, goal: str, context: str = "",
-                 dependencies: Optional[list[str]] = None,
-                 task_id: Optional[str] = None,
-                 max_retries: int = DEFAULT_MAX_RETRIES,
-                 timeout_seconds: int = DEFAULT_TIMEOUT) -> Task:
+    def add_task(
+        self,
+        goal: str,
+        context: str = "",
+        dependencies: list[str] | None = None,
+        task_id: str | None = None,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        timeout_seconds: int = DEFAULT_TIMEOUT,
+    ) -> Task:
         tid = task_id or str(uuid.uuid4())[:8]
         task = Task(
             task_id=tid,
@@ -289,7 +296,7 @@ class TaskRegistry:
         self.tasks[tid] = task
         return task
 
-    def get(self, task_id: str) -> Optional[Task]:
+    def get(self, task_id: str) -> Task | None:
         return self.tasks.get(task_id)
 
     def all_tasks(self) -> list[Task]:
@@ -322,6 +329,7 @@ class TaskRegistry:
 # Transcript Discovery
 # ---------------------------------------------------------------------------
 
+
 def discover_transcripts(live_dir: Path = LIVE_DIR) -> dict[str, str]:
     """Return {deleg_id: log_path} for all live transcript files."""
     found: dict[str, str] = {}
@@ -339,17 +347,22 @@ def discover_transcripts(live_dir: Path = LIVE_DIR) -> dict[str, str]:
 # Director Controller
 # ---------------------------------------------------------------------------
 
+
 class DirectorController:
     """Orchestrates task dispatch, monitoring, and retry logic."""
 
-    def __init__(self, registry: TaskRegistry, *,
-                 max_slots: int = MAX_SLOTS,
-                 poll_interval: int = POLL_INTERVAL,
-                 stuck_threshold: int = STUCK_THRESHOLD,
-                 status_path: Path = STATUS_PATH,
-                 log_path: Path = LOG_PATH,
-                 dispatch_queue_path: Path = DISPATCH_QUEUE_PATH,
-                 live_dir: Path = LIVE_DIR):
+    def __init__(
+        self,
+        registry: TaskRegistry,
+        *,
+        max_slots: int = MAX_SLOTS,
+        poll_interval: int = POLL_INTERVAL,
+        stuck_threshold: int = STUCK_THRESHOLD,
+        status_path: Path = STATUS_PATH,
+        log_path: Path = LOG_PATH,
+        dispatch_queue_path: Path = DISPATCH_QUEUE_PATH,
+        live_dir: Path = LIVE_DIR,
+    ):
         self.registry = registry
         self.max_slots = max_slots
         self.poll_interval = poll_interval
@@ -387,8 +400,7 @@ class DirectorController:
         for task in batch:
             task.status = "dispatched"
             task.dispatched_at = _now_iso()
-            _log_event("DISPATCH", task.task_id,
-                       f"goal={task.goal[:80]}", log_path=self.log_path)
+            _log_event("DISPATCH", task.task_id, f"goal={task.goal[:80]}", log_path=self.log_path)
 
         if batch:
             self._write_dispatch_queue(batch)
@@ -412,13 +424,15 @@ class DirectorController:
                 pass
 
         for task in tasks:
-            queue.append({
-                "task_id": task.task_id,
-                "goal": task.goal,
-                "context": task.context,
-                "status": "ready_to_dispatch",
-                "dispatched_at": task.dispatched_at,
-            })
+            queue.append(
+                {
+                    "task_id": task.task_id,
+                    "goal": task.goal,
+                    "context": task.context,
+                    "status": "ready_to_dispatch",
+                    "dispatched_at": task.dispatched_at,
+                }
+            )
 
         self.dispatch_queue_path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.dispatch_queue_path.with_suffix(".tmp")
@@ -449,8 +463,11 @@ class DirectorController:
                 if task.status == "dispatched" and task.dispatched_at:
                     dispatch_time = self._parse_iso(task.dispatched_at)
                     if dispatch_time and (now - dispatch_time) > task.timeout_seconds:
-                        self._mark_failed(task, "dispatch_timeout",
-                                          f"no transcript after {_elapsed_human(now - dispatch_time)}")
+                        self._mark_failed(
+                            task,
+                            "dispatch_timeout",
+                            f"no transcript after {_elapsed_human(now - dispatch_time)}",
+                        )
                 continue
 
             # Read transcript
@@ -462,8 +479,7 @@ class DirectorController:
                 task.last_change_ts = now
                 if task.status == "dispatched":
                     task.status = "running"
-                    _log_event("RUNNING", task.task_id,
-                               f"lines={lc}", log_path=self.log_path)
+                    _log_event("RUNNING", task.task_id, f"lines={lc}", log_path=self.log_path)
                 elif task.status == "stuck":
                     task.status = "running"
                     _log_event("UNSTUCK", task.task_id, log_path=self.log_path)
@@ -487,14 +503,12 @@ class DirectorController:
             if task.dispatched_at:
                 dispatch_time = self._parse_iso(task.dispatched_at)
                 if dispatch_time and (now - dispatch_time) > task.timeout_seconds:
-                    self._mark_failed(task, "timeout",
-                                      f"exceeded {task.timeout_seconds}s")
+                    self._mark_failed(task, "timeout", f"exceeded {task.timeout_seconds}s")
 
         # Cascade: mark pending tasks with failed deps as failed
         for task in self.registry.by_status("pending"):
             if self.registry.deps_failed(task):
-                self._mark_failed(task, "dep_failed",
-                                  "dependency permanently failed")
+                self._mark_failed(task, "dep_failed", "dependency permanently failed")
 
         # Try dispatching newly eligible tasks
         self.dispatch_batch()
@@ -503,7 +517,7 @@ class DirectorController:
         self._write_status()
         self._print_table()
 
-    def _find_transcript(self, task: Task, transcripts: dict[str, str]) -> Optional[str]:
+    def _find_transcript(self, task: Task, transcripts: dict[str, str]) -> str | None:
         """Match a task to its transcript file."""
         if task.agent_id and task.agent_id in transcripts:
             return transcripts[task.agent_id]
@@ -517,20 +531,21 @@ class DirectorController:
     def _mark_completed(self, task: Task) -> None:
         task.status = "completed"
         task.completed_at = _now_iso()
-        _log_event("COMPLETED", task.task_id,
-                   f"retries={task.retry_count}", log_path=self.log_path)
+        _log_event("COMPLETED", task.task_id, f"retries={task.retry_count}", log_path=self.log_path)
 
     def _mark_failed(self, task: Task, reason: str, detail: str = "") -> None:
         task.status = "failed"
         task.fail_reason = reason
         task.completed_at = _now_iso()
-        _log_event("FAILED", task.task_id,
-                   f"reason={reason} {detail}".strip(), log_path=self.log_path)
+        _log_event(
+            "FAILED", task.task_id, f"reason={reason} {detail}".strip(), log_path=self.log_path
+        )
 
     def _handle_stuck(self, task: Task, idle_seconds: float) -> None:
         """Handle a stuck agent: retry or fail."""
-        _log_event("STUCK", task.task_id,
-                   f"idle {_elapsed_human(idle_seconds)}", log_path=self.log_path)
+        _log_event(
+            "STUCK", task.task_id, f"idle {_elapsed_human(idle_seconds)}", log_path=self.log_path
+        )
 
         if task.retry_count < task.max_retries:
             task.retry_count += 1
@@ -540,15 +555,19 @@ class DirectorController:
             task.transcript_path = None
             task.last_line_count = 0
             task.last_change_ts = 0.0
-            _log_event("RETRY", task.task_id,
-                       f"attempt {task.retry_count}/{task.max_retries}",
-                       log_path=self.log_path)
+            _log_event(
+                "RETRY",
+                task.task_id,
+                f"attempt {task.retry_count}/{task.max_retries}",
+                log_path=self.log_path,
+            )
         else:
-            self._mark_failed(task, "stuck_exhausted",
-                              f"retries exhausted after {task.max_retries} attempts")
+            self._mark_failed(
+                task, "stuck_exhausted", f"retries exhausted after {task.max_retries} attempts"
+            )
 
     @staticmethod
-    def _parse_iso(iso_str: str) -> Optional[float]:
+    def _parse_iso(iso_str: str) -> float | None:
         """Parse ISO timestamp to epoch seconds."""
         try:
             # Handle both Z and +00:00 suffixes
@@ -650,12 +669,12 @@ class DirectorController:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def cmd_run(args: argparse.Namespace) -> None:
     """Run the director loop."""
     tasks_path = Path(args.tasks)
     if not tasks_path.exists():
-        print(f"[director] error: tasks file not found: {tasks_path}",
-              file=sys.stderr)
+        print(f"[director] error: tasks file not found: {tasks_path}", file=sys.stderr)
         sys.exit(1)
 
     registry = TaskRegistry(tasks_path)

@@ -69,7 +69,9 @@ def main(argv: list[str] | None = None) -> int:
                 try:
                     results = validate_directory(custom_dir)
                     for name, wf in results.items():
-                        print(f"ok custom  {name:30} profile={wf.profile.value:9} steps={len(wf.steps):2} version={wf.version}")
+                        print(
+                            f"ok custom  {name:30} profile={wf.profile.value:9} steps={len(wf.steps):2} version={wf.version}"
+                        )
                 except InvalidWorkflowError as exc:
                     print(f"INVALID custom: {exc}", file=sys.stderr)
                     exit_code = 1

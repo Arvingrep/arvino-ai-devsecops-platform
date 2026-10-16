@@ -158,26 +158,34 @@ class ArgoCDPromoter:
 
     def _clone_cached(self) -> Path:
         """Return a worktree from a cached bare clone (fast path)."""
-        bare = self._cache_dir / "bare"  # type: ignore[union-attr]
+        bare = self._cache_dir / "bare"  # type: ignore[operator]
         if not (bare / "HEAD").exists():
             _git(
-                "clone", "--bare", "--single-branch", "--branch", self._branch,
-                self._authenticated_url, str(bare),
+                "clone",
+                "--bare",
+                "--single-branch",
+                "--branch",
+                self._branch,
+                self._authenticated_url,
+                str(bare),
             )
         else:
             _git("-C", str(bare), "fetch", "--quiet", "origin", self._branch)
 
         worktree = Path(tempfile.mkdtemp(prefix="gitops-wt-"))
         _git(
-            "-C", str(bare), "worktree", "add", "--detach", str(worktree),
+            "-C",
+            str(bare),
+            "worktree",
+            "add",
+            "--detach",
+            str(worktree),
             f"origin/{self._branch}",
         )
         logger.debug("cached worktree -> %s", worktree)
         return worktree
 
-    def _resolve_manifest_path(
-        self, repo_root: Path, app: str, environment: str
-    ) -> Path:
+    def _resolve_manifest_path(self, repo_root: Path, app: str, environment: str) -> Path:
         """Find the manifest file to patch.
 
         Resolution order:
@@ -203,29 +211,36 @@ class ArgoCDPromoter:
             f"in {repo_root} (tried {candidates})"
         )
 
-    def _commit_and_push(
-        self, repo_path: Path, *, message: str, run_id: str
-    ) -> str:
+    def _commit_and_push(self, repo_path: Path, *, message: str, run_id: str) -> str:
         """Stage changes, commit, push, and return the new commit SHA."""
         _git("-C", str(repo_path), "add", "--all")
         # Check if there is anything to commit (no-op promotions are idempotent).
         diff = _git(
-            "-C", str(repo_path), "diff", "--cached", "--quiet",
+            "-C",
+            str(repo_path),
+            "diff",
+            "--cached",
+            "--quiet",
             check=False,
         )
         if diff.returncode == 0:
             # No diff — return HEAD SHA.
-            return _git("-C", str(repo_path), "rev-parse", "HEAD").strip()
+            return _git("-C", str(repo_path), "rev-parse", "HEAD").strip()  # type: ignore[no-any-return]
 
         _git(
-            "-C", str(repo_path), "commit", "--message", message,
-            "--author", "arvino-promoter <promoter@arvino.local>",
+            "-C",
+            str(repo_path),
+            "commit",
+            "--message",
+            message,
+            "--author",
+            "arvino-promoter <promoter@arvino.local>",
         )
         _git("-C", str(repo_path), "push", "origin", f"HEAD:{self._branch}")
 
         sha = _git("-C", str(repo_path), "rev-parse", "HEAD").strip()
         logger.info("committed %s -> %s/%s", sha[:8], self._repo_url, self._branch)
-        return sha
+        return sha  # type: ignore[no-any-return]
 
 
 # ---------------------------------------------------------------------------
@@ -248,9 +263,11 @@ def _set_image_tag(manifest_path: Path, revision: str) -> None:
     raw = manifest_path.read_text()
     doc: dict[str, Any] = yaml.load(raw, Loader=_Loader)  # noqa: S506 - _Loader is SafeLoader/CSafeLoader
 
-    if _patch_kustomization(doc, revision) or _patch_deployment(doc, revision):
-        pass
-    elif _patch_helm_values(doc, revision):
+    if (
+        _patch_kustomization(doc, revision)
+        or _patch_deployment(doc, revision)
+        or _patch_helm_values(doc, revision)
+    ):
         pass
     else:
         raise ValueError(
@@ -299,12 +316,7 @@ def _patch_deployment(doc: dict[str, Any], revision: str) -> bool:
     if kind not in ("Deployment", "StatefulSet", "DaemonSet"):
         return False
 
-    containers = (
-        doc.get("spec", {})
-        .get("template", {})
-        .get("spec", {})
-        .get("containers", [])
-    )
+    containers = doc.get("spec", {}).get("template", {}).get("spec", {}).get("containers", [])
     if not containers:
         raise ValueError(f"{kind} has no spec.template.spec.containers")
 
@@ -339,8 +351,8 @@ def _patch_helm_values(doc: dict[str, Any], revision: str) -> bool:
 def _git(*args: str, check: bool = True) -> Any:
     """Run ``git`` and return stdout, or a CompletedProcess when check=False."""
     env = {**os.environ, "GIT_TERMINAL_PROMPT": "0", "GCM_INTERACTIVE": "Never"}
-    result = subprocess.run(
-        ["git", *args],
+    result = subprocess.run(  # noqa: S603
+        ["git", *args],  # noqa: S607
         capture_output=True,
         text=True,
         check=False,
@@ -365,4 +377,4 @@ def _inject_token(url: str, token: str) -> str:
     prefix = "https://"
     if not url.startswith(prefix):
         raise ValueError(f"Expected https:// clone URL, got: {url!r}")
-    return f"https://arvino:{token}@{url[len(prefix):]}"
+    return f"https://arvino:{token}@{url[len(prefix) :]}"

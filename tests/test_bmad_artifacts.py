@@ -16,8 +16,8 @@ from __future__ import annotations
 
 from arvino.bmad import (
     architecture_artifact,
-    brief_artifact,
     bmad_uri,
+    brief_artifact,
     filter_bmad,
     prd_artifact,
     sha256_of_text,
@@ -25,7 +25,7 @@ from arvino.bmad import (
 )
 from arvino.domain import ArtifactSpec, BmadArtifactKind, Profile
 from arvino.ports import StepOutcome, StepRequest
-from tests.conftest import Env, build_env
+from tests.conftest import Env
 
 _REPO = "Arvingrep/firebird-sea"
 _REF = "main"
@@ -55,7 +55,9 @@ def test_bmad_kind_values_are_distinct() -> None:
 
 
 def test_prd_artifact_fields() -> None:
-    a = prd_artifact(_REPO, _REF, "_bmad-output/planning-artifacts/prds/prd-2026/prd.md", sha256=_SHA)
+    a = prd_artifact(
+        _REPO, _REF, "_bmad-output/planning-artifacts/prds/prd-2026/prd.md", sha256=_SHA
+    )
     assert a.kind == BmadArtifactKind.PRD
     assert a.name == "prd"
     assert a.uri == f"git://{_REPO}/{_REF}/_bmad-output/planning-artifacts/prds/prd-2026/prd.md"
@@ -65,24 +67,38 @@ def test_prd_artifact_fields() -> None:
 
 
 def test_architecture_artifact_derives_name_from_stem() -> None:
-    a = architecture_artifact(_REPO, _REF, "_bmad-output/planning-artifacts/architecture/x/ARCHITECTURE-SPINE.md")
+    a = architecture_artifact(
+        _REPO, _REF, "_bmad-output/planning-artifacts/architecture/x/ARCHITECTURE-SPINE.md"
+    )
     assert a.kind == BmadArtifactKind.ARCHITECTURE
     assert a.name == "ARCHITECTURE-SPINE"
 
 
 def test_architecture_artifact_explicit_name() -> None:
-    a = architecture_artifact(_REPO, _REF, "_bmad-output/planning-artifacts/architecture/x/ARCHITECTURE-SPINE.md", name="arch")
+    a = architecture_artifact(
+        _REPO,
+        _REF,
+        "_bmad-output/planning-artifacts/architecture/x/ARCHITECTURE-SPINE.md",
+        name="arch",
+    )
     assert a.name == "arch"
 
 
 def test_story_artifact_derives_id_from_filename() -> None:
-    a = story_artifact(_REPO, _REF, "_bmad-output/implementation-artifacts/spec-2-1-payments-core.md")
+    a = story_artifact(
+        _REPO, _REF, "_bmad-output/implementation-artifacts/spec-2-1-payments-core.md"
+    )
     assert a.kind == BmadArtifactKind.STORY
     assert a.name == "2-1"
 
 
 def test_story_artifact_explicit_name() -> None:
-    a = story_artifact(_REPO, _REF, "_bmad-output/implementation-artifacts/spec-2-1-payments.md", name="payments-core")
+    a = story_artifact(
+        _REPO,
+        _REF,
+        "_bmad-output/implementation-artifacts/spec-2-1-payments.md",
+        name="payments-core",
+    )
     assert a.name == "payments-core"
 
 
@@ -106,7 +122,8 @@ def test_sha256_of_text_returns_64_hex_chars() -> None:
 
 def test_artifactspec_rejects_bad_sha256() -> None:
     import pytest
-    with pytest.raises(Exception):
+
+    with pytest.raises(ValueError):
         ArtifactSpec(kind="bmad-prd", name="prd", uri="git://x/y", sha256="tooshort")
 
 
@@ -133,7 +150,8 @@ def test_filter_bmad_returns_only_matching_kind() -> None:
 
 _PRD = prd_artifact(_REPO, _REF, "_bmad-output/planning-artifacts/prds/prd.md", sha256=_SHA)
 _ARCH = architecture_artifact(
-    _REPO, _REF,
+    _REPO,
+    _REF,
     "_bmad-output/planning-artifacts/architecture/x/ARCHITECTURE-SPINE.md",
     sha256="b" * 64,
 )
@@ -147,9 +165,9 @@ def _spec_executor(req: StepRequest) -> StepOutcome:
 def _architecture_executor(req: StepRequest) -> StepOutcome:
     """Simulates the architect step consuming the PRD and registering the arch artifact."""
     # Verify the PRD was delivered as upstream
-    assert any(a.kind == BmadArtifactKind.PRD and a.name == "prd" for a in req.upstream_artifacts), (
-        f"architecture step did not receive PRD; upstream={req.upstream_artifacts}"
-    )
+    assert any(
+        a.kind == BmadArtifactKind.PRD and a.name == "prd" for a in req.upstream_artifacts
+    ), f"architecture step did not receive PRD; upstream={req.upstream_artifacts}"
     return StepOutcome(status="succeeded", artifacts=[_ARCH])
 
 
@@ -234,9 +252,12 @@ def test_standard_only_direct_upstream_artifacts_flow(env: Env) -> None:
 # Integration tests: Governed workflow — artifact flow
 # ---------------------------------------------------------------------------
 
-_GOVERNED_PRD = prd_artifact(_REPO, _REF, "_bmad-output/planning-artifacts/prds/prd.md", sha256="c" * 64)
+_GOVERNED_PRD = prd_artifact(
+    _REPO, _REF, "_bmad-output/planning-artifacts/prds/prd.md", sha256="c" * 64
+)
 _GOVERNED_ARCH = architecture_artifact(
-    _REPO, _REF,
+    _REPO,
+    _REF,
     "_bmad-output/planning-artifacts/architecture/x/ARCHITECTURE-SPINE.md",
     sha256="d" * 64,
 )
@@ -250,9 +271,7 @@ def test_governed_spec_artifact_reaches_adr(env: Env) -> None:
     adr_received_prd: list[bool] = []
 
     def _adr_executor(req: StepRequest) -> StepOutcome:
-        adr_received_prd.append(
-            any(a.kind == BmadArtifactKind.PRD for a in req.upstream_artifacts)
-        )
+        adr_received_prd.append(any(a.kind == BmadArtifactKind.PRD for a in req.upstream_artifacts))
         return StepOutcome(status="succeeded", artifacts=[_GOVERNED_ARCH])
 
     env.executor.script("adr", _adr_executor)
@@ -297,9 +316,12 @@ def test_governed_adr_artifact_reaches_implementation_after_approval(env: Env) -
 # Integration tests: multiple BMAD artifact kinds from one step
 # ---------------------------------------------------------------------------
 
+
 def test_spec_step_can_register_prd_and_brief_together(env: Env) -> None:
     """A product step may register both a PRD and a brief in a single completion."""
-    _brief = brief_artifact(_REPO, _REF, "_bmad-output/planning-artifacts/briefs/b/brief.md", sha256="e" * 64)
+    _brief = brief_artifact(
+        _REPO, _REF, "_bmad-output/planning-artifacts/briefs/b/brief.md", sha256="e" * 64
+    )
 
     env.executor.script(
         "spec",
@@ -316,7 +338,8 @@ def test_spec_step_can_register_prd_and_brief_together(env: Env) -> None:
 def test_architecture_step_can_register_arch_and_story_together(env: Env) -> None:
     """An architect step may register arch doc and a first story spec together."""
     _story = story_artifact(
-        _REPO, _REF,
+        _REPO,
+        _REF,
         "_bmad-output/implementation-artifacts/spec-2-1-payments-core.md",
         sha256="f" * 64,
     )

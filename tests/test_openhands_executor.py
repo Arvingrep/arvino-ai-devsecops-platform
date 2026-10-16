@@ -22,10 +22,9 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from arvino.adapters.openhands import OpenHandsExecutor, OpenHandsError
+from arvino.adapters.openhands import OpenHandsError, OpenHandsExecutor
 from arvino.domain import ArtifactSpec
-from arvino.ports import IssueRef, StepOutcome, StepRequest
-
+from arvino.ports import IssueRef, StepRequest
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -172,8 +171,8 @@ def _build_client_mock(
 
     # POST /api/conversations → create
     client.post.side_effect = [
-        _mock_response(200, {"id": conv_id}),           # create conversation
-        _mock_response(200, {"started": True}),          # start goal
+        _mock_response(200, {"id": conv_id}),  # create conversation
+        _mock_response(200, {"started": True}),  # start goal
     ]
 
     # GET /api/conversations/{id} → poll (running N-1 times, then terminal)
@@ -186,7 +185,7 @@ def _build_client_mock(
     # GET /api/conversations/{id}/git/diff
     diff = _mock_response(200, git_diff or {"diff": ""})
 
-    client.get.side_effect = polls + [final, diff]
+    client.get.side_effect = [*polls, final, diff]
 
     return client
 
@@ -366,7 +365,10 @@ class TestExecuteErrors:
             outcome = ex.execute(req)
 
         assert outcome.status == "failed"
-        assert "terminal" in (outcome.error or "").lower() or "timed out" in (outcome.error or "").lower()
+        assert (
+            "terminal" in (outcome.error or "").lower()
+            or "timed out" in (outcome.error or "").lower()
+        )
 
     def test_404_on_final_response_still_succeeds(self) -> None:
         """Missing final response (404) should not fail the step."""
@@ -382,7 +384,7 @@ class TestExecuteErrors:
         diff_ok = _mock_response(200, {})
         client_mock.get.side_effect = [
             _mock_response(200, {"status": "completed"}),
-            not_found,   # agent_final_response → 404
+            not_found,  # agent_final_response → 404
             diff_ok,
         ]
 

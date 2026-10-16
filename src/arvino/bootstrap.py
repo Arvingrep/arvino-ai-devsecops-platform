@@ -11,7 +11,6 @@ from arvino.engine import Engine, EngineSettings
 from arvino.fakes import (
     FakeGit,
     QueueExecutor,
-    RecordingNotifier,
     RecordingTracker,
     RecordOnlyPromoter,
     SandboxExecutor,

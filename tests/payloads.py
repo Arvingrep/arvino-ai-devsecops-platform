@@ -108,8 +108,7 @@ def ci_completion(
     base["repo"] = repo
     base["sha"] = sha
     base["checks"] = [
-        {"name": n, "conclusion": c, "url": f"https://ci.example/{n}"}
-        for n, c in checks.items()
+        {"name": n, "conclusion": c, "url": f"https://ci.example/{n}"} for n, c in checks.items()
     ]
     if branch:
         base["branch"] = branch
