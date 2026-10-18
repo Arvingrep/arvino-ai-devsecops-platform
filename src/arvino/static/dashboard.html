@@ -318,17 +318,18 @@ async function refreshAll() {
   updateConnection('loading');
   fetchErrors = 0;
 
-  const endpoints = ['/projects', '/runs', '/approvals'];
+  const endpoints = ['/projects', '/runs', '/approvals', '/events'];
   const results = await Promise.allSettled(endpoints.map(e => apiFetch(e).catch(err => ({ _error: err.message }))));
 
   const projects = results[0].value || [];
   const runs = results[1].value || [];
   const approvals = results[2].value || [];
+  const events = results[3].value || [];
 
   // Check errors
   results.forEach(r => { if (r.status === 'rejected' || (r.value && r.value._error)) fetchErrors++; });
 
-  if (fetchErrors === 3) {
+  if (fetchErrors === endpoints.length) {
     updateConnection('error');
     showEmptyAll('Connection failed');
     return;
@@ -338,6 +339,7 @@ async function refreshAll() {
   renderProjects(Array.isArray(projects) ? projects : (projects.items || projects.data || []));
   renderRuns(Array.isArray(runs) ? runs : (runs.items || runs.data || []));
   renderApprovals(Array.isArray(approvals) ? approvals : (approvals.items || approvals.data || []));
+  renderEvents(Array.isArray(events) ? events : (events.items || events.data || []));
 
   document.getElementById('last-refresh').textContent = 'Updated ' + new Date().toLocaleTimeString();
 }
@@ -516,48 +518,24 @@ function renderApprovals(approvals) {
   });
   html += '</tbody></table>';
   el.innerHTML = html;
-
-  // Also fetch /work for additional context
-  fetchWork();
 }
 
-// ── Fetch /work and /workflows ──
-async function fetchWork() {
-  try {
-    const work = await apiFetch('/work');
-    const workflows = await apiFetch('/workflows');
-    renderEvents(work, workflows);
-  } catch { /* non-critical */ }
-}
-
-function renderEvents(work, workflows) {
+// ── Render Recent Events (global /events feed, newest first) ──
+function renderEvents(events) {
   const el = document.getElementById('events-body');
-  const workItems = Array.isArray(work) ? work : (work?.items || work?.data || []);
-  const wfItems = Array.isArray(workflows) ? workflows : (workflows?.items || workflows?.data || []);
-  const total = workItems.length + wfItems.length;
-  document.getElementById('events-count').textContent = `(${total})`;
+  const items = Array.isArray(events) ? events : (events?.items || events?.data || []);
+  document.getElementById('events-count').textContent = `(${items.length})`;
 
-  if (!total) { el.innerHTML = '<div class="empty">No recent events</div>'; return; }
+  if (!items.length) { el.innerHTML = '<div class="empty">No recent events</div>'; return; }
 
-  let html = '<table><thead><tr><th>Type</th><th>Details</th><th>Time</th></tr></thead><tbody>';
+  let html = '<table><thead><tr><th>Type</th><th>Run</th><th>Actor</th><th>Time</th></tr></thead><tbody>';
 
-  workItems.slice(0, 15).forEach(w => {
-    const keys = Object.keys(w);
-    const nameKey = keys.find(k => /name/i.test(k)) || keys[0];
-    const statusKey = keys.find(k => /status/i.test(k));
-    const timeKey = keys.find(k => /(created|date|time|updated)/i.test(k));
-    html += `<tr><td><span class="badge info">Work</span></td>`;
-    html += `<td>${esc(w[nameKey] || '-')}</td>`;
-    html += `<td style="color:var(--muted)">${timeKey ? esc(timeAgo(w[timeKey])) : '-'}</td></tr>`;
-  });
-
-  wfItems.slice(0, 15).forEach(wf => {
-    const keys = Object.keys(wf);
-    const nameKey = keys.find(k => /name/i.test(k)) || keys[0];
-    const timeKey = keys.find(k => /(created|date|time|updated)/i.test(k));
-    html += `<tr><td><span class="badge purple">Workflow</span></td>`;
-    html += `<td>${esc(wf[nameKey] || '-')}</td>`;
-    html += `<td style="color:var(--muted)">${timeKey ? esc(timeAgo(wf[timeKey])) : '-'}</td></tr>`;
+  items.slice(0, 15).forEach(e => {
+    const ts = e.created_at || e.timestamp || '';
+    html += `<tr><td><span class="badge info">${esc(e.type || '-')}</span></td>`;
+    html += `<td>${esc(e.run_id || '-')}</td>`;
+    html += `<td>${esc(e.actor || '-')}</td>`;
+    html += `<td style="color:var(--muted)">${ts ? esc(timeAgo(ts)) : '-'}</td></tr>`;
   });
 
   html += '</tbody></table>';

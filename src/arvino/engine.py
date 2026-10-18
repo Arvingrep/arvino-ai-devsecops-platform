@@ -421,6 +421,13 @@ class Engine:
             s.expunge_all()
             return rows
 
+    def recent_events(self, limit: int = 50) -> list[EventRow]:
+        """Newest events across all runs (the global feed behind GET /events)."""
+        with transaction(self._sf) as s:
+            rows = list(s.scalars(select(EventRow).order_by(EventRow.id.desc()).limit(limit)))
+            s.expunge_all()
+            return rows
+
     def find_run_by_branch(self, branch: str) -> RunView | None:
         run_id = run_id_from_branch(branch)
         if run_id is None:
