@@ -88,11 +88,32 @@ def build_git_provider(settings: Settings) -> GitProvider:
 def build_executor(settings: Settings) -> AgentExecutor:
     """Instantiate the agent executor for production (queue) mode.
 
-    When ``ARVINO_REPO_BASE_DIR`` is set, ``ClaudeCodeExecutor`` runs Claude
-    Code in isolated worktrees under that directory.  Otherwise the pull-model
-    ``QueueExecutor`` is used (external harness picks up work items and posts
-    completion via the API).
+    Priority order (first match wins):
+    1. ``ARVINO_OPENHANDS_BASE_URL`` set → ``OpenHandsExecutor`` (Agent Canvas).
+    2. ``ARVINO_REPO_BASE_DIR`` set → ``ClaudeCodeExecutor`` (local worktree).
+    3. Fallback → ``QueueExecutor`` (pull-model; external harness / agent-harness.sh
+       picks up work items and posts completion via the API).
+
+    ``OpenHandsExecutor`` and ``ClaudeCodeExecutor`` can coexist simultaneously
+    when both env-vars are set: ``openhands_base_url`` takes priority and its
+    executor is registered under the ``"openhands"`` key in ``RoleRouter``,
+    while ``ClaudeCodeExecutor`` (or ``QueueExecutor``) remains under
+    ``"claude_code"``.  Operators switch individual roles in ``_ROLE_MAP``
+    to route traffic to either adapter.
     """
+    if settings.openhands_base_url:
+        from arvino.adapters.openhands import OpenHandsExecutor
+
+        log.info(
+            "Agent executor: OpenHandsExecutor (base=%s, timeout=%ss)",
+            settings.openhands_base_url,
+            settings.openhands_timeout_seconds,
+        )
+        return OpenHandsExecutor(
+            base_url=settings.openhands_base_url,
+            timeout_seconds=settings.openhands_timeout_seconds,
+        )
+
     repo_base = Path(settings.repo_base_dir) if settings.repo_base_dir else None
     if repo_base is not None:
         from arvino.adapters.claude_code import ClaudeCodeExecutor
@@ -127,10 +148,27 @@ def build_engine(settings: Settings, *, init_db: bool = True) -> Engine:
     else:
         # Production mode: wire real adapters.
         git = build_git_provider(settings)
-        executor = build_executor(settings)
+
+        # Build the primary executor (OpenHands > ClaudeCode > Queue, see build_executor).
+        primary_executor = build_executor(settings)
+
+        # Always keep a "claude_code" key available so the RoleRouter never fails
+        # for legacy roles.  When OpenHandsExecutor is primary, fall back to
+        # QueueExecutor for claude_code (agent-harness.sh can still handle it).
+        if settings.openhands_base_url:
+            # OpenHands is primary; register under "openhands"; claude_code falls
+            # back to QueueExecutor so agent-harness.sh remains functional.
+            adapters: dict[str, AgentExecutor] = {
+                "openhands": primary_executor,
+                "claude_code": QueueExecutor(),
+            }
+            log.info("RoleRouter: openhands (primary) + claude_code (QueueExecutor fallback)")
+        else:
+            adapters = {"claude_code": primary_executor}
+
         from arvino.adapters.role_router import RoleRouter
 
-        executor = RoleRouter({"claude_code": executor})
+        executor = RoleRouter(adapters)
     # Build the underlying notifier (Temporal or no-op) first.
     base_notifier = build_notifier(settings)
     # When Telegram is configured, wrap both tracker and notifier through it.
