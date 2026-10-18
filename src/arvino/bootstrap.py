@@ -162,9 +162,7 @@ def build_engine(settings: Settings, *, init_db: bool = True) -> Engine:
                 "openhands": primary_executor,
                 "claude_code": QueueExecutor(),
             }
-            log.info(
-                "RoleRouter: openhands (primary) + claude_code (QueueExecutor fallback)"
-            )
+            log.info("RoleRouter: openhands (primary) + claude_code (QueueExecutor fallback)")
         else:
             adapters = {"claude_code": primary_executor}
 
