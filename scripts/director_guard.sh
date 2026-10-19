@@ -5,7 +5,7 @@
 # 连续执行第 2 条非只读命令时，打印 HARD WARNING 并以退出码 2 终止。
 #
 # 只读命令白名单（不计数）：
-#   kubectl get/describe/logs/events/top/explain
+#   kubectl get/describe/logs/events/top/explain（含前置 flag 如 --context/-n）
 #   curl (无 -X POST/PUT/PATCH/DELETE 且无 --data/-d)
 #   gh pr view / gh issue view / gh run view / gitea pr view / git log / git diff / git show / git status
 #   cat / ls / find / grep / rg / head / tail / wc / stat / echo / printf / jq / yq / helm template / helm lint
@@ -41,8 +41,8 @@ _director_is_readonly() {
   case "$cmd" in
     # git 只读操作
     git\ log*|git\ diff*|git\ show*|git\ status*|git\ branch*|git\ tag*|git\ stash\ list*) return 0 ;;
-    # kubectl 只读
-    kubectl\ get\ *|kubectl\ describe\ *|kubectl\ logs*|kubectl\ events*|kubectl\ top\ *|kubectl\ explain\ *) return 0 ;;
+    # kubectl 只读（允许 --context/--kubeconfig/-n 等 flag 出现在子命令之前）
+    kubectl\ *get\ *|kubectl\ *get|kubectl\ *describe\ *|kubectl\ *logs*|kubectl\ *events*|kubectl\ *top\ *|kubectl\ *explain\ *) return 0 ;;
     # gh / gitea 只读 PR/issue/run view
     gh\ pr\ view*|gh\ issue\ view*|gh\ run\ view*|gh\ api\ -X\ GET*|gh\ release\ view*) return 0 ;;
     # curl 无写操作（简单判断：无 -X POST/PUT/PATCH/DELETE 且无 --data/-d 标志）

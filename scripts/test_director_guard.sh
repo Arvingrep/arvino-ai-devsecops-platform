@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
-# vendor/test-director-guard.sh — director-guard.sh 验收测试
+# scripts/test_director_guard.sh — director-guard.sh 验收测试
 #
 # 模拟总监在同一事件内执行两次非只读命令：
 #   调用 1（git commit）→ 应打 WARNING，退出码 0
 #   调用 2（kubectl apply）→ 应打 HARD BLOCK，退出码 2
 # 中间穿插一条只读命令（git log）→ 不影响计数
+#
+# 还覆盖 kubectl 前置 flag 场景（QA 返修）：
+#   kubectl --context gcp-gke -n arvino get pods       → 只读
+#   kubectl --context mac-mini-orbstack -n argocd get applications → 只读
+#   kubectl -n arvino logs deploy/arvino-api --tail=50  → 只读
+#   kubectl --context gcp-gke -n arvino apply -f x.yaml → 非只读
+#   kubectl --context gcp-gke -n arvino exec -it pod -- sh → 非只读
 #
 # 用法：bash scripts/test_director_guard.sh
 # 全部断言通过则打印 "ALL PASS" 并退出 0；任一失败退出 1。
@@ -95,8 +102,89 @@ else
   FAILS=$((FAILS + 1))
 fi
 
-# 清理
+# 清理原始测试 state
 rm -f "$COUNT_FILE" "$LOG_FILE"
+
+# =============================================================================
+# QA 返修：kubectl 前置 flag 场景（独立 event ID，避免干扰原有计数）
+# =============================================================================
+echo ""
+echo "--- QA 返修：kubectl flag-before-subcommand 测试 ---"
+
+PFLAG_EVENT="pflag-test-$$"
+export DIRECTOR_GUARD_EVENT_ID="$PFLAG_EVENT"
+COUNT_FILE2="/tmp/director-guard-count-${PFLAG_EVENT}"
+LOG_FILE2="/tmp/director-guard-${PFLAG_EVENT}.log"
+rm -f "$COUNT_FILE2" "$LOG_FILE2"
+
+# Re-source guard 以重置内部变量
+source "$GUARD"
+
+# PF-1: kubectl --context gcp-gke -n arvino get pods → 只读
+set +e
+director_check "kubectl --context gcp-gke -n arvino get pods" 2>/dev/null
+pf1_exit=$?
+set -e
+assert_exit "PF-1 kubectl --context gcp-gke -n arvino get pods → 只读" 0 "$pf1_exit"
+
+count_pf=$(cat "$COUNT_FILE2" 2>/dev/null || echo "0")
+if [ "$count_pf" = "0" ]; then
+  printf '✅ PASS: count still 0 after PF-1 readonly\n'
+else
+  printf '❌ FAIL: count should be 0 after PF-1, got "%s"\n' "$count_pf" >&2
+  FAILS=$((FAILS + 1))
+fi
+
+# PF-2: kubectl --context mac-mini-orbstack -n argocd get applications → 只读
+set +e
+director_check "kubectl --context mac-mini-orbstack -n argocd get applications" 2>/dev/null
+pf2_exit=$?
+set -e
+assert_exit "PF-2 kubectl --context mac-mini-orbstack -n argocd get applications → 只读" 0 "$pf2_exit"
+
+# PF-3: kubectl -n arvino logs deploy/arvino-api --tail=50 → 只读
+set +e
+director_check "kubectl -n arvino logs deploy/arvino-api --tail=50" 2>/dev/null
+pf3_exit=$?
+set -e
+assert_exit "PF-3 kubectl -n arvino logs deploy/arvino-api --tail=50 → 只读" 0 "$pf3_exit"
+
+# Verify count still 0 after 3 readonly calls
+count_after_ro=$(cat "$COUNT_FILE2" 2>/dev/null || echo "0")
+if [ "$count_after_ro" = "0" ]; then
+  printf '✅ PASS: count still 0 after PF-1/2/3 readonly kubectl\n'
+else
+  printf '❌ FAIL: count should be 0 after readonly, got "%s"\n' "$count_after_ro" >&2
+  FAILS=$((FAILS + 1))
+fi
+
+# PF-4: kubectl --context gcp-gke -n arvino apply -f x.yaml → 非只读 (WARNING, exit 0)
+set +e
+director_check "kubectl --context gcp-gke -n arvino apply -f x.yaml" 2>/dev/null
+pf4_exit=$?
+set -e
+assert_exit "PF-4 kubectl --context gcp-gke -n arvino apply -f x.yaml → 非只读 WARNING" 0 "$pf4_exit"
+
+count_pf4=$(cat "$COUNT_FILE2" 2>/dev/null || echo "0")
+if [ "$count_pf4" = "1" ]; then
+  printf '✅ PASS: count = 1 after PF-4 non-readonly apply\n'
+else
+  printf '❌ FAIL: count should be 1 after PF-4, got "%s"\n' "$count_pf4" >&2
+  FAILS=$((FAILS + 1))
+fi
+
+# PF-5: kubectl --context gcp-gke -n arvino exec -it pod -- sh → 非只读 (HARD BLOCK, exit 2)
+set +e
+(
+  source "$GUARD"
+  director_check "kubectl --context gcp-gke -n arvino exec -it pod -- sh"
+) 2>&1
+pf5_exit=$?
+set -e
+assert_exit "PF-5 kubectl --context gcp-gke -n arvino exec -it pod -- sh → 非只读 HARD BLOCK" 2 "$pf5_exit"
+
+# 清理
+rm -f "$COUNT_FILE2" "$LOG_FILE2"
 
 echo ""
 if [ "$FAILS" -eq 0 ]; then
