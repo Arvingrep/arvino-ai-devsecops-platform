@@ -31,6 +31,40 @@ DIRECTOR_GUARD_LOG="${DIRECTOR_GUARD_LOG:-/tmp/director-guard-${DIRECTOR_GUARD_E
 # 计数文件：每个 event 一个，记录本 event 内已执行的非只读命令数
 _GUARD_COUNT_FILE="/tmp/director-guard-count-${DIRECTOR_GUARD_EVENT_ID}"
 
+# ---- kubectl 子命令提取 -------------------------------------------------------
+# 从 kubectl 命令字符串中提取第一个非 flag token 作为子命令。
+# 去除所有全局 flag（--context/--kubeconfig/-n/--namespace/--request-timeout 等，
+# 包括 "flag=value" 和 "flag value" 两种形式）后，取剩余第一个 token。
+_kubectl_subcmd() {
+  local cmd="$1"
+  # 去掉 "kubectl" 开头
+  local rest="${cmd#kubectl}"
+  # 用 awk 逐 token 解析，跳过 flag (-- 或 -) 及其后跟的值
+  printf '%s' "$rest" | awk '
+  {
+    skip = 0
+    for (i = 1; i <= NF; i++) {
+      if (skip) { skip = 0; continue }
+      tok = $i
+      # --flag=value 形式：整个 token 是 flag，跳过
+      if (tok ~ /^--[a-zA-Z][-a-zA-Z0-9]*=/) { continue }
+      # --flag value 或 -X value 形式（短/长 flag 不含 =）
+      if (tok ~ /^-/) {
+        # 需要吞掉下一个 token 作为 value 的 flag 列表：
+        #   --context --cluster --user --kubeconfig --namespace --request-timeout
+        #   -n  -s  --server  --token  --certificate-authority
+        if (tok ~ /^(--context|--cluster|--user|--kubeconfig|--namespace|-n|--server|-s|--token|--certificate-authority|--request-timeout)$/) {
+          skip = 1
+        }
+        continue
+      }
+      # 第一个非 flag token 就是子命令
+      print tok
+      exit
+    }
+  }'
+}
+
 # ---- 只读判断 ---------------------------------------------------------------
 # 返回 0 = 只读（不计数），1 = 非只读（计数）
 _director_is_readonly() {
@@ -41,8 +75,23 @@ _director_is_readonly() {
   case "$cmd" in
     # git 只读操作
     git\ log*|git\ diff*|git\ show*|git\ status*|git\ branch*|git\ tag*|git\ stash\ list*) return 0 ;;
-    # kubectl 只读（允许 --context/--kubeconfig/-n 等 flag 出现在子命令之前）
-    kubectl\ *get\ *|kubectl\ *get|kubectl\ *describe\ *|kubectl\ *logs*|kubectl\ *events*|kubectl\ *top\ *|kubectl\ *explain\ *) return 0 ;;
+
+    # kubectl：先黑名单（写操作子命令），无论出现在命令哪个位置都判为非只读
+    kubectl\ *)
+      local subcmd
+      subcmd=$(_kubectl_subcmd "$cmd")
+      case "$subcmd" in
+        exec|cp|apply|delete|patch|edit|scale|rollout|cordon|uncordon|drain|taint|\
+label|annotate|set|create|replace|run|debug|port-forward|attach|proxy|auth)
+          return 1 ;;
+        get|describe|logs|events|top|explain|version|api-resources|api-versions|cluster-info)
+          return 0 ;;
+        # kubectl 其他子命令默认视为写操作
+        *)
+          return 1 ;;
+      esac
+      ;;
+
     # gh / gitea 只读 PR/issue/run view
     gh\ pr\ view*|gh\ issue\ view*|gh\ run\ view*|gh\ api\ -X\ GET*|gh\ release\ view*) return 0 ;;
     # curl 无写操作（简单判断：无 -X POST/PUT/PATCH/DELETE 且无 --data/-d 标志）

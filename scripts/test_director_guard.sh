@@ -186,6 +186,158 @@ assert_exit "PF-5 kubectl --context gcp-gke -n arvino exec -it pod -- sh → 非
 # 清理
 rm -f "$COUNT_FILE2" "$LOG_FILE2"
 
+# =============================================================================
+# 第三轮 QA 返修：黑名单优先 + 严格子命令提取（覆盖 CRIT-1/2/3 + HIGH-1/2）
+# =============================================================================
+echo ""
+echo "--- QA 第三轮返修：黑名单优先 + 子命令提取测试 ---"
+
+BL_EVENT="blacklist-test-$$"
+export DIRECTOR_GUARD_EVENT_ID="$BL_EVENT"
+COUNT_FILE3="/tmp/director-guard-count-${BL_EVENT}"
+LOG_FILE3="/tmp/director-guard-${BL_EVENT}.log"
+rm -f "$COUNT_FILE3" "$LOG_FILE3"
+
+source "$GUARD"
+
+# --- CRIT-1: exec 子命令含 'apt-get' 必须被 BLOCK（第一条写命令 WARNING exit 0）
+set +e
+director_check "kubectl --context gcp-gke -n arvino exec -it pod -- sh -c 'apt-get update'" 2>/dev/null
+crit1_exit=$?
+set -e
+assert_exit "CRIT-1 exec+apt-get → 非只读 WARNING (exit=0)" 0 "$crit1_exit"
+count_crit1=$(cat "$COUNT_FILE3" 2>/dev/null || echo "0")
+if [ "$count_crit1" = "1" ]; then
+  printf '✅ PASS: count = 1 after CRIT-1 exec (apt-get 不能当只读)\n'
+else
+  printf '❌ FAIL: count should be 1 after CRIT-1, got "%s"\n' "$count_crit1" >&2
+  FAILS=$((FAILS + 1))
+fi
+
+# --- CRIT-2: exec 子命令 'get foo' 也必须被拦截（第二条写命令 HARD BLOCK exit 2）
+set +e
+(
+  source "$GUARD"
+  director_check "kubectl --context gcp-gke -n arvino exec -it pod -- sh -c 'get foo'"
+) 2>&1
+crit2_exit=$?
+set -e
+assert_exit "CRIT-2 exec+'get foo' → 非只读 HARD BLOCK (exit=2)" 2 "$crit2_exit"
+
+# --- CRIT-3: delete 命令后跟 'get' 参数必须被拦截（独立 event，是第一条非只读 → WARNING）
+CRIT3_EVENT="crit3-test-$$"
+export DIRECTOR_GUARD_EVENT_ID="$CRIT3_EVENT"
+COUNT_FILE_C3="/tmp/director-guard-count-${CRIT3_EVENT}"
+rm -f "$COUNT_FILE_C3"
+source "$GUARD"
+
+set +e
+director_check "kubectl --context gcp-gke -n arvino delete pod x --dry-run=client get" 2>/dev/null
+crit3_exit=$?
+set -e
+assert_exit "CRIT-3 delete+trailing-'get' → 非只读 WARNING (exit=0)" 0 "$crit3_exit"
+count_c3=$(cat "$COUNT_FILE_C3" 2>/dev/null || echo "0")
+if [ "$count_c3" = "1" ]; then
+  printf '✅ PASS: count = 1 after CRIT-3 delete (trailing get 不能变只读)\n'
+else
+  printf '❌ FAIL: count should be 1 after CRIT-3, got "%s"\n' "$count_c3" >&2
+  FAILS=$((FAILS + 1))
+fi
+rm -f "$COUNT_FILE_C3"
+
+# HIGH-1: rollout restart 必须被拦截
+HIGH1_EVENT="high1-test-$$"
+export DIRECTOR_GUARD_EVENT_ID="$HIGH1_EVENT"
+COUNT_FILE_H1="/tmp/director-guard-count-${HIGH1_EVENT}"
+rm -f "$COUNT_FILE_H1"
+source "$GUARD"
+
+set +e
+director_check "kubectl --context gcp-gke -n arvino rollout restart deploy/x" 2>/dev/null
+high1_exit=$?
+set -e
+assert_exit "HIGH-1 rollout restart → 非只读 WARNING (exit=0)" 0 "$high1_exit"
+count_h1=$(cat "$COUNT_FILE_H1" 2>/dev/null || echo "0")
+if [ "$count_h1" = "1" ]; then
+  printf '✅ PASS: count = 1 after HIGH-1 rollout\n'
+else
+  printf '❌ FAIL: count should be 1 after HIGH-1, got "%s"\n' "$count_h1" >&2
+  FAILS=$((FAILS + 1))
+fi
+rm -f "$COUNT_FILE_H1"
+
+# HIGH-2: kubectl cp 必须被拦截
+HIGH2_EVENT="high2-test-$$"
+export DIRECTOR_GUARD_EVENT_ID="$HIGH2_EVENT"
+COUNT_FILE_H2="/tmp/director-guard-count-${HIGH2_EVENT}"
+rm -f "$COUNT_FILE_H2"
+source "$GUARD"
+
+set +e
+director_check "kubectl --context gcp-gke -n arvino cp /tmp/a pod:/b" 2>/dev/null
+high2_exit=$?
+set -e
+assert_exit "HIGH-2 kubectl cp → 非只读 WARNING (exit=0)" 0 "$high2_exit"
+count_h2=$(cat "$COUNT_FILE_H2" 2>/dev/null || echo "0")
+if [ "$count_h2" = "1" ]; then
+  printf '✅ PASS: count = 1 after HIGH-2 cp\n'
+else
+  printf '❌ FAIL: count should be 1 after HIGH-2, got "%s"\n' "$count_h2" >&2
+  FAILS=$((FAILS + 1))
+fi
+rm -f "$COUNT_FILE_H2"
+
+# =============================================================================
+# 子 shell / 引号变体测试（验证 guard 不因 function export 而失效于子 shell）
+# =============================================================================
+echo ""
+echo "--- 子 shell / 引号变体测试 ---"
+
+# SH-1: 双引号包裹子命令中含 get — 仍应走 exec 黑名单
+SH1_EVENT="sh1-test-$$"
+export DIRECTOR_GUARD_EVENT_ID="$SH1_EVENT"
+COUNT_FILE_SH1="/tmp/director-guard-count-${SH1_EVENT}"
+rm -f "$COUNT_FILE_SH1"
+source "$GUARD"
+
+set +e
+director_check "kubectl exec pod -- bash -c \"get pods\"" 2>/dev/null
+sh1_exit=$?
+set -e
+assert_exit "SH-1 exec+双引号'get pods' → 非只读 WARNING (exit=0)" 0 "$sh1_exit"
+count_sh1=$(cat "$COUNT_FILE_SH1" 2>/dev/null || echo "0")
+if [ "$count_sh1" = "1" ]; then
+  printf '✅ PASS: count = 1 after SH-1 (双引号内 get 不成只读)\n'
+else
+  printf '❌ FAIL: count should be 1 after SH-1, got "%s"\n' "$count_sh1" >&2
+  FAILS=$((FAILS + 1))
+fi
+rm -f "$COUNT_FILE_SH1"
+
+# SH-2: kubectl get pods —— 无前置 flag 的经典只读，确保不受新逻辑影响
+SH2_EVENT="sh2-test-$$"
+export DIRECTOR_GUARD_EVENT_ID="$SH2_EVENT"
+COUNT_FILE_SH2="/tmp/director-guard-count-${SH2_EVENT}"
+rm -f "$COUNT_FILE_SH2"
+source "$GUARD"
+
+set +e
+director_check "kubectl get pods" 2>/dev/null
+sh2_exit=$?
+set -e
+assert_exit "SH-2 kubectl get pods（无 flag）→ 只读 (exit=0)" 0 "$sh2_exit"
+count_sh2=$(cat "$COUNT_FILE_SH2" 2>/dev/null || echo "0")
+if [ "$count_sh2" = "0" ]; then
+  printf '✅ PASS: count still 0 after SH-2 pure-readonly get\n'
+else
+  printf '❌ FAIL: count should be 0 after SH-2, got "%s"\n' "$count_sh2" >&2
+  FAILS=$((FAILS + 1))
+fi
+rm -f "$COUNT_FILE_SH2"
+
+# 清理 blacklist-test state
+rm -f "$COUNT_FILE3" "$LOG_FILE3"
+
 echo ""
 if [ "$FAILS" -eq 0 ]; then
   echo "ALL PASS"
