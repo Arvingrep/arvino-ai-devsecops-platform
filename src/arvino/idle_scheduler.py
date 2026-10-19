@@ -69,9 +69,7 @@ class IdleScheduler:
                     )
                     started.append(run.id)
             except Exception as exc:
-                log.warning(
-                    "idle_scheduler failed to start run for %s: %s", issue.id, exc
-                )
+                log.warning("idle_scheduler failed to start run for %s: %s", issue.id, exc)
         return started
 
     def _backlog_issues(self, project_id: str) -> list[IssueView]:

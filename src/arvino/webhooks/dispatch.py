@@ -28,6 +28,36 @@ log = logging.getLogger(__name__)
 TERMINAL_STATE_GROUPS = {"completed", "cancelled"}
 INCIDENT_PROFILE = Profile.STANDARD
 
+# Label and title keywords used to auto-infer profile for GitHub/Gitea issues.
+_GOVERNED_KEYWORDS = frozenset(
+    {"architecture", "infra", "infrastructure", "governed", "arch", "epic/infra"}
+)
+_BUGFIX_KEYWORDS = frozenset({"bug", "fix", "hotfix", "bugfix", "regression", "patch"})
+
+
+def _infer_profile(labels: list[str], title: str) -> Profile:
+    """Return Fast/Standard/Governed based on issue labels and title.
+
+    Rules (in priority order):
+    - bmad:story label  -> Standard
+    - architecture/infra label or title keyword -> Governed
+    - bug/fix/hotfix label or title keyword -> Fast
+    - fallback -> Standard
+    """
+    label_set = {lbl.lower() for lbl in labels}
+    if "bmad:story" in label_set:
+        return Profile.STANDARD
+    if label_set & _GOVERNED_KEYWORDS:
+        return Profile.GOVERNED
+    title_lower = title.lower()
+    if any(kw in title_lower for kw in _GOVERNED_KEYWORDS):
+        return Profile.GOVERNED
+    if label_set & _BUGFIX_KEYWORDS:
+        return Profile.FAST
+    if any(kw in title_lower for kw in _BUGFIX_KEYWORDS):
+        return Profile.FAST
+    return Profile.STANDARD
+
 
 class DispatchResult(BaseModel):
     status: str  # handled | ignored
@@ -114,12 +144,18 @@ class Dispatcher:
         return (next(iter(found)) if found else None), None
 
     def _issue(self, ev: IssueUpserted) -> DispatchResult:
-        project = self.engine.find_project(plane_project_id=ev.plane_project_id)
+        # --- locate project ---
+        if ev.source in ("github", "gitea"):
+            if not ev.repo:
+                return DispatchResult(status="ignored", detail="git issue has no repo field")
+            project = self.engine.find_project(repo_full_name=ev.repo)
+        else:
+            project = self.engine.find_project(plane_project_id=ev.plane_project_id or "")
         if project is None:
-            return DispatchResult(status="ignored", detail="unknown Plane project")
+            return DispatchResult(status="ignored", detail="unknown project")
         issue, _ = self.engine.upsert_issue(
             project.id,
-            "plane",
+            ev.source,
             ev.external_id,
             ev.title,
             body=ev.body,
@@ -129,14 +165,17 @@ class Dispatcher:
         profile, label_error = self._profile_from_labels(ev.labels)
         if label_error:
             return DispatchResult(status="ignored", detail=label_error)
+        # --- auto-infer profile when none is set via label ---
+        if profile is None and ev.source in ("github", "gitea"):
+            profile = _infer_profile(ev.labels, ev.title)
         if profile is None or ev.action == "deleted" or ev.state_group in TERMINAL_STATE_GROUPS:
             return DispatchResult(status="handled", detail="issue stored; no run requested")
         run, created = self.engine.start_run(
             project.id,
             issue.id,
             profile,
-            f"plane:{ev.external_id}:{profile.value}",
-            "webhook:plane",
+            f"{ev.source}:{ev.external_id}:{profile.value}",
+            f"webhook:{ev.source}",
         )
         return DispatchResult(
             status="handled",

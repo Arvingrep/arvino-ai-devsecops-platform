@@ -108,8 +108,7 @@ def ci_completion(
     base["repo"] = repo
     base["sha"] = sha
     base["checks"] = [
-        {"name": n, "conclusion": c, "url": f"https://ci.example/{n}"}
-        for n, c in checks.items()
+        {"name": n, "conclusion": c, "url": f"https://ci.example/{n}"} for n, c in checks.items()
     ]
     if branch:
         base["branch"] = branch
@@ -138,6 +137,30 @@ def nightingale_alert(
     base["is_recovered"] = recovered
     base["tags"] = [f"project={project}", "env=production"]
     return base
+
+
+def github_issue(
+    number: int = 99,
+    title: str = "Test issue",
+    body: str = "body text",
+    labels: list[str] | None = None,
+    action: str = "opened",
+    state: str = "open",
+    repo: str = "Arvingrep/firebird-sea",
+) -> dict[str, Any]:
+    """Minimal GitHub issues webhook payload."""
+    return {
+        "action": action,
+        "issue": {
+            "number": number,
+            "title": title,
+            "body": body,
+            "state": state,
+            "labels": [{"id": i + 1, "name": n} for i, n in enumerate(labels or [])],
+        },
+        "repository": {"full_name": repo},
+        "sender": {"login": "arvin"},
+    }
 
 
 def hmac_headers(secret: str, body: bytes, header: str, prefix: str = "") -> dict[str, str]:

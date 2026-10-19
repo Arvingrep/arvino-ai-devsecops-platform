@@ -1188,9 +1188,12 @@ class Engine:
         # All pending agent/ci/deploy steps at or after the insertion point must
         # depend on the spending approval so they don't start before it is decided.
         for st in run.steps:
-            if st.position > insert_before_position and st.status == StepStatus.PENDING.value:
-                if spending_key not in st.depends_on:
-                    st.depends_on = list(st.depends_on) + [spending_key]
+            if (
+                st.position > insert_before_position
+                and st.status == StepStatus.PENDING.value
+                and spending_key not in st.depends_on
+            ):
+                st.depends_on = [*list(st.depends_on), spending_key]
 
         self._event(
             s,

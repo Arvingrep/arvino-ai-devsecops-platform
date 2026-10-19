@@ -47,11 +47,13 @@ embedding full text in the output column is not immutable nor queryable.
 
    ```python
    from arvino.bmad import prd_artifact, architecture_artifact
+
    outcome = StepOutcome(
        status="succeeded",
        artifacts=[
-           prd_artifact(repo, branch_ref, "_bmad-output/planning-artifacts/prds/prd.md",
-                        sha256=sha256_of_blob),
+           prd_artifact(
+               repo, branch_ref, "_bmad-output/planning-artifacts/prds/prd.md", sha256=sha256_of_blob
+           ),
        ],
    )
    ```

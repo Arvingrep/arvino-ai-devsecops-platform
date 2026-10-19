@@ -22,9 +22,8 @@ import signal
 import sys
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Optional
 
 # ---------------------------------------------------------------------------
 # Config
@@ -40,9 +39,11 @@ TRANSCRIPT_GLOB = "deleg_*/task-*.log"
 # Types
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class AgentSnapshot:
     """Mutable state for a single delegation agent."""
+
     deleg_id: str
     log_path: str
     last_line: str = ""
@@ -56,8 +57,9 @@ class AgentSnapshot:
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _now_iso() -> str:
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _elapsed_human(seconds: float) -> str:
@@ -96,7 +98,7 @@ def _read_last_line(path: str) -> tuple[str, int]:
         return ("", 0)
 
 
-def _detect_terminal_status(last_line: str) -> Optional[str]:
+def _detect_terminal_status(last_line: str) -> str | None:
     """If the transcript shows a final status, return it."""
     ll = last_line.lower()
     if "status=completed" in ll or "exit_reason=completed" in ll:
@@ -125,6 +127,7 @@ def _log_event(event: str, deleg_id: str, detail: str = "") -> None:
 # ---------------------------------------------------------------------------
 # Core monitor
 # ---------------------------------------------------------------------------
+
 
 class HeartbeatMonitor:
     """Tracks delegation agents and writes status/events."""
@@ -188,7 +191,9 @@ class HeartbeatMonitor:
             terminal = _detect_terminal_status(last_line)
             if terminal and snap.status not in ("completed", "stopped"):
                 snap.status = terminal
-                _log_event(terminal.upper(), did, f"after {_elapsed_human(now - snap.first_seen_ts)}")
+                _log_event(
+                    terminal.upper(), did, f"after {_elapsed_human(now - snap.first_seen_ts)}"
+                )
                 continue
 
             # Stuck detection (only for running agents)
@@ -211,19 +216,21 @@ class HeartbeatMonitor:
     def _write_status(self, now: float) -> None:
         """Write compact status JSON."""
         rows = []
-        for did, snap in sorted(self.agents.items()):
+        for _did, snap in sorted(self.agents.items()):
             age = now - snap.first_seen_ts
             idle = now - snap.last_change_ts
             # Truncate last line for display
             preview = snap.last_line[:120] + ("…" if len(snap.last_line) > 120 else "")
-            rows.append({
-                "id": snap.deleg_id,
-                "status": snap.status,
-                "age": _elapsed_human(age),
-                "idle": _elapsed_human(idle),
-                "lines": snap.last_line_count,
-                "preview": preview,
-            })
+            rows.append(
+                {
+                    "id": snap.deleg_id,
+                    "status": snap.status,
+                    "age": _elapsed_human(age),
+                    "idle": _elapsed_human(idle),
+                    "lines": snap.last_line_count,
+                    "preview": preview,
+                }
+            )
 
         counts = {}
         for r in rows:
@@ -273,6 +280,7 @@ class HeartbeatMonitor:
 # ---------------------------------------------------------------------------
 # Entry
 # ---------------------------------------------------------------------------
+
 
 def main() -> None:
     once = "--once" in sys.argv

@@ -135,10 +135,10 @@ class BmadArtifactKind(StrEnum):
     (e.g. ``git://Arvingrep/firebird-sea/main/_bmad-output/planning-artifacts/prds/prd.md``).
     """
 
-    PRD = "bmad-prd"                    # Product Requirements Document
+    PRD = "bmad-prd"  # Product Requirements Document
     ARCHITECTURE = "bmad-architecture"  # Architecture spine / ADR
-    STORY = "bmad-story"                # Individual user story / acceptance criteria
-    BRIEF = "bmad-brief"                # Project brief / discovery document
+    STORY = "bmad-story"  # Individual user story / acceptance criteria
+    BRIEF = "bmad-brief"  # Project brief / discovery document
 
 
 class ArtifactSpec(BaseModel):

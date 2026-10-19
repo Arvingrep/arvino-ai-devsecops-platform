@@ -41,9 +41,11 @@ class Settings(BaseSettings):
     oidc_role_claim: str = "arvino_role"
 
     # Webhook credentials. Unset -> that source is rejected.
-    plane_webhook_secret: SecretStr | None = None
     gitea_webhook_secret: SecretStr | None = None
     github_webhook_secret: SecretStr | None = None
+    # Plane 集成已确定下线(2026-10-16决策,见PR#25全量移除),此字段暂留仅为
+    # 兼容api.py里还没清理掉的plane webhook路由,不属于本PR范围,不新增功能。
+    plane_webhook_secret: SecretStr | None = None
     ci_webhook_token: SecretStr | None = None
     argocd_webhook_token: SecretStr | None = None
     nightingale_webhook_token: SecretStr | None = None
@@ -80,6 +82,14 @@ class Settings(BaseSettings):
     # Claude API costs will pause and require a spending-change approval before
     # any further agent steps are dispatched.  None = no limit enforced.
     run_cost_budget_usd: float | None = None
+
+    # OpenHands Agent Canvas executor settings.
+    # When openhands_base_url is set, OpenHandsExecutor is used instead of
+    # QueueExecutor (external harness / agent-harness.sh).  The API key is read
+    # from the OPENHANDS_API_KEY environment variable inside the executor itself
+    # so it never surfaces through settings or logs.
+    openhands_base_url: str | None = None
+    openhands_timeout_seconds: int = 1800
 
     # Telegram notification adapter. When both are set, status updates and
     # approval pokes are sent to the configured Telegram chat.

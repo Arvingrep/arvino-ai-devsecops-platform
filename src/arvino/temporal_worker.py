@@ -115,9 +115,7 @@ class ReconcileDriver:
                 "reconcile_all",
                 result_type=list,
                 start_to_close_timeout=timedelta(seconds=180),
-                retry_policy=RetryPolicy(
-                    initial_interval=timedelta(seconds=5), maximum_attempts=5
-                ),
+                retry_policy=RetryPolicy(initial_interval=timedelta(seconds=5), maximum_attempts=5),
             )
             with contextlib.suppress(TimeoutError):
                 await workflow.wait_condition(

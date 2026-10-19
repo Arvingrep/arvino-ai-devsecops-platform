@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Arvino Dashboard</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d2991d;
+    --purple: #a371f7;
+    --orange: #d2991d;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  /* Header */
+  .header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  .header h1 { font-size: 18px; font-weight: 600; }
+  .header-right { display: flex; align-items: center; gap: 16px; font-size: 13px; color: var(--muted); }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+  .status-dot.ok { background: var(--green); }
+  .status-dot.err { background: var(--red); }
+  .status-dot.loading { background: var(--yellow); animation: pulse 1s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+  .btn {
+    background: var(--border);
+    color: var(--text);
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  .btn:hover { background: #484f58; }
+
+  /* Layout */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 16px;
+    padding: 16px 24px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .card.full-width { grid-column: 1 / -1; }
+  .card-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-weight: 600;
+    font-size: 14px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .card-body { padding: 12px 16px; max-height: 400px; overflow-y: auto; }
+  .card-body.large { max-height: 600px; }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th { text-align: left; color: var(--muted); font-weight: 500; padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--border); }
+  tr:hover { background: #1c2129; }
+  .clickable { cursor: pointer; }
+  .clickable:hover { color: var(--accent); }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .badge.success { background: #1a3a2a; color: var(--green); }
+  .badge.warning { background: #3a2e1a; color: var(--yellow); }
+  .badge.error { background: #3a1a1a; color: var(--red); }
+  .badge.info { background: #1a2a3a; color: var(--accent); }
+  .badge.purple { background: #2a1a3a; color: var(--purple); }
+
+  /* Run detail */
+  .run-detail { display: none; }
+  .run-detail.open { display: block; }
+  .run-detail-header {
+    padding: 8px 16px;
+    background: #0d1117;
+    border-bottom: 1px solid var(--border);
+    font-size: 13px;
+  }
+  .step-list { list-style: none; }
+  .step-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px;
+    font-size: 13px;
+    border-bottom: 1px solid #1c2129;
+  }
+  .step-icon { font-size: 14px; width: 16px; text-align: center; }
+  .step-name { flex: 1; }
+  .step-status { font-size: 11px; }
+
+  /* Events */
+  .event-item {
+    padding: 8px 0;
+    border-bottom: 1px solid #1c2129;
+    font-size: 13px;
+  }
+  .event-time { color: var(--muted); font-size: 11px; }
+
+  /* Auth modal */
+  .modal-overlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 24px;
+    width: 420px;
+    max-width: 90vw;
+  }
+  .modal h2 { font-size: 16px; margin-bottom: 8px; }
+  .modal p { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
+  .modal input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: #0d1117;
+    color: var(--text);
+    font-size: 14px;
+    font-family: monospace;
+    margin-bottom: 12px;
+  }
+  .modal .btn-row { display: flex; gap: 8px; justify-content: flex-end; }
+  .modal .hint { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+  .modal .error-msg { color: var(--red); font-size: 12px; margin-bottom: 8px; display: none; }
+
+  /* Empty state */
+  .empty { color: var(--muted); text-align: center; padding: 24px; font-size: 13px; }
+
+  /* Scrollbar */
+  .card-body::-webkit-scrollbar { width: 6px; }
+  .card-body::-webkit-scrollbar-track { background: transparent; }
+  .card-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- Auth Modal -->
+<div id="auth-modal" class="modal-overlay">
+  <div class="modal">
+    <h2>Arvino API Authentication</h2>
+    <p>Enter your Bearer token to connect to the Arvino API at <code>arvino.k8shome.com</code>.</p>
+    <div class="hint">Get your token from the Arvino platform settings.</div>
+    <input id="token-input" type="password" placeholder="Bearer token..." autocomplete="off">
+    <div id="auth-error" class="error-msg"></div>
+    <div class="btn-row">
+      <button class="btn" onclick="document.getElementById('token-input').value=''; document.getElementById('auth-error').style.display='none';">Clear</button>
+      <button class="btn" onclick="saveToken()" style="background:var(--green);color:#000;font-weight:600;">Connect</button>
+    </div>
+  </div>
+</div>
+
+<!-- Header -->
+<div class="header">
+  <h1>&#9670; Arvino Dashboard</h1>
+  <div class="header-right">
+    <span><span id="conn-dot" class="status-dot loading"></span><span id="conn-status">Initializing</span></span>
+    <span id="last-refresh"></span>
+    <button class="btn" onclick="changeToken()">Change Token</button>
+    <button class="btn" onclick="refreshAll()" style="background:var(--accent);color:#000;font-weight:600;">Refresh</button>
+  </div>
+</div>
+
+<!-- Grid -->
+<div class="grid">
+  <!-- Projects -->
+  <div class="card">
+    <div class="card-header">Projects <span id="proj-count"></span></div>
+    <div class="card-body" id="projects-body"><div class="empty">Loading...</div></div>
+  </div>
+
+  <!-- Pending Approvals -->
+  <div class="card">
+    <div class="card-header">Pending Approvals <span id="appr-count"></span></div>
+    <div class="card-body" id="approvals-body"><div class="empty">Loading...</div></div>
+  </div>
+
+  <!-- Active Runs -->
+  <div class="card full-width">
+    <div class="card-header">Runs <span id="runs-count"></span></div>
+    <div class="card-body large" id="runs-body"><div class="empty">Loading...</div></div>
+  </div>
+
+  <!-- Recent Events -->
+  <div class="card full-width">
+    <div class="card-header">Recent Events <span id="events-count"></span></div>
+    <div class="card-body" id="events-body"><div class="empty">Loading...</div></div>
+  </div>
+</div>
+
+<script>
+const API_BASE = window.location.origin;
+const REFRESH_INTERVAL = 10000;
+
+let openRunId = null;
+
+// ── Token management ──
+function getToken() { return localStorage.getItem('arvino_token'); }
+
+function saveToken() {
+  const token = document.getElementById('token-input').value.trim();
+  if (!token) return;
+  // Validate by making a probe request
+  probeToken(token).then(valid => {
+    if (valid) {
+      localStorage.setItem('arvino_token', token);
+      document.getElementById('auth-modal').style.display = 'none';
+      refreshAll();
+    } else {
+      document.getElementById('auth-error').textContent = 'Connection failed. Check your token and try again.';
+      document.getElementById('auth-error').style.display = 'block';
+    }
+  });
+}
+
+async function probeToken(token) {
+  try {
+    const res = await fetch(`${API_BASE}/projects`, {
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+    return res.ok;
+  } catch { return false; }
+}
+
+function changeToken() {
+  localStorage.removeItem('arvino_token');
+  document.getElementById('token-input').value = '';
+  document.getElementById('auth-error').style.display = 'none';
+  document.getElementById('auth-modal').style.display = 'flex';
+}
+
+// ── API helpers ──
+async function apiFetch(path) {
+  const token = getToken();
+  if (!token) throw new Error('No token');
+  const res = await fetch(`${API_BASE}${path}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return res.json();
+}
+
+// ── Rendering helpers ──
+function statusBadge(status) {
+  const s = (status || '').toLowerCase();
+  if (/success|complete|passed|done|ok/.test(s)) return `<span class="badge success">${status}</span>`;
+  if (/fail|error|abort|cancel/.test(s)) return `<span class="badge error">${status}</span>`;
+  if (/pending|waiting|queued/.test(s)) return `<span class="badge warning">${status}</span>`;
+  if (/running|active|progress/.test(s)) return `<span class="badge info">${status}</span>`;
+  return `<span class="badge purple">${status}</span>`;
+}
+
+function timeAgo(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  const now = new Date();
+  const diff = Math.floor((now - d) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  return d.toLocaleDateString();
+}
+
+// ── Data fetch ──
+let fetchErrors = 0;
+
+async function refreshAll() {
+  const token = getToken();
+  if (!token) {
+    document.getElementById('auth-modal').style.display = 'flex';
+    return;
+  }
+  document.getElementById('auth-modal').style.display = 'none';
+
+  updateConnection('loading');
+  fetchErrors = 0;
+
+  const endpoints = ['/projects', '/runs', '/approvals'];
+  const results = await Promise.allSettled(endpoints.map(e => apiFetch(e).catch(err => ({ _error: err.message }))));
+
+  const projects = results[0].value || [];
+  const runs = results[1].value || [];
+  const approvals = results[2].value || [];
+
+  // Check errors
+  results.forEach(r => { if (r.status === 'rejected' || (r.value && r.value._error)) fetchErrors++; });
+
+  if (fetchErrors === 3) {
+    updateConnection('error');
+    showEmptyAll('Connection failed');
+    return;
+  }
+  updateConnection(fetchErrors > 0 ? 'partial' : 'ok');
+
+  renderProjects(Array.isArray(projects) ? projects : (projects.items || projects.data || []));
+  renderRuns(Array.isArray(runs) ? runs : (runs.items || runs.data || []));
+  renderApprovals(Array.isArray(approvals) ? approvals : (approvals.items || approvals.data || []));
+
+  document.getElementById('last-refresh').textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+function updateConnection(state) {
+  const dot = document.getElementById('conn-dot');
+  const label = document.getElementById('conn-status');
+  dot.className = 'status-dot';
+  switch(state) {
+    case 'ok': dot.classList.add('ok'); label.textContent = 'Connected'; break;
+    case 'loading': dot.classList.add('loading'); label.textContent = 'Refreshing'; break;
+    case 'partial': dot.classList.add('warning'); label.textContent = 'Partial'; break;
+    case 'error': dot.classList.add('err'); label.textContent = 'Error'; break;
+  }
+}
+
+function showEmptyAll(msg) {
+  ['projects','runs','approvals','events'].forEach(id => {
+    const el = document.getElementById(id+'-body');
+    if (el) el.innerHTML = `<div class="empty">${msg}</div>`;
+  });
+}
+
+// ── Render Projects ──
+function renderProjects(projects) {
+  const el = document.getElementById('projects-body');
+  document.getElementById('proj-count').textContent = `(${projects.length})`;
+  if (!projects.length) { el.innerHTML = '<div class="empty">No projects</div>'; return; }
+
+  const keys = Object.keys(projects[0]);
+  const nameKey = keys.find(k => /name/i.test(k)) || keys[0];
+  const descKey = keys.find(k => /desc/i.test(k));
+  const statusKey = keys.find(k => /status/i.test(k));
+
+  let html = '<table><thead><tr><th>Name</th><th>Status</th></tr></thead><tbody>';
+  projects.forEach(p => {
+    html += `<tr><td><strong>${esc(p[nameKey])}</strong>${descKey && p[descKey] ? `<br><small style="color:var(--muted)">${esc(p[descKey])}</small>` : ''}</td>`;
+    html += `<td>${statusKey ? statusBadge(p[statusKey]) : '-'}</td></tr>`;
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+// ── Render Runs ──
+function renderRuns(runs) {
+  const el = document.getElementById('runs-body');
+  document.getElementById('runs-count').textContent = `(${runs.length})`;
+  if (!runs.length) { el.innerHTML = '<div class="empty">No runs</div>'; return; }
+
+  const keys = Object.keys(runs[0]);
+  const idKey = keys.find(k => /^(id|run_id)$/i.test(k)) || keys[0];
+  const nameKey = keys.find(k => /name/i.test(k)) || keys.find(k => /title/i.test(k));
+  const statusKey = keys.find(k => /status/i.test(k));
+  const projectKey = keys.find(k => /project/i.test(k));
+  const startedKey = keys.find(k => /(start|created|begin)/i.test(k));
+  const workflowKey = keys.find(k => /workflow/i.test(k));
+
+  let html = '<table><thead><tr><th>Run</th><th>Project</th><th>Status</th><th>Started</th></tr></thead><tbody>';
+
+  runs.forEach(r => {
+    const rid = r[idKey];
+    const name = nameKey ? r[nameKey] : `Run ${rid}`;
+    html += `<tr class="clickable" onclick="toggleRun('${esc(rid)}')">`;
+    html += `<td>${esc(name)}</td>`;
+    html += `<td>${projectKey ? esc(r[projectKey]) : '-'}</td>`;
+    html += `<td>${statusKey ? statusBadge(r[statusKey]) : '-'}</td>`;
+    html += `<td style="color:var(--muted)">${startedKey ? esc(timeAgo(r[startedKey])) : '-'}</td>`;
+    html += `</tr>`;
+    html += `<tr id="run-detail-${esc(rid)}" class="run-detail"><td colspan="4"><div class="run-detail-header">Loading steps&hellip;</div></td></tr>`;
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+
+  // If a run was open, re-open it
+  if (openRunId) {
+    const detail = document.getElementById('run-detail-' + openRunId);
+    if (detail) fetchRunDetail(openRunId);
+  }
+}
+
+// ── Run detail ──
+async function toggleRun(runId) {
+  const detail = document.getElementById('run-detail-' + runId);
+  if (!detail) return;
+
+  if (detail.classList.contains('open')) {
+    detail.classList.remove('open');
+    openRunId = null;
+  } else {
+    // Close others
+    document.querySelectorAll('.run-detail.open').forEach(d => d.classList.remove('open'));
+    detail.classList.add('open');
+    openRunId = runId;
+    await fetchRunDetail(runId);
+  }
+}
+
+async function fetchRunDetail(runId) {
+  const detail = document.getElementById('run-detail-' + runId);
+  if (!detail) return;
+
+  detail.querySelector('td').innerHTML = '<div class="run-detail-header">Loading&hellip;</div>';
+
+  try {
+    const [runData, events] = await Promise.all([
+      apiFetch(`/runs/${runId}`).catch(() => null),
+      apiFetch(`/runs/${runId}/events`).catch(() => null)
+    ]);
+
+    let html = '';
+    const rd = runData || {};
+    const steps = rd.steps || rd.tasks || rd.jobs || [];
+
+    if (steps.length) {
+      html += '<div class="run-detail-header">Steps</div>';
+      html += '<ul class="step-list">';
+      steps.forEach(s => {
+        const icon = stepIcon(s.status || s.state || '');
+        const name = s.name || s.title || s.step || s.id || 'Unknown';
+        const status = s.status || s.state || '';
+        html += `<li class="step-item"><span class="step-icon">${icon}</span><span class="step-name">${esc(name)}</span><span class="step-status">${statusBadge(status)}</span></li>`;
+      });
+      html += '</ul>';
+    }
+
+    const eventList = Array.isArray(events) ? events : (events?.items || events?.data || []);
+    if (eventList.length) {
+      html += '<div class="run-detail-header">Events (' + eventList.length + ')</div>';
+      eventList.slice(0, 20).forEach(e => {
+        const ts = e.timestamp || e.time || e.created_at || e.date || '';
+        const msg = e.message || e.event || e.type || e.name || JSON.stringify(e).slice(0, 120);
+        html += `<div class="event-item"><span class="event-time">${esc(timeAgo(ts))}</span><br>${esc(msg)}</div>`;
+      });
+    }
+
+    if (!steps.length && !eventList.length) {
+      html += '<div class="run-detail-header">Raw data</div><pre style="padding:12px;font-size:11px;overflow-x:auto;">' + esc(JSON.stringify(rd, null, 2)) + '</pre>';
+    }
+
+    detail.querySelector('td').innerHTML = html;
+  } catch (err) {
+    detail.querySelector('td').innerHTML = '<div class="run-detail-header" style="color:var(--red)">Error loading detail: ' + esc(err.message) + '</div>';
+  }
+}
+
+function stepIcon(status) {
+  const s = (status || '').toLowerCase();
+  if (/success|complete|passed|done/.test(s)) return '\u2714';
+  if (/fail|error|abort/.test(s)) return '\u2718';
+  if (/running|active|progress/.test(s)) return '\u25B6';
+  if (/pending|waiting|queued/.test(s)) return '\u25CB';
+  return '\u25CF';
+}
+
+// ── Render Approvals ──
+function renderApprovals(approvals) {
+  const el = document.getElementById('approvals-body');
+  document.getElementById('appr-count').textContent = `(${approvals.length})`;
+  if (!approvals.length) { el.innerHTML = '<div class="empty">No pending approvals</div>'; return; }
+
+  const keys = Object.keys(approvals[0]);
+  const nameKey = keys.find(k => /name/i.test(k)) || keys.find(k => /title/i.test(k));
+  const statusKey = keys.find(k => /status/i.test(k));
+  const approverKey = keys.find(k => /(approver|user|reviewer|who)/i.test(k));
+  const runKey = keys.find(k => /run/i.test(k));
+  const createdKey = keys.find(k => /(created|date|time)/i.test(k));
+
+  let html = '<table><thead><tr><th>Subject</th><th>Approver</th><th>Status</th><th>Created</th></tr></thead><tbody>';
+  approvals.forEach(a => {
+    html += `<tr>`;
+    html += `<td>${nameKey ? esc(a[nameKey]) : '-'}</td>`;
+    html += `<td>${approverKey ? esc(a[approverKey]) : '-'}</td>`;
+    html += `<td>${statusKey ? statusBadge(a[statusKey]) : '-'}</td>`;
+    html += `<td style="color:var(--muted)">${createdKey ? esc(timeAgo(a[createdKey])) : '-'}</td>`;
+    html += `</tr>`;
+  });
+  html += '</tbody></table>';
+  el.innerHTML = html;
+
+  // Also fetch /work for additional context
+  fetchWork();
+}
+
+// ── Fetch /work and /workflows ──
+async function fetchWork() {
+  try {
+    const work = await apiFetch('/work');
+    const workflows = await apiFetch('/workflows');
+    renderEvents(work, workflows);
+  } catch { /* non-critical */ }
+}
+
+function renderEvents(work, workflows) {
+  const el = document.getElementById('events-body');
+  const workItems = Array.isArray(work) ? work : (work?.items || work?.data || []);
+  const wfItems = Array.isArray(workflows) ? workflows : (workflows?.items || workflows?.data || []);
+  const total = workItems.length + wfItems.length;
+  document.getElementById('events-count').textContent = `(${total})`;
+
+  if (!total) { el.innerHTML = '<div class="empty">No recent events</div>'; return; }
+
+  let html = '<table><thead><tr><th>Type</th><th>Details</th><th>Time</th></tr></thead><tbody>';
+
+  workItems.slice(0, 15).forEach(w => {
+    const keys = Object.keys(w);
+    const nameKey = keys.find(k => /name/i.test(k)) || keys[0];
+    const statusKey = keys.find(k => /status/i.test(k));
+    const timeKey = keys.find(k => /(created|date|time|updated)/i.test(k));
+    html += `<tr><td><span class="badge info">Work</span></td>`;
+    html += `<td>${esc(w[nameKey] || '-')}</td>`;
+    html += `<td style="color:var(--muted)">${timeKey ? esc(timeAgo(w[timeKey])) : '-'}</td></tr>`;
+  });
+
+  wfItems.slice(0, 15).forEach(wf => {
+    const keys = Object.keys(wf);
+    const nameKey = keys.find(k => /name/i.test(k)) || keys[0];
+    const timeKey = keys.find(k => /(created|date|time|updated)/i.test(k));
+    html += `<tr><td><span class="badge purple">Workflow</span></td>`;
+    html += `<td>${esc(wf[nameKey] || '-')}</td>`;
+    html += `<td style="color:var(--muted)">${timeKey ? esc(timeAgo(wf[timeKey])) : '-'}</td></tr>`;
+  });
+
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+// ── Util ──
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Init ──
+document.getElementById('token-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') saveToken();
+});
+
+if (getToken()) {
+  // Probe existing token
+  probeToken(getToken()).then(valid => {
+    if (valid) {
+      document.getElementById('auth-modal').style.display = 'none';
+      refreshAll();
+    } else {
+      document.getElementById('auth-error').textContent = 'Stored token is invalid. Please re-enter.';
+      document.getElementById('auth-error').style.display = 'block';
+    }
+  });
+}
+
+// Auto-refresh
+setInterval(refreshAll, REFRESH_INTERVAL);
+</script>
+</body>
+</html>

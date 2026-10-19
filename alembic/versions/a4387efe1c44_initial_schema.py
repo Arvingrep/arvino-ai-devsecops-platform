@@ -8,9 +8,10 @@ Create Date: 2026-10-15 11:13:02.827794
 
 from collections.abc import Sequence
 
-import arvino.db
 import sqlalchemy as sa
 from alembic import op
+
+import arvino.db
 
 # revision identifiers, used by Alembic.
 revision: str = "a4387efe1c44"

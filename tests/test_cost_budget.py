@@ -1,4 +1,4 @@
-"""Tests for Phase 6 – cost/budget tracking and spending-change approval.
+"""Tests for Phase 6 - cost/budget tracking and spending-change approval.
 
 Coverage:
 - ClaudeCodeExecutor extracts cost_usd from JSON output and includes it in StepOutcome.output
@@ -22,9 +22,15 @@ from unittest.mock import patch
 import pytest
 
 from arvino.adapters.claude_code import ClaudeCodeExecutor
-from arvino.domain import ApprovalKind, ApprovalStatus, StepKind, StepStatus
+from arvino.domain import ApprovalKind, ApprovalStatus, StepStatus
 from arvino.engine import Engine, EngineSettings
-from arvino.fakes import FakeGit, RecordingNotifier, RecordingTracker, RecordOnlyPromoter, StaticPolicy
+from arvino.fakes import (
+    FakeGit,
+    RecordingNotifier,
+    RecordingTracker,
+    RecordOnlyPromoter,
+    StaticPolicy,
+)
 from arvino.ports import IssueRef, StepRequest
 
 # ---------------------------------------------------------------------------
@@ -195,7 +201,7 @@ class _CostExecutor:
 
     COST_PER_STEP: float = 0.10
 
-    def execute(self, request: StepRequest):  # noqa: ANN201
+    def execute(self, request: StepRequest):
         from arvino.domain import ArtifactSpec
         from arvino.ports import StepOutcome
 
@@ -217,6 +223,7 @@ def _make_run(engine: Engine, *, budget_label: str = ""):
     prj = engine.create_project(f"proj{budget_label}", f"Test project {budget_label}")
     iss, _ = engine.upsert_issue(prj.id, "api", "1", "Test issue")
     from arvino.domain import Profile
+
     view, _ = engine.start_run(prj.id, iss.id, Profile.FAST, f"key-{budget_label}", "owner")
     return engine.get_run(view.id)
 
@@ -239,17 +246,20 @@ class TestCostAccumulationInViews:
         expected_total = agent_count * _CostExecutor.COST_PER_STEP
         assert run.cost_usd_total == pytest.approx(expected_total)
 
-    def test_no_cost_when_executor_omits_cost_usd(self, engine_factory: Any, tmp_path: Path) -> None:
+    def test_no_cost_when_executor_omits_cost_usd(
+        self, engine_factory: Any, tmp_path: Path
+    ) -> None:
         """Runs using a no-cost executor accumulate 0.0."""
         from arvino.db import init_schema, make_engine, make_session_factory
         from arvino.fakes import ScriptedExecutor
-        from arvino.domain import ArtifactSpec
         from arvino.ports import Ports, StepOutcome
         from arvino.workflows.model import load_registry
 
         sa = make_engine(f"sqlite:///{tmp_path}/test-no-cost.db")
         init_schema(sa)
-        free_exec = ScriptedExecutor(default=StepOutcome(status="succeeded", output={}, artifacts=[]))
+        free_exec = ScriptedExecutor(
+            default=StepOutcome(status="succeeded", output={}, artifacts=[])
+        )
         ports = Ports(
             executor=free_exec,
             tracker=RecordingTracker(),
@@ -274,10 +284,11 @@ class TestBudgetEnforcement:
         engine = engine_factory(budget_usd=None)
         run = _make_run(engine)
         run = engine.advance(run.id)
-        kinds = {s.kind for s in run.steps}
+        {s.kind for s in run.steps}
         # approval steps exist only for the APPROVAL kind
         spending = [
-            s for s in run.steps
+            s
+            for s in run.steps
             if s.kind == "approval" and s.approval_kind == ApprovalKind.SPENDING.value
         ]
         assert spending == []
@@ -288,7 +299,8 @@ class TestBudgetEnforcement:
         run = _make_run(engine)
         run = engine.advance(run.id)
         spending = [
-            s for s in run.steps
+            s
+            for s in run.steps
             if s.kind == "approval" and s.approval_kind == ApprovalKind.SPENDING.value
         ]
         assert len(spending) >= 1, "Expected a spending approval step to be injected"
@@ -300,14 +312,21 @@ class TestBudgetEnforcement:
         run = _make_run(engine)
         run = engine.advance(run.id)
         spending = next(
-            (s for s in run.steps if s.kind == "approval" and s.approval_kind == ApprovalKind.SPENDING.value),
+            (
+                s
+                for s in run.steps
+                if s.kind == "approval" and s.approval_kind == ApprovalKind.SPENDING.value
+            ),
             None,
         )
         if spending is None:
-            pytest.skip("No pending agent steps after first advance (fast workflow may be fully done)")
+            pytest.skip(
+                "No pending agent steps after first advance (fast workflow may be fully done)"
+            )
         # All pending steps that come after the spending approval should list it as a dependency.
         pending_after = [
-            s for s in run.steps
+            s
+            for s in run.steps
             if s.status == StepStatus.PENDING.value and s.position > spending.position
         ]
         for s in pending_after:
@@ -329,6 +348,7 @@ class TestBudgetEnforcement:
         assert spending_approval.status == ApprovalStatus.PENDING.value
         # Approve it as a human owner.
         from arvino.domain import Principal, PrincipalKind
+
         owner = Principal(id="human:owner", kind=PrincipalKind.HUMAN, roles=("owner",))
         engine.decide_approval(spending_approval.id, owner, "approved", reason="Approved by test")
         run = engine.get_run(run.id)
@@ -342,7 +362,8 @@ class TestBudgetEnforcement:
         run = engine.advance(run.id)
         run = engine.advance(run.id)  # second advance should not insert another spending approval
         spending = [
-            s for s in run.steps
+            s
+            for s in run.steps
             if s.kind == "approval" and s.approval_kind == ApprovalKind.SPENDING.value
         ]
         assert len(spending) <= 1, "Should not insert duplicate spending approvals"
@@ -353,7 +374,8 @@ class TestBudgetEnforcement:
         run = _make_run(engine)
         run = engine.advance(run.id)
         spending = [
-            s for s in run.steps
+            s
+            for s in run.steps
             if s.kind == "approval" and s.approval_kind == ApprovalKind.SPENDING.value
         ]
         assert spending == []
@@ -367,6 +389,10 @@ class TestBudgetEnforcement:
         # Either budget_exceeded event was emitted, or the workflow completed under budget.
         # If a spending step was injected, the event must be present.
         run = engine.get_run(run.id)
-        spending = [s for s in run.steps if s.kind == "approval" and s.approval_kind == ApprovalKind.SPENDING.value]
+        spending = [
+            s
+            for s in run.steps
+            if s.kind == "approval" and s.approval_kind == ApprovalKind.SPENDING.value
+        ]
         if spending:
             assert "run.budget_exceeded" in event_types

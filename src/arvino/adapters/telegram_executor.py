@@ -193,7 +193,7 @@ class TelegramAgentExecutor:
                 if not data.get("ok"):
                     logger.error("telegram getUpdates error: %s", data.get("description"))
                     return []
-                return data.get("result", [])
+                return data.get("result", [])  # type: ignore[no-any-return]
         except httpx.HTTPError as exc:
             logger.error("telegram getUpdates failed: %s", exc)
             return []
@@ -299,25 +299,20 @@ class TelegramAgentExecutor:
             raw = self._run_claude(prompt, worktree_dir)
             return self._parse_result(raw, request)
         except subprocess.TimeoutExpired:
-            logger.warning(
-                "claude-code timed out for %s/%s", request.run_id, request.step_key
-            )
+            logger.warning("claude-code timed out for %s/%s", request.run_id, request.step_key)
             return StepOutcome(
                 status="failed",
                 error=f"Claude Code timed out after {self.timeout_seconds}s",
                 retryable=True,
             )
         except TelegramExecutorError as exc:
-            logger.exception(
-                "claude-code failed for %s/%s", request.run_id, request.step_key
-            )
+            logger.exception("claude-code failed for %s/%s", request.run_id, request.step_key)
             return StepOutcome(status="failed", error=str(exc), retryable=True)
         except Exception as exc:
             logger.exception("unexpected error in telegram executor")
             return StepOutcome(status="failed", error=str(exc), retryable=True)
         finally:
             if worktree_dir is not None:
-
                 self._cleanup_worktree(worktree_dir)
 
     def _prepare_worktree(self, request: StepRequest) -> Path:
@@ -353,9 +348,7 @@ class TelegramAgentExecutor:
         if self.repo_base_dir is not None:
             return self.repo_base_dir
         if request.repo is None:
-            raise TelegramExecutorError(
-                "StepRequest.repo is None and no repo_base_dir configured"
-            )
+            raise TelegramExecutorError("StepRequest.repo is None and no repo_base_dir configured")
         raise TelegramExecutorError(
             "Auto-cloning from request.repo is not yet implemented; set repo_base_dir"
         )
@@ -364,9 +357,7 @@ class TelegramAgentExecutor:
         """Assemble the Claude Code prompt from the step request."""
         parts: list[str] = []
         parts.append(f"You are acting as the **{request.role}** agent.")
-        parts.append(
-            f"Run: {request.run_id}  Step: {request.step_key}  Attempt: {request.attempt}"
-        )
+        parts.append(f"Run: {request.run_id}  Step: {request.step_key}  Attempt: {request.attempt}")
         parts.append(f"Idempotency key: {request.idempotency_key}")
         parts.append(f"Branch prefix: {request.branch_prefix}")
         parts.append("")
@@ -386,9 +377,7 @@ class TelegramAgentExecutor:
             parts.append("")
 
         parts.append("## Rules")
-        parts.append(
-            f"- Only create branches under the prefix `{request.branch_prefix}`."
-        )
+        parts.append(f"- Only create branches under the prefix `{request.branch_prefix}`.")
         parts.append("- Never merge a pull request.")
         parts.append("- Commit your changes and push when done.")
         if request.repo:
@@ -455,9 +444,7 @@ class TelegramAgentExecutor:
         except json.JSONDecodeError:
             return {"raw_output": text}
 
-    def _parse_result(
-        self, raw: dict[str, Any], request: StepRequest
-    ) -> StepOutcome:
+    def _parse_result(self, raw: dict[str, Any], request: StepRequest) -> StepOutcome:
         """Turn Claude Code JSON output into a :class:`StepOutcome`."""
         artifacts: list[ArtifactSpec] = []
 
@@ -467,9 +454,7 @@ class TelegramAgentExecutor:
                 ArtifactSpec(
                     kind="pull-request",
                     name="pr",
-                    uri=f"github://{request.repo}/pulls/{pr_number}"
-                    if request.repo
-                    else "",
+                    uri=f"github://{request.repo}/pulls/{pr_number}" if request.repo else "",
                     metadata={"number": pr_number},
                 )
             )
@@ -515,9 +500,7 @@ class TelegramAgentExecutor:
 
     # -- Approval step execution -----------------------------------------------
 
-    def request_approval(
-        self, request: StepRequest, token: str
-    ) -> StepOutcome:
+    def request_approval(self, request: StepRequest, token: str) -> StepOutcome:
         """Handle an approval step by posting a request and (optionally) polling.
 
         When ``enable_approval_polling`` is ``False``, returns ``running``
@@ -542,9 +525,7 @@ class TelegramAgentExecutor:
 
         return self._poll_approval(request, token)
 
-    def _poll_approval(
-        self, request: StepRequest, token: str
-    ) -> StepOutcome:
+    def _poll_approval(self, request: StepRequest, token: str) -> StepOutcome:
         """Poll Telegram getUpdates for /approve or /reject from the owner.
 
         Each call to getUpdates passes ``offset = last_processed_id + 1`` so
@@ -575,9 +556,8 @@ class TelegramAgentExecutor:
                     continue
 
                 # Only accept from the owner (when configured).
-                if (
+                if self.owner_telegram_id and str(from_user.get("id")) != str(
                     self.owner_telegram_id
-                    and str(from_user.get("id")) != str(self.owner_telegram_id)
                 ):
                     continue
 

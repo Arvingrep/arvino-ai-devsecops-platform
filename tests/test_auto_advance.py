@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from arvino.adapters.role_router import _ROLE_MAP, RoleRouter
-from arvino.domain import Role
 from arvino.ports import StepOutcome, StepRequest
 from tests.conftest import Env
 
-
 # ------------------------------------------------------------------ helpers
+
 
 def _make_request(role: str) -> StepRequest:
     return StepRequest(
@@ -103,12 +102,13 @@ def test_all_role_map_entries_resolve() -> None:
 
 def test_reconcile_all_delegates_to_engine_and_returns_ids(env: Env) -> None:
     """reconcile_all activity calls engine.reconcile() and returns a list of run IDs."""
-    from arvino.temporal_worker import Activities
-
     # Start a run so reconcile has something to return.
     from arvino.domain import Profile
+    from arvino.temporal_worker import Activities
 
-    view, _ = env.engine.start_run(env.project_id, env.issue_id, Profile.FAST, "rk-reconcile", "owner")
+    view, _ = env.engine.start_run(
+        env.project_id, env.issue_id, Profile.FAST, "rk-reconcile", "owner"
+    )
     acts = Activities(env.engine)
     result = acts.reconcile_all()
     assert isinstance(result, list)

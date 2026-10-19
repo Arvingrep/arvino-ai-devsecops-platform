@@ -10,7 +10,7 @@
 # the external executor.
 #
 # Required env:
-#   ARVINO_API_TOKEN     — Bearer token for the Arvino API (agent role)
+#   ARVINO_AGENT_TOKEN   — Bearer token for the Arvino API (agent role)
 #   CLAUDE_CODE_OAUTH_TOKEN — OAuth token for Claude Code CLI
 #
 # Optional env:
@@ -36,8 +36,8 @@ CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT:-600}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
 
 # ── Validate prerequisites ──────────────────────────────────────────────────
-if [[ -z "${ARVINO_API_TOKEN:-}" ]]; then
-  echo "FATAL: ARVINO_API_TOKEN is required" >&2
+if [[ -z "${ARVINO_AGENT_TOKEN:-}" ]]; then
+  echo "FATAL: ARVINO_AGENT_TOKEN is required" >&2
   exit 1
 fi
 if [[ -z "${CLAUDE_CODE_OAUTH_TOKEN:-}" ]]; then
@@ -62,7 +62,7 @@ log_info()  { [[ "$LOG_LEVEL" != "warn" ]]  && echo "$(_ts) [INFO]  $*" >&2 || t
 log_warn()  { echo "$(_ts) [WARN]  $*" >&2; }
 log_error() { echo "$(_ts) [ERROR] $*" >&2; }
 
-AUTH_HEADER="Authorization: Bearer ${ARVINO_API_TOKEN}"
+AUTH_HEADER="Authorization: Bearer ${ARVINO_AGENT_TOKEN}"
 
 # ── API helpers ─────────────────────────────────────────────────────────────
 api_get() {

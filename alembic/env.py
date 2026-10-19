@@ -9,17 +9,17 @@ pass an open ``sqlalchemy.engine.Connection`` via
 ``config.attributes["connection"]``; in that case we reuse it instead of
 creating a new engine (important for in-memory SQLite test databases).
 """
+
 from __future__ import annotations
 
 import os
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from alembic import context
-
 # Import the project's declarative base so autogenerate picks up all models.
-from arvino.db import Base  # noqa: E402
+from arvino.db import Base
 
 # ---------------------------------------------------------------------------
 # Alembic config object — provides access to values in alembic.ini
@@ -36,9 +36,7 @@ target_metadata = Base.metadata
 # ---------------------------------------------------------------------------
 # URL resolution: env var wins; ini fallback used for offline SQL dumps.
 # ---------------------------------------------------------------------------
-_db_url: str | None = os.environ.get("DATABASE_URL") or config.get_main_option(
-    "sqlalchemy.url"
-)
+_db_url: str | None = os.environ.get("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
 
 
 def run_migrations_offline() -> None:
