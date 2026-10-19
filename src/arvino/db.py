@@ -260,9 +260,19 @@ def init_schema(engine: SAEngine) -> None:
     from alembic import command as alembic_command
     from alembic.config import Config as AlembicConfig
 
-    # Locate alembic.ini relative to this file: src/arvino/db.py -> project root
-    _root = Path(__file__).resolve().parent.parent.parent
-    alembic_cfg = AlembicConfig(str(_root / "alembic.ini"))
+    # Locate alembic.ini: prefer ARVINO_ALEMBIC_INI env var (set in container images
+    # where the package is pip-installed and source-tree-relative lookup breaks),
+    # fall back to the source-tree-relative path (editable installs/local dev where
+    # src/arvino/db.py -> project root is still 3 parents up).
+    import os
+
+    _env_ini = os.environ.get("ARVINO_ALEMBIC_INI")
+    if _env_ini:
+        _ini_path = Path(_env_ini)
+    else:
+        _root = Path(__file__).resolve().parent.parent.parent
+        _ini_path = _root / "alembic.ini"
+    alembic_cfg = AlembicConfig(str(_ini_path))
     # Override the connection to use the engine we already have, not the ini URL.
     alembic_cfg.attributes["connection"] = engine.connect()
     with engine.connect() as conn:
