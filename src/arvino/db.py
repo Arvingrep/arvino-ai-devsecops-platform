@@ -255,16 +255,15 @@ def init_schema(engine: SAEngine) -> None:
     Replaces the old ``Base.metadata.create_all`` call so schema changes are
     always managed through versioned migrations rather than DDL reflection.
     """
-    from pathlib import Path
-
-    from alembic import command as alembic_command
-    from alembic.config import Config as AlembicConfig
-
     # Locate alembic.ini: prefer ARVINO_ALEMBIC_INI env var (set in container images
     # where the package is pip-installed and source-tree-relative lookup breaks),
     # fall back to the source-tree-relative path (editable installs/local dev where
     # src/arvino/db.py -> project root is still 3 parents up).
     import os
+    from pathlib import Path
+
+    from alembic import command as alembic_command
+    from alembic.config import Config as AlembicConfig
 
     _env_ini = os.environ.get("ARVINO_ALEMBIC_INI")
     if _env_ini:
