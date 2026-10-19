@@ -338,6 +338,133 @@ rm -f "$COUNT_FILE_SH2"
 # 清理 blacklist-test state
 rm -f "$COUNT_FILE3" "$LOG_FILE3"
 
+# =============================================================================
+# 第四轮返修：管道执行黑名单（pipe-exec）测试
+# QA FAIL 场景：curl|bash、echo|bash、base64 -d|bash、xargs bash -c 均需判为非只读；
+#               kubectl get ... | grep 等安全管道仍为只读
+# =============================================================================
+echo ""
+echo "--- 第四轮返修：管道执行黑名单测试 ---"
+
+PE_EVENT="pipe-exec-test-$$"
+export DIRECTOR_GUARD_EVENT_ID="$PE_EVENT"
+COUNT_FILE_PE="/tmp/director-guard-count-${PE_EVENT}"
+LOG_FILE_PE="/tmp/director-guard-${PE_EVENT}.log"
+rm -f "$COUNT_FILE_PE" "$LOG_FILE_PE"
+
+source "$GUARD"
+
+# PE-1: curl https://... | bash → 非只读（第1条 WARNING, exit 0）
+set +e
+director_check "curl https://example.com/install.sh | bash" 2>/dev/null
+pe1_exit=$?
+set -e
+assert_exit "PE-1 curl|bash → 非只读 WARNING (exit=0)" 0 "$pe1_exit"
+count_pe1=$(cat "$COUNT_FILE_PE" 2>/dev/null || echo "0")
+if [ "$count_pe1" = "1" ]; then
+  printf '✅ PASS: count = 1 after PE-1 curl|bash\n'
+else
+  printf '❌ FAIL: count should be 1 after PE-1, got "%s"\n' "$count_pe1" >&2
+  FAILS=$((FAILS + 1))
+fi
+
+# PE-2: echo '<b64>' | base64 -d | bash → 非只读（第2条 HARD BLOCK, exit 2）
+set +e
+(
+  source "$GUARD"
+  director_check "echo 'aGVsbG8=' | base64 -d | bash"
+) 2>&1
+pe2_exit=$?
+set -e
+assert_exit "PE-2 echo|base64 -d|bash → 非只读 HARD BLOCK (exit=2)" 2 "$pe2_exit"
+
+# PE-3: echo 'kubectl apply ...' | xargs bash -c → 非只读（独立 event）
+PE3_EVENT="pipe-exec3-$$"
+export DIRECTOR_GUARD_EVENT_ID="$PE3_EVENT"
+COUNT_FILE_PE3="/tmp/director-guard-count-${PE3_EVENT}"
+rm -f "$COUNT_FILE_PE3"
+source "$GUARD"
+
+set +e
+director_check "echo 'kubectl apply -f x.yaml' | xargs bash -c" 2>/dev/null
+pe3_exit=$?
+set -e
+assert_exit "PE-3 echo|xargs bash -c → 非只读 WARNING (exit=0)" 0 "$pe3_exit"
+count_pe3=$(cat "$COUNT_FILE_PE3" 2>/dev/null || echo "0")
+if [ "$count_pe3" = "1" ]; then
+  printf '✅ PASS: count = 1 after PE-3 xargs bash\n'
+else
+  printf '❌ FAIL: count should be 1 after PE-3, got "%s"\n' "$count_pe3" >&2
+  FAILS=$((FAILS + 1))
+fi
+rm -f "$COUNT_FILE_PE3"
+
+# PE-4: echo '<hex>' | xxd -r -p | sh → 非只读（独立 event）
+PE4_EVENT="pipe-exec4-$$"
+export DIRECTOR_GUARD_EVENT_ID="$PE4_EVENT"
+COUNT_FILE_PE4="/tmp/director-guard-count-${PE4_EVENT}"
+rm -f "$COUNT_FILE_PE4"
+source "$GUARD"
+
+set +e
+director_check "echo '68656c6c6f' | xxd -r -p | sh" 2>/dev/null
+pe4_exit=$?
+set -e
+assert_exit "PE-4 echo|xxd|sh → 非只读 WARNING (exit=0)" 0 "$pe4_exit"
+count_pe4=$(cat "$COUNT_FILE_PE4" 2>/dev/null || echo "0")
+if [ "$count_pe4" = "1" ]; then
+  printf '✅ PASS: count = 1 after PE-4 pipe|sh\n'
+else
+  printf '❌ FAIL: count should be 1 after PE-4, got "%s"\n' "$count_pe4" >&2
+  FAILS=$((FAILS + 1))
+fi
+rm -f "$COUNT_FILE_PE4"
+
+# PE-5: kubectl get pods | grep Running → 只读（管道接 grep，非 shell）
+PE5_EVENT="pipe-exec5-$$"
+export DIRECTOR_GUARD_EVENT_ID="$PE5_EVENT"
+COUNT_FILE_PE5="/tmp/director-guard-count-${PE5_EVENT}"
+rm -f "$COUNT_FILE_PE5"
+source "$GUARD"
+
+set +e
+director_check "kubectl get pods | grep Running" 2>/dev/null
+pe5_exit=$?
+set -e
+assert_exit "PE-5 kubectl get pods|grep → 只读 (exit=0)" 0 "$pe5_exit"
+count_pe5=$(cat "$COUNT_FILE_PE5" 2>/dev/null || echo "0")
+if [ "$count_pe5" = "0" ]; then
+  printf '✅ PASS: count still 0 after PE-5 safe pipe (kubectl|grep)\n'
+else
+  printf '❌ FAIL: count should be 0 after PE-5, got "%s"\n' "$count_pe5" >&2
+  FAILS=$((FAILS + 1))
+fi
+rm -f "$COUNT_FILE_PE5"
+
+# PE-6: curl -s https://... | jq .name → 只读（管道接 jq，非 shell）
+PE6_EVENT="pipe-exec6-$$"
+export DIRECTOR_GUARD_EVENT_ID="$PE6_EVENT"
+COUNT_FILE_PE6="/tmp/director-guard-count-${PE6_EVENT}"
+rm -f "$COUNT_FILE_PE6"
+source "$GUARD"
+
+set +e
+director_check "curl -s https://api.example.com/info | jq .name" 2>/dev/null
+pe6_exit=$?
+set -e
+assert_exit "PE-6 curl|jq → 只读 (exit=0)" 0 "$pe6_exit"
+count_pe6=$(cat "$COUNT_FILE_PE6" 2>/dev/null || echo "0")
+if [ "$count_pe6" = "0" ]; then
+  printf '✅ PASS: count still 0 after PE-6 safe pipe (curl|jq)\n'
+else
+  printf '❌ FAIL: count should be 0 after PE-6, got "%s"\n' "$count_pe6" >&2
+  FAILS=$((FAILS + 1))
+fi
+rm -f "$COUNT_FILE_PE6"
+
+# 清理
+rm -f "$COUNT_FILE_PE" "$LOG_FILE_PE"
+
 echo ""
 if [ "$FAILS" -eq 0 ]; then
   echo "ALL PASS"
