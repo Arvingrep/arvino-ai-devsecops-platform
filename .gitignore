@@ -13,3 +13,11 @@ htmlcov/
 *.db
 *.sqlite3
 !.env.example
+
+# Git worktrees (managed separately)
+.worktrees/
+
+# Backup directories and files
+**/.dup-backup/
+*.bak
+*\ 2.md
