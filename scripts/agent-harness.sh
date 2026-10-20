@@ -21,6 +21,8 @@
 #   CLAUDE_MODEL         — Model to use (default: sonnet)
 #   CLAUDE_MAX_TURNS     — Max agentic turns (default: 30)
 #   CLAUDE_TIMEOUT       — Timeout in seconds (default: 600)
+#   ARVINO_LEASE_TTL     — Claimed lease TTL in seconds (default: timeout + 600, capped 3600)
+#   ARVINO_LEASE_RENEW_INTERVAL — Seconds between lease renewals (default: 300)
 #   LOG_LEVEL            — debug|info|warn (default: info)
 
 set -euo pipefail
@@ -33,6 +35,11 @@ ROLE="${ARVINO_ROLE:-}"
 CLAUDE_MODEL="${CLAUDE_MODEL:-sonnet}"
 CLAUDE_MAX_TURNS="${CLAUDE_MAX_TURNS:-30}"
 CLAUDE_TIMEOUT="${CLAUDE_TIMEOUT:-600}"
+LEASE_TTL="${ARVINO_LEASE_TTL:-$((CLAUDE_TIMEOUT + 600))}"
+if (( LEASE_TTL > 3600 )); then
+  LEASE_TTL=3600
+fi
+LEASE_RENEW_INTERVAL="${ARVINO_LEASE_RENEW_INTERVAL:-300}"
 LOG_LEVEL="${LOG_LEVEL:-info}"
 
 # ── Validate prerequisites ──────────────────────────────────────────────────
@@ -81,6 +88,88 @@ api_post() {
     -H "Content-Type: application/json" \
     -d "$body" \
     "${API_URL}${path}" 2>&1
+}
+
+# ── Lease helpers (T1) ──────────────────────────────────────────────────────
+# A step must be claimed before the harness touches the repo. The returned
+# token is single-use proof of ownership and must accompany /complete.
+LEASE_TOKEN=""
+LEASE_RUN_ID=""
+LEASE_STEP_KEY=""
+LEASE_RENEW_PID=""
+LEASE_RENEW_FAILED_FILE=""
+EXECUTION_STARTED=0
+
+claim_step() {
+  local run_id="$1" step_key="$2"
+  local body response token verified
+  body=$(jq -n --argjson ttl "$LEASE_TTL" '{ttl_seconds: $ttl}')
+  if ! response=$(api_post "/runs/${run_id}/steps/${step_key}/claim" "$body" 2>&1); then
+    log_warn "  Claim rejected: ${response}"
+    return 1
+  fi
+  token=$(echo "$response" | jq -r '.lease_token // empty' 2>/dev/null || true)
+  if [[ -z "$token" ]]; then
+    log_error "  Claim response has no lease_token: ${response}"
+    return 1
+  fi
+  verified=$(echo "$response" | jq -r '.role_verified // false' 2>/dev/null || echo false)
+  if [[ "$verified" != "true" ]]; then
+    log_warn "  Claimed with a token that has no role metadata (role_verified=false)"
+  fi
+  LEASE_TOKEN="$token"
+  LEASE_RUN_ID="$run_id"
+  LEASE_STEP_KEY="$step_key"
+  log_info "  Lease claimed (ttl=${LEASE_TTL}s)"
+  return 0
+}
+
+release_lease() {
+  local run_id="$1" step_key="$2" token="$3"
+  local body
+  body=$(jq -n --arg token "$token" '{lease_token: $token}')
+  api_post "/runs/${run_id}/steps/${step_key}/release" "$body" >/dev/null 2>&1 || true
+}
+
+start_lease_renewer() {
+  local run_id="$1" step_key="$2" token="$3"
+  local script_pid="$$"
+  LEASE_RENEW_FAILED_FILE="${WORK_DIR}/${run_id}-${step_key}.renew-failed"
+  rm -f "$LEASE_RENEW_FAILED_FILE"
+  (
+    while sleep "$LEASE_RENEW_INTERVAL"; do
+      if ! kill -0 "$script_pid" 2>/dev/null; then
+        exit 0
+      fi
+      body=$(jq -n --arg token "$token" --argjson ttl "$LEASE_TTL" \
+        '{lease_token: $token, ttl_seconds: $ttl}')
+      if ! api_post "/runs/${run_id}/steps/${step_key}/renew" "$body" >/dev/null 2>&1; then
+        echo "renew failed at $(_ts)" >"$LEASE_RENEW_FAILED_FILE"
+        exit 1
+      fi
+    done
+  ) &
+  LEASE_RENEW_PID=$!
+  log_debug "  Lease renewer started (every ${LEASE_RENEW_INTERVAL}s, pid=${LEASE_RENEW_PID})"
+}
+
+stop_lease_renewer() {
+  if [[ -n "$LEASE_RENEW_PID" ]]; then
+    kill "$LEASE_RENEW_PID" 2>/dev/null || true
+    wait "$LEASE_RENEW_PID" 2>/dev/null || true
+    LEASE_RENEW_PID=""
+  fi
+}
+
+finish_lease() {
+  if [[ -n "$LEASE_RENEW_FAILED_FILE" && -f "$LEASE_RENEW_FAILED_FILE" ]]; then
+    log_warn "  Lease renewal failed during execution: $(cat "$LEASE_RENEW_FAILED_FILE")"
+  fi
+  stop_lease_renewer
+  LEASE_TOKEN=""
+  LEASE_RUN_ID=""
+  LEASE_STEP_KEY=""
+  EXECUTION_STARTED=0
 }
 
 # ── Fetch context for a work item ───────────────────────────────────────────
@@ -146,6 +235,16 @@ execute_work_item() {
 
   log_info "═══ Executing: run=${run_id} step=${step_key} role=${role} attempt=${attempt}"
 
+  # T1: claim before touching the repo. If another executor owns the step,
+  # leave it alone and keep polling.
+  LEASE_TOKEN=""
+  if ! claim_step "$run_id" "$step_key"; then
+    log_warn "  Skipping ${run_id}/${step_key}: no lease"
+    return 0
+  fi
+  start_lease_renewer "$run_id" "$step_key" "$LEASE_TOKEN"
+  EXECUTION_STARTED=0
+
   # Fetch run, issue, project context
   local run_json issue_json project_json
   run_json=$(fetch_run_context "$run_id")
@@ -204,6 +303,11 @@ execute_work_item() {
   local claude_stdout claude_stderr claude_exit
   local output_file="${work_dir}/claude-output.json"
   local error_file="${work_dir}/claude-stderr.txt"
+
+  # From here on the agent may write to the repo: never auto-release this
+  # lease on shutdown. An abandoned run must expire and be reclaimed with
+  # stop evidence, not handed to a second writer.
+  EXECUTION_STARTED=1
 
   set +e
   # Use perl alarm for timeout (macOS doesn't have coreutils timeout by default)
@@ -269,11 +373,13 @@ except json.JSONDecodeError:
     --argjson output "$output" \
     --arg error "$error_msg" \
     --arg actor "$actor" \
+    --arg lease_token "$LEASE_TOKEN" \
     '{
       attempt: $attempt,
       status: $status,
       output: $output,
-      actor: $actor
+      actor: $actor,
+      lease_token: $lease_token
     } + (if $error != "" then {error: $error, retryable: true} else {} end)')
 
   log_info "  Reporting completion: status=${status}"
@@ -289,9 +395,12 @@ except json.JSONDecodeError:
   case "$result" in
     applied)  log_info "  ✓ Step ${step_key} completed successfully" ;;
     duplicate) log_warn "  Step ${step_key} was already completed (duplicate)" ;;
-    stale)    log_warn "  Step ${step_key} completion was stale (wrong attempt)" ;;
+    stale)    log_warn "  Step ${step_key} completion was stale (wrong attempt or lease)" ;;
+    expired)  log_error "  Step ${step_key} lease expired before completion; operator reclaim required" ;;
     *)        log_error "  Unexpected result: ${complete_response}" ;;
   esac
+
+  finish_lease
 }
 
 # ── Main polling loop ───────────────────────────────────────────────────────
@@ -370,6 +479,18 @@ cleanup() {
   log_info "Shutting down agent harness…"
   exit 0
 }
+
+on_exit() {
+  # Only release a lease that never reached execution. Once the agent started,
+  # the lease must expire and be reclaimed with explicit stop evidence.
+  if [[ -n "$LEASE_TOKEN" && "$EXECUTION_STARTED" -eq 0 ]]; then
+    log_warn "Releasing unstarted lease for ${LEASE_RUN_ID}/${LEASE_STEP_KEY}"
+    release_lease "$LEASE_RUN_ID" "$LEASE_STEP_KEY" "$LEASE_TOKEN"
+  fi
+  stop_lease_renewer
+}
+
 trap cleanup SIGINT SIGTERM
+trap on_exit EXIT
 
 main "$@"

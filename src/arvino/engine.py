@@ -15,15 +15,18 @@ Design rules (see ADR 0003/0004):
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 import re
+import secrets
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import StrEnum
 from typing import Any, Literal
 
-from sqlalchemy import select, update
+from sqlalchemy import delete, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -36,6 +39,7 @@ from arvino.db import (
     EventRow,
     IssueRow,
     ProjectRow,
+    RepoWriteLockRow,
     RunRow,
     SessionFactory,
     StepRow,
@@ -73,6 +77,7 @@ from arvino.views import (
     ApprovalView,
     ArtifactView,
     IssueView,
+    LeaseView,
     ProjectView,
     RunView,
     StepView,
@@ -85,11 +90,41 @@ log = logging.getLogger(__name__)
 RUN_ID_RE = re.compile(r"^arvino/(run-[0-9a-f]{12})/")
 _ERR_MAX = 2000
 
+# External-executor leases.  TTLs are server-bounded: the client may ask for a
+# shorter lease but can never extend it beyond LEASE_TTL_MAX_SECONDS.
+LEASE_TTL_DEFAULT_SECONDS = 900
+LEASE_TTL_MAX_SECONDS = 3600
+# Reclaim requires positive stop evidence; mere lease expiry is NOT evidence.
+STOP_EVIDENCE_KINDS = frozenset({"terminated", "operator_declared"})
+# Steps whose executor may write to the repository.  Read/evaluation roles
+# (architect, qa, security, researcher, ...) deliberately do not take the lock.
+REPO_WRITE_ROLES = frozenset(role.value for role in IMPLEMENTER_ROLES) | {
+    "devops",
+    "smartcontract",
+}
+
+
+def _hash_lease_token(token: str) -> str:
+    return hashlib.sha256(token.encode("utf-8")).hexdigest()
+
+
+def _repo_key(repo_full_name: str | None) -> str | None:
+    """Normalise ``projects.repo_full_name`` for the write-lock primary key.
+
+    Lower-casing is intentionally conservative: over-merging two spellings of
+    the same repository is safer than under-merging and allowing concurrent
+    writers.
+    """
+    if not repo_full_name:
+        return None
+    return repo_full_name.strip().lower() or None
+
 
 class CompletionResult(StrEnum):
     APPLIED = "applied"
     DUPLICATE = "duplicate"
     STALE = "stale"
+    EXPIRED = "expired"
 
 
 @dataclass(frozen=True)
@@ -843,9 +878,21 @@ class Engine:
     # ------------------------------------------------------------------ completion
 
     def complete_step(
-        self, run_id: str, step_key: str, attempt: int, outcome: StepOutcome, principal: Principal
+        self,
+        run_id: str,
+        step_key: str,
+        attempt: int,
+        outcome: StepOutcome,
+        principal: Principal,
+        *,
+        lease_token: str | None = None,
     ) -> CompletionResult:
-        """External completion of an async step (agent harness). Idempotent and attempt-fenced."""
+        """External completion of an async step (agent harness).
+
+        Idempotent and attempt-fenced.  When the step is lease-managed, the
+        caller must present the plaintext lease token issued at claim time; the
+        identity is always taken from ``principal``, never from ``outcome.actor``.
+        """
         with transaction(self._sf) as s:
             run = s.get(RunRow, run_id)
             if run is None:
@@ -853,20 +900,51 @@ class Engine:
             st = self._step(run, step_key)
             if st.kind != StepKind.AGENT.value:
                 raise ConflictError("only agent steps accept external completion")
+            # Reject a bad lease before any read-only PR verification runs.
+            lease_problem = self._lease_completion_problem(
+                s, run_id, st, attempt, lease_token, principal.id, principal.id
+            )
+            if lease_problem is not None:
+                return lease_problem
         before = self._run_status(run_id)
-        result = self._finalize(run_id, step_key, attempt, outcome, source=principal.id)
+        result = self._finalize(
+            run_id,
+            step_key,
+            attempt,
+            outcome,
+            source=principal.id,
+            lease_token=lease_token,
+            lease_principal=principal.id,
+        )
         if result is CompletionResult.APPLIED:
             self.advance(run_id)
         self._after_change(run_id, before)
         return result
 
     def _finalize(
-        self, run_id: str, key: str, attempt: int, outcome: StepOutcome, *, source: str
+        self,
+        run_id: str,
+        key: str,
+        attempt: int,
+        outcome: StepOutcome,
+        *,
+        source: str,
+        lease_token: str | None = None,
+        lease_principal: str | None = None,
     ) -> CompletionResult:
         pr: PullRequestInfo | None = None
         if outcome.status == "succeeded":
             outcome, pr = self._preflight_success(run_id, key, outcome)
-        return self._apply_outcome(run_id, key, attempt, outcome, source=source, verified_pr=pr)
+        return self._apply_outcome(
+            run_id,
+            key,
+            attempt,
+            outcome,
+            source=source,
+            verified_pr=pr,
+            lease_token=lease_token,
+            lease_principal=lease_principal,
+        )
 
     def _preflight_success(
         self, run_id: str, key: str, outcome: StepOutcome
@@ -900,6 +978,85 @@ class Engine:
             return _failed(f"pull request base {info.base_ref!r} is not {base!r}"), None
         return outcome, info
 
+    def _lease_completion_problem(
+        self,
+        s: Session,
+        run_id: str,
+        st: StepRow,
+        attempt: int,
+        lease_token: str | None,
+        lease_principal: str | None,
+        source: str,
+    ) -> CompletionResult | None:
+        """Validate a completion against the step lease, recording why it was rejected.
+
+        Returns ``None`` when the step is not lease-managed or the completion is
+        valid.  Identity comes from the authenticated Principal, never from the
+        request body's ``actor`` field.
+        """
+        if st.executor_lease_token_hash is None:
+            return None
+        if lease_token is None:
+            self._event(
+                s,
+                run_id,
+                "step.lease_token_missing",
+                source,
+                step=st.key,
+                attempt=attempt,
+                executor=st.executor_principal,
+            )
+            return CompletionResult.STALE
+        if lease_principal != st.executor_principal:
+            self._event(
+                s,
+                run_id,
+                "step.lease_principal_mismatch",
+                source,
+                step=st.key,
+                attempt=attempt,
+                executor=st.executor_principal,
+                presented=lease_principal,
+            )
+            return CompletionResult.STALE
+        if not hmac.compare_digest(st.executor_lease_token_hash, _hash_lease_token(lease_token)):
+            self._event(
+                s,
+                run_id,
+                "step.lease_token_mismatch",
+                source,
+                step=st.key,
+                attempt=attempt,
+                executor=st.executor_principal,
+            )
+            return CompletionResult.STALE
+        if st.executor_attempt != st.attempt:
+            self._event(
+                s,
+                run_id,
+                "step.lease_attempt_mismatch",
+                source,
+                step=st.key,
+                attempt=attempt,
+                executor_attempt=st.executor_attempt,
+                current_attempt=st.attempt,
+            )
+            return CompletionResult.STALE
+        expires_at = st.executor_lease_expires_at
+        if expires_at is None or expires_at <= self._now():
+            self._event(
+                s,
+                run_id,
+                "step.lease_expired_completion_ignored",
+                source,
+                step=st.key,
+                attempt=attempt,
+                executor=st.executor_principal,
+                lease_expires_at=expires_at.isoformat() if expires_at else None,
+            )
+            return CompletionResult.EXPIRED
+        return None
+
     def _apply_outcome(
         self,
         run_id: str,
@@ -909,6 +1066,8 @@ class Engine:
         *,
         source: str,
         verified_pr: PullRequestInfo | None = None,
+        lease_token: str | None = None,
+        lease_principal: str | None = None,
     ) -> CompletionResult:
         with transaction(self._sf) as s:
             run = self._lock_run(s, run_id)
@@ -935,10 +1094,23 @@ class Engine:
                 )
                 return CompletionResult.STALE
 
+            lease_problem = self._lease_completion_problem(
+                s, run_id, st, attempt, lease_token, lease_principal, source
+            )
+            if lease_problem is not None:
+                return lease_problem
+
             if outcome.status == "running":
                 if outcome.output:
                     st.output = {**st.output, **outcome.output}
                 return CompletionResult.APPLIED
+
+            # A non-running outcome consumes the lease: the external executor has
+            # either finished or reported a failure.  The repo write lock is freed
+            # with it.  Audit fields (principal/claimed_at/attempt) are retained.
+            st.executor_lease_token_hash = None
+            st.executor_lease_expires_at = None
+            self._delete_repo_lock(s, run_id, key)
 
             actor = outcome.actor or (default_actor(st.role) if st.role else None)
             if outcome.status == "succeeded":
@@ -1098,6 +1270,11 @@ class Engine:
             ):
                 st.status = StepStatus.CANCELLED.value
                 st.finished_at = now
+                # Cancellation terminates any external lease with the step.
+                st.executor_lease_token_hash = None
+                st.executor_lease_expires_at = None
+        # A terminal run must never retain a repository write lock.
+        s.execute(delete(RepoWriteLockRow).where(RepoWriteLockRow.run_id == run.id))
         for a in s.scalars(select(ApprovalRow).where(ApprovalRow.run_id == run.id)):
             if a.status == ApprovalStatus.PENDING.value:
                 a.status = ApprovalStatus.CANCELLED.value
@@ -1482,9 +1659,13 @@ class Engine:
                 if RunStatus(run.status).terminal:
                     continue
                 for st in run.steps:
+                    # A leased step is never retried by the timeout reaper: the old
+                    # executor may still be alive.  An expired lease must be reclaimed
+                    # by an operator with stop evidence first.
                     if (
                         st.status in (StepStatus.RUNNING.value, StepStatus.WAITING_APPROVAL.value)
                         and st.started_at is not None
+                        and st.executor_lease_token_hash is None
                         and st.started_at + timedelta(seconds=st.timeout_seconds) <= now
                     ):
                         expired.append((run.id, st.key, st.attempt, StepStatus(st.status)))
@@ -1551,6 +1732,9 @@ class Engine:
                         st.kind == StepKind.AGENT.value
                         and st.status == StepStatus.RUNNING.value
                         and st.role
+                        # Claimed work is never offered again automatically, even
+                        # after lease expiry: reclaim with stop evidence is required.
+                        and st.executor_lease_token_hash is None
                     ):
                         if role and st.role != role:
                             continue
@@ -1566,3 +1750,409 @@ class Engine:
                             )
                         )
             return items
+
+    # ------------------------------------------------------------------ external executor leases
+
+    def _lease_ttl(self, ttl_seconds: int | None) -> int:
+        if ttl_seconds is None:
+            return LEASE_TTL_DEFAULT_SECONDS
+        if ttl_seconds <= 0:
+            raise ConflictError("ttl_seconds must be positive")
+        return min(ttl_seconds, LEASE_TTL_MAX_SECONDS)
+
+    @staticmethod
+    def _assert_claim_role(st: StepRow, principal: Principal) -> bool:
+        """Authorise a claim by role and report whether the role was explicit.
+
+        A Principal carrying roles must carry the step's role (``orchestrator`` is
+        accepted as an operator override).  Legacy static agent tokens carry no
+        role claims; they remain accepted for compatibility and the claim event
+        records ``role_verified=False``.  The runtime permission model is a
+        separate approval item (design §8.4); this method does not pretend to be
+        that model.
+        """
+        if principal.has_role("orchestrator"):
+            return True
+        if not principal.roles:
+            return False
+        if st.role is None or not principal.has_role(st.role):
+            raise PolicyDeniedError(
+                [f"principal {principal.id!r} lacks role {st.role!r} for step {st.key!r}"]
+            )
+        return True
+
+    @staticmethod
+    def _delete_repo_lock(s: Session, run_id: str, step_key: str) -> None:
+        s.execute(
+            delete(RepoWriteLockRow).where(
+                RepoWriteLockRow.run_id == run_id,
+                RepoWriteLockRow.step_key == step_key,
+            )
+        )
+
+    @staticmethod
+    def _extend_repo_lock(
+        s: Session,
+        repo_key: str | None,
+        run_id: str,
+        step_key: str,
+        token_hash: str,
+        expires_at: datetime,
+    ) -> None:
+        if repo_key is None:
+            return
+        lock = s.get(RepoWriteLockRow, repo_key)
+        if (
+            lock is not None
+            and lock.run_id == run_id
+            and lock.step_key == step_key
+            and hmac.compare_digest(lock.executor_lease_token_hash, token_hash)
+        ):
+            lock.expires_at = expires_at
+
+    def claim_step(
+        self,
+        run_id: str,
+        step_key: str,
+        principal: Principal,
+        *,
+        ttl_seconds: int | None = None,
+    ) -> LeaseView:
+        """Atomically claim a running agent step for an external executor.
+
+        The plaintext token is returned exactly once and only its SHA-256 is
+        stored.  A lease is never stolen, not even after expiry: an operator must
+        call :meth:`reclaim_lease` with stop evidence first.
+        """
+        ttl = self._lease_ttl(ttl_seconds)
+        token = secrets.token_urlsafe(32)
+        token_hash = _hash_lease_token(token)
+        now = self._now()
+        expires_at = now + timedelta(seconds=ttl)
+        with transaction(self._sf) as s:
+            run = self._lock_run(s, run_id)
+            st = self._step(run, step_key)
+            if st.kind != StepKind.AGENT.value:
+                raise ConflictError("only agent steps can be claimed")
+            if RunStatus(run.status).terminal:
+                raise ConflictError(f"run {run_id} is terminal")
+            if st.status != StepStatus.RUNNING.value:
+                raise ConflictError(
+                    f"step {step_key!r} is {st.status}; only running steps can be claimed"
+                )
+            if st.not_before is not None and st.not_before > now:
+                raise ConflictError(f"step {step_key!r} is not yet runnable")
+
+            if st.executor_lease_token_hash is not None:
+                held_until = st.executor_lease_expires_at
+                if held_until is not None and held_until <= now:
+                    raise ConflictError(
+                        f"lease on {step_key!r} expired at {held_until.isoformat()}; "
+                        "operator reclaim with stop evidence is required"
+                    )
+                suffix = f" until {held_until.isoformat()}" if held_until else ""
+                raise ConflictError(
+                    f"step {step_key!r} is already leased by {st.executor_principal!r}{suffix}"
+                )
+
+            role_verified = self._assert_claim_role(st, principal)
+            project = s.get(ProjectRow, run.project_id)
+            repo_key = _repo_key(project.repo_full_name if project else None)
+            holds_repo = bool(repo_key and st.role in REPO_WRITE_ROLES)
+            if holds_repo:
+                assert repo_key is not None
+                lock = s.get(RepoWriteLockRow, repo_key)
+                if lock is not None:
+                    if lock.expires_at <= now:
+                        raise ConflictError(
+                            f"repository {repo_key!r} is write-locked by "
+                            f"{lock.executor_principal!r} until {lock.expires_at.isoformat()}; "
+                            "operator reclaim is required"
+                        )
+                    raise ConflictError(
+                        f"repository {repo_key!r} is write-locked by "
+                        f"{lock.executor_principal!r} (run {lock.run_id}, step {lock.step_key}) "
+                        f"until {lock.expires_at.isoformat()}"
+                    )
+                s.add(
+                    RepoWriteLockRow(
+                        repo_key=repo_key,
+                        run_id=run_id,
+                        step_key=step_key,
+                        executor_principal=principal.id,
+                        executor_lease_token_hash=token_hash,
+                        executor_attempt=st.attempt,
+                        expires_at=expires_at,
+                        acquired_at=now,
+                    )
+                )
+                try:
+                    s.flush()
+                except IntegrityError as exc:
+                    raise ConflictError(
+                        f"repository {repo_key!r} was write-locked concurrently"
+                    ) from exc
+
+            prev_attempt = st.attempt
+            res = s.execute(
+                update(StepRow)
+                .where(
+                    StepRow.id == st.id,
+                    StepRow.status == StepStatus.RUNNING.value,
+                    StepRow.attempt == prev_attempt,
+                    StepRow.executor_lease_token_hash.is_(None),
+                )
+                .values(
+                    executor_principal=principal.id,
+                    executor_lease_expires_at=expires_at,
+                    executor_lease_token_hash=token_hash,
+                    executor_claimed_at=now,
+                    executor_attempt=prev_attempt,
+                )
+                .execution_options(synchronize_session=False)
+            )
+            if res.rowcount != 1:  # type: ignore[attr-defined]
+                raise ConflictError(f"step {step_key!r} was claimed concurrently")
+            self._event(
+                s,
+                run_id,
+                "step.lease_claimed",
+                principal.id,
+                step=step_key,
+                attempt=prev_attempt,
+                expires_at=expires_at.isoformat(),
+                repo_key=repo_key,
+                holds_repo_lock=holds_repo,
+                role_verified=role_verified,
+            )
+            return LeaseView(
+                run_id=run_id,
+                step_key=step_key,
+                attempt=prev_attempt,
+                executor_principal=principal.id,
+                lease_expires_at=expires_at,
+                repo_key=repo_key,
+                role_verified=role_verified,
+                lease_token=token,
+            )
+
+    def renew_lease(
+        self,
+        run_id: str,
+        step_key: str,
+        lease_token: str,
+        principal: Principal,
+        *,
+        ttl_seconds: int | None = None,
+    ) -> LeaseView:
+        """Extend a live lease.  Expired leases cannot be renewed (reclaim first)."""
+        ttl = self._lease_ttl(ttl_seconds)
+        token_hash = _hash_lease_token(lease_token)
+        now = self._now()
+        expires_at = now + timedelta(seconds=ttl)
+        with transaction(self._sf) as s:
+            run = self._lock_run(s, run_id)
+            st = self._step(run, step_key)
+            if st.executor_lease_token_hash is None:
+                raise ConflictError(f"step {step_key!r} has no active lease")
+            if st.status != StepStatus.RUNNING.value:
+                raise ConflictError(f"step {step_key!r} is {st.status}, not running")
+            if principal.id != st.executor_principal:
+                raise ConflictError("lease principal mismatch")
+            if not hmac.compare_digest(st.executor_lease_token_hash, token_hash):
+                raise ConflictError("lease token mismatch")
+            if st.executor_attempt != st.attempt:
+                raise ConflictError("lease attempt is stale")
+            if st.executor_lease_expires_at is None or st.executor_lease_expires_at <= now:
+                raise ConflictError(
+                    "lease expired; operator reclaim with stop evidence is required"
+                )
+            res = s.execute(
+                update(StepRow)
+                .where(
+                    StepRow.id == st.id,
+                    StepRow.status == StepStatus.RUNNING.value,
+                    StepRow.attempt == st.attempt,
+                    StepRow.executor_lease_token_hash == token_hash,
+                    # Never resurrect an expired lease, even under a local race.
+                    StepRow.executor_lease_expires_at > now,
+                )
+                .values(executor_lease_expires_at=expires_at)
+                .execution_options(synchronize_session=False)
+            )
+            if res.rowcount != 1:  # type: ignore[attr-defined]
+                raise ConflictError("lease changed concurrently; renew rejected")
+            project = s.get(ProjectRow, run.project_id)
+            repo_key = _repo_key(project.repo_full_name if project else None)
+            self._extend_repo_lock(s, repo_key, run_id, step_key, token_hash, expires_at)
+            self._event(
+                s,
+                run_id,
+                "step.lease_renewed",
+                principal.id,
+                step=step_key,
+                attempt=st.attempt,
+                expires_at=expires_at.isoformat(),
+                repo_key=repo_key,
+            )
+            return LeaseView(
+                run_id=run_id,
+                step_key=step_key,
+                attempt=st.attempt,
+                executor_principal=principal.id,
+                lease_expires_at=expires_at,
+                repo_key=repo_key,
+            )
+
+    def release_lease(
+        self,
+        run_id: str,
+        step_key: str,
+        lease_token: str,
+        principal: Principal,
+    ) -> LeaseView:
+        """Voluntarily release a lease (the strongest form of stop evidence)."""
+        token_hash = _hash_lease_token(lease_token)
+        with transaction(self._sf) as s:
+            run = self._lock_run(s, run_id)
+            st = self._step(run, step_key)
+            if st.executor_lease_token_hash is None:
+                raise ConflictError(f"step {step_key!r} has no active lease")
+            if principal.id != st.executor_principal:
+                raise ConflictError("lease principal mismatch")
+            if not hmac.compare_digest(st.executor_lease_token_hash, token_hash):
+                raise ConflictError("lease token mismatch")
+            attempt = st.attempt
+            res = s.execute(
+                update(StepRow)
+                .where(
+                    StepRow.id == st.id,
+                    StepRow.status == StepStatus.RUNNING.value,
+                    StepRow.attempt == attempt,
+                    StepRow.executor_lease_token_hash == token_hash,
+                )
+                .values(
+                    status=StepStatus.PENDING.value,
+                    not_before=None,
+                    started_at=None,
+                    executor_lease_token_hash=None,
+                    executor_lease_expires_at=None,
+                )
+                .execution_options(synchronize_session=False)
+            )
+            if res.rowcount != 1:  # type: ignore[attr-defined]
+                raise ConflictError("lease changed concurrently; release rejected")
+            project = s.get(ProjectRow, run.project_id)
+            repo_key = _repo_key(project.repo_full_name if project else None)
+            self._delete_repo_lock(s, run_id, step_key)
+            self._event(
+                s,
+                run_id,
+                "step.lease_released",
+                principal.id,
+                step=step_key,
+                attempt=attempt,
+                repo_key=repo_key,
+            )
+            return LeaseView(
+                run_id=run_id,
+                step_key=step_key,
+                attempt=attempt,
+                executor_principal=principal.id,
+                lease_expires_at=None,
+                repo_key=repo_key,
+            )
+
+    def reclaim_lease(
+        self,
+        run_id: str,
+        step_key: str,
+        principal: Principal,
+        *,
+        stop_evidence: str,
+        detail: str,
+    ) -> LeaseView:
+        """Reclaim an expired lease after positive evidence that the holder stopped.
+
+        Lease expiry alone is not evidence.  Accepted evidence kinds are
+        ``terminated`` (executor reported termination, grace elapsed, no renew)
+        and ``operator_declared`` (an operator explicitly asserts the old
+        executor is gone).  Both require a non-empty ``detail`` reference for
+        the audit trail.
+        """
+        if principal.kind is PrincipalKind.AGENT or not (
+            principal.has_role("owner") or principal.has_role("orchestrator")
+        ):
+            raise PolicyDeniedError(
+                ["reclaim requires an operator principal (owner or orchestrator)"]
+            )
+        if stop_evidence not in STOP_EVIDENCE_KINDS:
+            raise PolicyDeniedError(
+                [
+                    "reclaim requires stop evidence ('terminated' or "
+                    "'operator_declared'); lease expiry alone is not evidence"
+                ]
+            )
+        evidence_detail = detail.strip()
+        if not evidence_detail:
+            raise PolicyDeniedError(["reclaim requires a non-empty evidence detail/reference"])
+
+        now = self._now()
+        with transaction(self._sf) as s:
+            run = self._lock_run(s, run_id)
+            st = self._step(run, step_key)
+            if st.executor_lease_token_hash is None:
+                raise ConflictError(f"step {step_key!r} has no active lease")
+            if st.status != StepStatus.RUNNING.value:
+                raise ConflictError(f"step {step_key!r} is {st.status}, not running")
+            if st.executor_attempt != st.attempt:
+                raise ConflictError("lease attempt is stale")
+            if st.executor_lease_expires_at is None or st.executor_lease_expires_at > now:
+                raise ConflictError("lease is still valid; reclaim is only allowed after expiry")
+            attempt = st.attempt
+            prior_executor = st.executor_principal
+            token_hash = st.executor_lease_token_hash
+            res = s.execute(
+                update(StepRow)
+                .where(
+                    StepRow.id == st.id,
+                    StepRow.status == StepStatus.RUNNING.value,
+                    StepRow.attempt == attempt,
+                    StepRow.executor_lease_token_hash == token_hash,
+                    # Do not reclaim a lease that was renewed concurrently.
+                    StepRow.executor_lease_expires_at <= now,
+                )
+                .values(
+                    status=StepStatus.PENDING.value,
+                    not_before=None,
+                    started_at=None,
+                    executor_lease_token_hash=None,
+                    executor_lease_expires_at=None,
+                )
+                .execution_options(synchronize_session=False)
+            )
+            if res.rowcount != 1:  # type: ignore[attr-defined]
+                raise ConflictError("lease changed concurrently; reclaim rejected")
+            project = s.get(ProjectRow, run.project_id)
+            repo_key = _repo_key(project.repo_full_name if project else None)
+            self._delete_repo_lock(s, run_id, step_key)
+            self._event(
+                s,
+                run_id,
+                "step.lease_reclaimed",
+                principal.id,
+                step=step_key,
+                attempt=attempt,
+                prior_executor=prior_executor,
+                stop_evidence=stop_evidence,
+                evidence_detail=evidence_detail,
+                repo_key=repo_key,
+            )
+            return LeaseView(
+                run_id=run_id,
+                step_key=step_key,
+                attempt=attempt,
+                executor_principal=prior_executor or "",
+                lease_expires_at=None,
+                repo_key=repo_key,
+            )

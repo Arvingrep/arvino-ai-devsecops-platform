@@ -137,8 +137,37 @@ class StepRow(Base):
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Cost reported by the executor (e.g. Claude API) for this step attempt.
     cost_usd: Mapped[float | None] = mapped_column(Float, nullable=True)
+    # External-executor lease (opt-in; NULL for the engine's built-in executor path).
+    # The plaintext token is returned once on claim and only its SHA-256 is stored.
+    executor_principal: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    executor_lease_expires_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    executor_lease_token_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    executor_claimed_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
+    executor_attempt: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     run: Mapped[RunRow] = relationship(back_populates="steps")
+
+
+class RepoWriteLockRow(Base):
+    """At most one implementer holds a write lease per repository.
+
+    ``repo_key`` is derived from ``projects.repo_full_name`` (trimmed and
+    lower-cased) and is the primary key, so the database itself enforces the
+    "one writer per repo" invariant.  The lock expires with its step lease and
+    is never stolen automatically: an expired lock must be reclaimed by an
+    operator after stop evidence (see ``Engine.reclaim_lease``).
+    """
+
+    __tablename__ = "repo_write_locks"
+
+    repo_key: Mapped[str] = mapped_column(String(200), primary_key=True)
+    run_id: Mapped[str] = mapped_column(ForeignKey("workflow_runs.id"), index=True)
+    step_key: Mapped[str] = mapped_column(String(64))
+    executor_principal: Mapped[str] = mapped_column(String(200))
+    executor_lease_token_hash: Mapped[str] = mapped_column(String(64))
+    executor_attempt: Mapped[int] = mapped_column(Integer)
+    expires_at: Mapped[datetime] = mapped_column(UTCDateTime)
+    acquired_at: Mapped[datetime] = mapped_column(UTCDateTime)
 
 
 class ApprovalRow(Base):

@@ -53,7 +53,28 @@ class StepView(_View):
     output: dict[str, Any]
     last_error: str | None
     cost_usd: float | None = None
+    # Lease visibility for directors/operators; the token hash is never exposed.
+    executor_principal: str | None = None
+    executor_lease_expires_at: datetime | None = None
+    executor_claimed_at: datetime | None = None
     position: int = 0
+
+
+class LeaseView(BaseModel):
+    """Result of claim/renew/release/reclaim.
+
+    ``lease_token`` is only populated on a successful claim: the plaintext token
+    is shown once and never persisted.
+    """
+
+    run_id: str
+    step_key: str
+    attempt: int
+    executor_principal: str
+    lease_expires_at: datetime | None
+    repo_key: str | None = None
+    role_verified: bool = False
+    lease_token: str | None = None
 
 
 class ApprovalView(_View):

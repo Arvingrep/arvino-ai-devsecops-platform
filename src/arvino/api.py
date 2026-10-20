@@ -40,6 +40,7 @@ from arvino.views import (
     ApprovalView,
     EventView,
     IssueView,
+    LeaseView,
     ProjectView,
     RunView,
     WorkItem,
@@ -93,6 +94,22 @@ class CompleteIn(BaseModel):
     error: str | None = None
     retryable: bool = True
     actor: str | None = None
+    # Required by the server for lease-managed steps; ignored for legacy steps.
+    lease_token: str | None = Field(default=None, max_length=512)
+
+
+class ClaimIn(BaseModel):
+    ttl_seconds: int | None = Field(default=None, ge=1, le=86400)
+
+
+class LeaseTokenIn(BaseModel):
+    lease_token: str = Field(min_length=1, max_length=512)
+    ttl_seconds: int | None = Field(default=None, ge=1, le=86400)
+
+
+class ReclaimIn(BaseModel):
+    stop_evidence: Literal["terminated", "operator_declared"]
+    detail: str = Field(min_length=1, max_length=1000)
 
 
 class DecisionIn(BaseModel):
@@ -382,8 +399,61 @@ def create_app(engine: Engine, settings: Settings) -> FastAPI:
             actor=body.actor,
         )
         return {
-            "result": engine.complete_step(run_id, step_key, body.attempt, outcome, principal).value
+            "result": engine.complete_step(
+                run_id,
+                step_key,
+                body.attempt,
+                outcome,
+                principal,
+                lease_token=body.lease_token,
+            ).value
         }
+
+    @app.post("/runs/{run_id}/steps/{step_key}/claim")
+    def claim_step(
+        run_id: str,
+        step_key: str,
+        principal: Annotated[Principal, worker],
+        body: ClaimIn | None = None,
+    ) -> LeaseView:
+        return engine.claim_step(
+            run_id, step_key, principal, ttl_seconds=body.ttl_seconds if body else None
+        )
+
+    @app.post("/runs/{run_id}/steps/{step_key}/renew")
+    def renew_lease(
+        run_id: str,
+        step_key: str,
+        body: LeaseTokenIn,
+        principal: Annotated[Principal, worker],
+    ) -> LeaseView:
+        return engine.renew_lease(
+            run_id, step_key, body.lease_token, principal, ttl_seconds=body.ttl_seconds
+        )
+
+    @app.post("/runs/{run_id}/steps/{step_key}/release")
+    def release_lease(
+        run_id: str,
+        step_key: str,
+        body: LeaseTokenIn,
+        principal: Annotated[Principal, worker],
+    ) -> LeaseView:
+        return engine.release_lease(run_id, step_key, body.lease_token, principal)
+
+    @app.post("/runs/{run_id}/steps/{step_key}/reclaim")
+    def reclaim_lease(
+        run_id: str,
+        step_key: str,
+        body: ReclaimIn,
+        principal: Annotated[Principal, operator],
+    ) -> LeaseView:
+        return engine.reclaim_lease(
+            run_id,
+            step_key,
+            principal,
+            stop_evidence=body.stop_evidence,
+            detail=body.detail,
+        )
 
     @app.get("/work", dependencies=[worker])
     def work(role: str | None = None) -> list[WorkItem]:
