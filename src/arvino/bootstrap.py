@@ -85,6 +85,34 @@ def build_git_provider(settings: Settings) -> GitProvider:
     return GitHubProvider()
 
 
+def _assert_takeover_external_only(settings: Settings) -> None:
+    """Fail closed when takeover mode is combined with a built-in executor.
+
+    B3 (2026-10-21): during the takeover only ``QueueExecutor`` plus the
+    external harness may execute steps.  Silently preferring OpenHands or
+    ClaudeCode would reintroduce a second writer that holds no lease.
+    """
+    if not settings.takeover_external_only:
+        return
+    if settings.adapters == "sandbox":
+        raise RuntimeError(
+            "ARVINO_TAKEOVER_EXTERNAL_ONLY=true forbids ARVINO_ADAPTERS=sandbox"
+        )
+    configured = [
+        name
+        for name, value in (
+            ("ARVINO_OPENHANDS_BASE_URL", settings.openhands_base_url),
+            ("ARVINO_REPO_BASE_DIR", settings.repo_base_dir),
+        )
+        if value
+    ]
+    if configured:
+        raise RuntimeError(
+            "ARVINO_TAKEOVER_EXTERNAL_ONLY=true forbids built-in executors; unset "
+            + " and ".join(configured)
+        )
+
+
 def build_executor(settings: Settings) -> AgentExecutor:
     """Instantiate the agent executor for production (queue) mode.
 
@@ -101,6 +129,7 @@ def build_executor(settings: Settings) -> AgentExecutor:
     ``"claude_code"``.  Operators switch individual roles in ``_ROLE_MAP``
     to route traffic to either adapter.
     """
+    _assert_takeover_external_only(settings)
     if settings.openhands_base_url:
         from arvino.adapters.openhands import OpenHandsExecutor
 
@@ -135,6 +164,7 @@ def build_executor(settings: Settings) -> AgentExecutor:
 
 
 def build_engine(settings: Settings, *, init_db: bool = True) -> Engine:
+    _assert_takeover_external_only(settings)
     sa = make_engine(settings.database_url)
     if init_db:
         init_schema(sa)

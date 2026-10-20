@@ -7,6 +7,9 @@ data:
   # "queue": agent steps wait for the external harness (OpenHands / Claude Code wrapper).
   # NEVER "sandbox" outside local smoke tests (in-process fakes).
   ARVINO_ADAPTERS: queue
+  # B3 (2026-10-21): takeover runs external-only. Startup fails if
+  # OPENHANDS_BASE_URL / REPO_BASE_DIR is ever added to this deployment.
+  ARVINO_TAKEOVER_EXTERNAL_ONLY: "true"
   ARVINO_RECONCILE_INTERVAL_SECONDS: "30"
   ARVINO_TEMPORAL_ADDRESS: temporal-frontend.temporal.svc.cluster.local:7233
   ARVINO_TEMPORAL_NAMESPACE: default

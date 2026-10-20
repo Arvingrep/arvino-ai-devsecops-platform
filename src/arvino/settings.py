@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     # "sandbox": in-process fakes that auto-complete; for local smoke tests ONLY.
     adapters: Literal["queue", "sandbox"] = "queue"
 
+    # B3 (2026-10-21): during the takeover only the external queue path may
+    # execute agent steps. When true, built-in executors (OpenHands/ClaudeCode)
+    # and sandbox fakes are rejected at startup instead of being silently used.
+    takeover_external_only: bool = False
+
     # Policy backend. HTTP (OPA server) wins; otherwise the opa CLI + policy dir; otherwise deny-all.
     opa_url: str | None = None
     opa_bin: str | None = None

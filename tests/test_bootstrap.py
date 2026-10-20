@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+
 from arvino.bootstrap import (
     DenyAllPolicy,
     NoopNotifier,
@@ -83,6 +85,42 @@ def test_build_executor_claude_code(tmp_path: Path) -> None:
     assert executor.max_turns == 5
     assert executor.timeout_seconds == 120
     assert executor.repo_base_dir == tmp_path
+
+
+# --------------------------------------------------------------------------- #
+# takeover_external_only (B3: external queue is the only execution path)
+# --------------------------------------------------------------------------- #
+
+
+def test_takeover_external_only_allows_queue() -> None:
+    settings = Settings(adapters="queue", takeover_external_only=True)
+    assert isinstance(build_executor(settings), QueueExecutor)
+
+
+def test_takeover_external_only_rejects_repo_base_dir(tmp_path: Path) -> None:
+    settings = Settings(
+        adapters="queue", takeover_external_only=True, repo_base_dir=str(tmp_path)
+    )
+    with pytest.raises(RuntimeError, match="ARVINO_REPO_BASE_DIR"):
+        build_executor(settings)
+
+
+def test_takeover_external_only_rejects_openhands() -> None:
+    settings = Settings(
+        adapters="queue",
+        takeover_external_only=True,
+        openhands_base_url="http://openhands.example",
+    )
+    with pytest.raises(RuntimeError, match="ARVINO_OPENHANDS_BASE_URL"):
+        build_executor(settings)
+
+
+def test_takeover_external_only_rejects_sandbox() -> None:
+    settings = Settings(
+        adapters="sandbox", takeover_external_only=True, database_url="sqlite://"
+    )
+    with pytest.raises(RuntimeError, match="sandbox"):
+        build_engine(settings)
 
 
 # --------------------------------------------------------------------------- #
