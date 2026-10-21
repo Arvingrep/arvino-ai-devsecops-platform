@@ -37,14 +37,14 @@
 | 产物 sha256 | `e40003ae3489e6442c2f7ff8a9f5bc77a53c4026508d9e1644f2c71aed2efde7` |
 | 支撑证据 1 | `contrib/qoder-agent-team/takeover-preflight.json`（只读预检）sha256 `9aa722f2c4a01742b459810b7ee222fc15d00bd7d2baeb80899c26563551da27` |
 | 支撑证据 2 | `contrib/qoder-agent-team/takeover-design-review.json`（独立静态审查回执，10 条意见已全部处理）sha256 `9d7fffe51223895f8a0bec72f8365a48f477bdaa50017756987d5e8e581b62ff` |
-| 支撑证据 3 | `contrib/qoder-agent-team/registration-verification-checklist.md`（十角色注册核验清单）sha256 `4c8d1271f83b83d597fe290fc0c4f93fd741c751e9df51b032d8e55681103d0b` |
-| 支撑证据 4 | `contrib/qoder-agent-team/registration-playbook.md`（注册操作卡，本轮新增）sha256 `41fff9ab8b7e44d9cbf02b67f81fcf48ccc28a80ba61d1d13013f496a0eaa35d` |
-| 支撑证据 5 | `contrib/qoder-agent-team/approval-request-template.md`（本模板）sha256 `f584b92b5f0e7879130fb02f217e13b313eddcfd2c8ba1390673787197408488` |
-| 支撑证据 6 | `contrib/qoder-agent-team/TEAM.md` sha256 `52f3da567d1517b70b5ce4c2f755e3cab7984c4ae06e34eaa2c4a1ff9b27052a`；`roles.yaml` sha256 `50df6ad7dc3728b4ccf4d0dc0dd0227184106d81db290212416a76092b773f58` |
+| 支撑证据 3 | `contrib/qoder-agent-team/registration-verification-checklist.md`（十角色注册核验清单）sha256 `856c1c887bd98e41e1c35dd62fd7453463240b08d251c2fd163afb8fb959a556` |
+| 支撑证据 4 | `contrib/qoder-agent-team/registration-playbook.md`（注册操作卡，本轮新增）sha256 `22b59170522d299903f002422eaf35ce9e57229c2f5bf68f1f552042764c8229` |
+| 支撑证据 5 | `contrib/qoder-agent-team/approval-request-template.md`（本模板）sha256 `610f962ffbcac9d8d96c53d4deb163c1887f96513f6a1fc21b538a7a5df14e00` |
+| 支撑证据 6 | `contrib/qoder-agent-team/TEAM.md` sha256 `cfb4beffa1a6017e07603800031744a3f7c4df6163480146a9599235c3728b88`；`roles.yaml` sha256 `50df6ad7dc3728b4ccf4d0dc0dd0227184106d81db290212416a76092b773f58` |
 | 支撑证据 7 | `contrib/qoder-agent-team/registration-verification.json`（**注册核验回执，2026-10-21 结论 `passed_with_blockers`**）sha256 `f961e03dbf133965bad36cebaaef69328eae5be4a852817af54d996039d6dc82` |
 | 角色索引 | `contrib/qoder-agent-team/roles.yaml`（`deployment_status: prepared_not_registered`） |
 
-sha256 均为本轮实测（`shasum -a 256`），与 `approval-request-template.md` §草稿中记录的取值一致。
+sha256 为记录时点的实测值（`shasum -a 256`）；本目录文件在 2026-10-21 上午存在并行编辑，后续取值以磁盘实测为准，差异登记在 `docs/internal/CHANGELOG_FRAMEWORK.md` 的「记录修正」行。
 
 ### 2. 方案要解决什么 / 不解决什么
 
