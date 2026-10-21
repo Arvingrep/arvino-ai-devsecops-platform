@@ -1,0 +1,106 @@
+# 角色索引：目标定义 + Qoder 账号侧注册映射。声明不等于运行时权限强制或真实任务锁。
+# instructions_file 相对于本索引目录；模型家族须另行实查，不在此猜模型名称。
+schema_version: 2
+deployment_status: registered_lead_backend_frontend_devops_tester
+registration_evidence: registration-verification.json
+registration_evidence_sha256: f961e03dbf133965bad36cebaaef69328eae5be4a852817af54d996039d6dc82
+team_profile_id: 562925f0-04d2-4630-bc68-43e16f318bed
+team_discussion_id: 51d5f922-c844-4de9-8185-c42c017438a2
+team_name: Arvino 研发交付组
+active_roles:
+  - name: arvino-lead
+    charter_role: orchestrator
+    instructions_file: arvino-lead.md
+    verification_only: false
+    model_family_required: operator_selected
+    registration_status: registered
+    qoder_agent_profile_id: cd541ef8-857a-40ff-9479-d342b9344191
+    team_seat: leader
+  - name: arvino-architect
+    charter_role: architect
+    instructions_file: arvino-architect.md
+    verification_only: false
+    model_family_required: operator_selected
+    registration_status: not_yet_registered
+  - name: arvino-backend
+    charter_role: backend
+    instructions_file: arvino-backend.md
+    verification_only: false
+    model_family_required: operator_selected
+    registration_status: registered
+    qoder_agent_profile_id: 5387c844-93ab-43c1-a09b-16e8eee768af
+    team_seat: member
+  - name: arvino-frontend
+    charter_role: frontend
+    instructions_file: arvino-frontend.md
+    verification_only: false
+    model_family_required: operator_selected
+    registration_status: registered
+    qoder_agent_profile_id: fe94b877-7502-456a-8f93-2bc84d8f5fa4
+    team_seat: member
+  - name: arvino-devops
+    charter_role: devops
+    instructions_file: arvino-devops.md
+    verification_only: false
+    model_family_required: operator_selected
+    registration_status: registered
+    qoder_agent_profile_id: 16ea8880-3a5f-4f57-8358-4f328cd24101
+    team_seat: member
+  - name: arvino-tester
+    charter_role: tester
+    instructions_file: arvino-tester.md
+    verification_only: true
+    model_family_required: different_from_implementer
+    registration_status: registered
+    qoder_agent_profile_id: d6856db8-8e19-4d9d-9292-9a4847325bc8
+    team_seat: member
+  - name: arvino-security
+    charter_role: security
+    instructions_file: arvino-security.md
+    verification_only: true
+    model_family_required: different_from_implementer
+    registration_status: not_yet_registered
+  - name: arvino-researcher
+    charter_role: researcher
+    instructions_file: arvino-researcher.md
+    verification_only: false
+    model_family_required: operator_selected
+    registration_status: not_yet_registered
+  - name: arvino-design
+    charter_role: design
+    instructions_file: arvino-design.md
+    verification_only: false
+    model_family_required: operator_selected
+    registration_status: not_yet_registered
+  - name: arvino-smartcontract
+    charter_role: smartcontract
+    instructions_file: arvino-smartcontract.md
+    verification_only: false
+    model_family_required: operator_selected
+    registration_status: not_yet_registered
+legacy_files:
+  - name: arvino-developer
+    instructions_file: arvino-developer.md
+    status: deprecated_draft
+    active: false
+    do_not_dispatch: true
+  - name: arvino-sre
+    instructions_file: arvino-sre.md
+    status: deprecated_draft
+    active: false
+    do_not_dispatch: true
+  - name: arvino-reviewer
+    instructions_file: arvino-reviewer.md
+    status: deprecated_draft
+    active: false
+    do_not_dispatch: true
+max_parallel_implementers_per_repo: 1
+production_write: false
+auto_commit: false
+auto_push: false
+auto_merge: false
+open_evidence_gaps:
+  - 成员派发链路未观测：一次真实团队任务只产生 leader 会话，四名成员无独立执行会话
+  - tester/security 异构模型无实证：两者均未执行，无实际运行模型记录
+  - 逐智能体工具权限禁止列表无法本地读回，需在设置页读回确认
+  - 逐智能体文件路径强制隔离无此 UI 字段，只能靠全局权限模式与逐命令审批

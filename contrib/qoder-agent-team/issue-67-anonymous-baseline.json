@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "historical_evidence_snapshot_not_task_ledger",
+  "scope": "Issue #67 canary 匿名基线审计，不含实现认领、登录内页或上线验收",
+  "issue_url": "https://github.com/Arvingrep/firebird-sea/issues/67",
+  "target_origin": "https://canary.fbird.men",
+  "audit_started_at_utc": "2026-10-20T16:39:23Z",
+  "independent_execution_session_id": "3f319889-2407-4c6f-95b9-c91276b51d79",
+  "source": "独立执行会话真实 Bash 回执；总监 read_chat_session(includeToolOutputs=true) 回读，另对三项复验。仅归档有限摘要，不保存网页原文或凭据。",
+  "execution_session_state_at_read": "ready",
+  "method": {
+    "http_method": "GET",
+    "authentication": "anonymous_no_cookie_or_token",
+    "request_timeout_seconds": 10,
+    "maximum_redirects": 3,
+    "sequential_requests": true,
+    "reported_request_count_approximate": 61,
+    "first_hop_command_template": "curl -sS -o /dev/null --max-time 10 -A arvino-baseline-audit/1.0 -w '%{http_code}|%{redirect_url}' URL",
+    "final_response_command_template": "curl -sS -o /dev/null --max-time 10 -A arvino-baseline-audit/1.0 -L --max-redirs 3 -w '%{http_code}|%{num_redirects}|%{url_effective}|%{size_download}' URL",
+    "exit_code_interpretation": "curl 退出码 0 仅说明传输成功；HTTP 404 仍为验收失败。HTTP 200 不自动证明业务正常。"
+  },
+  "path_count": 21,
+  "paths": [
+    {"path": "/", "initial_http": 200, "final_http": 200, "redirect_count": 0, "final_url": "https://canary.fbird.men/", "response_bytes": 70167, "curl_exit_code": 0},
+    {"path": "/u", "initial_http": 302, "final_http": 200, "redirect_count": 1, "final_url": "https://canary.fbird.men/login.html?furl=https%3A%2F%2Fcanary.fbird.men%2Fu", "response_bytes": 19146, "curl_exit_code": 0, "classification": "login_required_not_authenticated_page_pass"},
+    {"path": "/b", "initial_http": 302, "final_http": 200, "redirect_count": 1, "final_url": "https://canary.fbird.men/login.html?furl=https%3A%2F%2Fcanary.fbird.men%2Fb", "response_bytes": 19146, "curl_exit_code": 0, "classification": "login_required_not_authenticated_page_pass"},
+    {"path": "/supplier", "initial_http": 302, "final_http": 200, "redirect_count": 1, "final_url": "https://canary.fbird.men/login.html?furl=https%3A%2F%2Fcanary.fbird.men%2Fsupplier", "response_bytes": 19153, "curl_exit_code": 0, "classification": "login_required_not_authenticated_page_pass"},
+    {"path": "/supplier/job", "initial_http": 302, "final_http": 200, "redirect_count": 1, "final_url": "https://canary.fbird.men/login.html?furl=https%3A%2F%2Fcanary.fbird.men%2Fsupplier%2Fjob", "response_bytes": 19159, "curl_exit_code": 0, "classification": "login_required_not_authenticated_page_pass"},
+    {"path": "/member", "initial_http": 302, "final_http": 200, "redirect_count": 2, "intermediate_path": "/b/", "final_url": "https://canary.fbird.men/login.html?furl=https%3A%2F%2Fcanary.fbird.men%2Fb%2F", "response_bytes": 19147, "curl_exit_code": 0, "classification": "login_required_not_authenticated_page_pass"},
+    {"path": "/business", "initial_http": 200, "final_http": 200, "redirect_count": 0, "final_url": "https://canary.fbird.men/business", "response_bytes": 53392, "curl_exit_code": 0},
+    {"path": "/info", "initial_http": 200, "final_http": 200, "redirect_count": 0, "final_url": "https://canary.fbird.men/info", "response_bytes": 28320, "curl_exit_code": 0},
+    {"path": "/house", "initial_http": 200, "final_http": 200, "redirect_count": 0, "final_url": "https://canary.fbird.men/house", "response_bytes": 48774, "curl_exit_code": 0},
+    {"path": "/job", "initial_http": 200, "final_http": 200, "redirect_count": 0, "final_url": "https://canary.fbird.men/job", "response_bytes": 34185, "curl_exit_code": 0},
+    {"path": "/car", "initial_http": 200, "final_http": 200, "redirect_count": 0, "final_url": "https://canary.fbird.men/car", "response_bytes": 30602, "curl_exit_code": 0},
+    {"path": "/special", "initial_http": 200, "final_http": 200, "redirect_count": 0, "final_url": "https://canary.fbird.men/special", "response_bytes": 20136, "curl_exit_code": 0},
+    {"path": "/waimai", "initial_http": 200, "final_http": 200, "redirect_count": 0, "final_url": "https://canary.fbird.men/waimai", "response_bytes": 27913, "curl_exit_code": 0},
+    {"path": "/quanjing", "initial_http": 200, "final_http": 200, "redirect_count": 0, "final_url": "https://canary.fbird.men/quanjing", "response_bytes": 51270, "curl_exit_code": 0},
+    {"path": "/shop", "initial_http": 200, "final_http": 200, "redirect_count": 0, "final_url": "https://canary.fbird.men/shop", "response_bytes": 38025, "curl_exit_code": 0},
+    {"path": "/news", "initial_http": 200, "final_http": 200, "redirect_count": 0, "final_url": "https://canary.fbird.men/news", "response_bytes": 33608, "curl_exit_code": 0},
+    {"path": "/zhaopin", "initial_http": 404, "final_http": 404, "redirect_count": 0, "final_url": "https://canary.fbird.men/zhaopin", "response_bytes": 0, "curl_exit_code": 0, "classification": "http_failure"},
+    {"path": "/baokan", "initial_http": 200, "final_http": 200, "redirect_count": 0, "final_url": "https://canary.fbird.men/baokan", "response_bytes": 21923, "curl_exit_code": 0},
+    {"path": "/jianzhan", "initial_http": 200, "final_http": 200, "redirect_count": 0, "final_url": "https://canary.fbird.men/jianzhan", "response_bytes": 8722, "curl_exit_code": 0},
+    {"path": "/fenlei", "initial_http": 200, "final_http": 200, "redirect_count": 0, "final_url": "https://canary.fbird.men/fenlei", "response_bytes": 28321, "curl_exit_code": 0},
+    {"path": "/zhuang", "initial_http": 200, "final_http": 200, "redirect_count": 0, "final_url": "https://canary.fbird.men/zhuang", "response_bytes": 35715, "curl_exit_code": 0}
+  ],
+  "director_recheck": {
+    "observed_at_utc": "2026-10-20T16:49:26.941370+00:00",
+    "source": "总监独立 Python subprocess 调用匿名 curl 回执，复验时间为历史观察时间，不是文件保存时间。",
+    "results": [
+      {"path": "/zhaopin", "http": 404, "bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855", "title": null, "has_closing_html": false, "has_closing_body": false, "curl_exit_code": 0},
+      {"path": "/business", "http": 200, "bytes": 53392, "sha256": "c31c9c4b838b7da9cb5a8a0f01527f1a07a4ba649440da1c8a729b8d059a980b", "title": "商家标题", "has_closing_html": false, "has_closing_body": true, "curl_exit_code": 0},
+      {"path": "/special", "http": 200, "bytes": 20136, "sha256": "8904235905d5af238a4153635e606c8b7ed9d18a98102aa8c3a619494cbc8511", "title": "", "has_closing_html": true, "has_closing_body": true, "curl_exit_code": 0}
+    ]
+  },
+  "correction_to_execution_summary": "执行者以 /business 缺结束 html 标签推断渲染截断和新回归，证据不足；总监复验观察到结束 body 标签。仅列结构/可见行为待复核，不继承该诊断或未经证明的配置根因。",
+  "project_record": {
+    "project_url": "https://github.com/users/Arvingrep/projects/3",
+    "draft_title": "Qoder 试点：Issue #67 匿名基线审计",
+    "project_item_id": "PVTI_lAHOAuOIfM4BmVo3zhCLYmI",
+    "draft_content_id": "DI_lAHOAuOIfM4BmVo3zgLbgDc",
+    "created_at_utc": "2026-10-20T16:55:37Z",
+    "verification": "gh api graphql 直接读取 ProjectV2Item 的 DraftIssue title/body/createdAt 和所属 Project，确认创建成功；原 Issue 查询仍 OPEN、updatedAt 为 2026-10-10T07:49:18Z；原卡仍 Todo/需求池。",
+    "original_issue_modified": false,
+    "repository_issue_created": false,
+    "public_body_excludes_local_paths_credentials_and_private_accounts": true
+  },
+  "assessment": {
+    "anonymous_audit_scope": "complete_with_findings",
+    "issue_67_delivery": "not_verified_not_complete",
+    "role_registration": "prepared_not_registered",
+    "heterogeneous_model_verification": "not_verified",
+    "task_ledger_wiring": "not_verified",
+    "implementation_owner_claim": "not_performed",
+    "owner_lock_and_atomic_claim_verification": "not_verified",
+    "old_scheduler_disabled": false,
+    "source_deployment_revision": "not_verified"
+  },
+  "not_verified": [
+    "登录后的 supplier/job 及其他商家中心内页",
+    "后台模块配置及错误根因",
+    "business 结构的实际渲染影响与 special 空标题根因",
+    "demo 与生产环境",
+    "十角色实际注册、权限隔离和真实模型家族",
+    "真实 owner 锁及 CAS/原子认领机制",
+    "持久化账本认领及写任务的单调度切换",
+    "完整业务功能、CI 与端到端交付"
+  ],
+  "no_actions_performed": ["登录", "生产写", "网站或数据库配置变更", "业务源码修改", "commit", "push", "merge", "付费", "关闭旧调度"]
+}
