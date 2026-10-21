@@ -205,3 +205,14 @@
 | 2026-10-21 | 停调度 | `1ee96fd19f7f`（每 3 分钟）、`1972eac66c26`（夜间）、`0c82db48c322`（看板值守，每 15 分钟）于 10:42 全部 `paused`；最后执行 firebird 10:40:24、看板 10:28:24。观察至 10:46:37，firebird 两个 3 分钟周期与看板一个 15 分钟周期均无新执行；看板 running=0、近 45 分钟 task_events=0。恢复：`hermes cron resume <id>`。 | Qoder 总监 | 待 Arvin 知会 |
 | 2026-10-21 | 安全 | **同一密钥再次外泄到会话记录**：两次只读 Deployment env 的命令把 live `GH_TOKEN` 明文带入输出（其中一次是核对 B3 env 时被过滤条件带出）。已停止继续读取 env 值；该值未写入仓库/台账/报告。**轮换仍未执行，须立即吊销**；后续只允许读取键名，任何命令不得打印 env 值。 | Qoder 总监 | ⚠ 待 Arvin 轮换 |
 | 2026-10-21 | 未验证 | 首次真实业务任务：活库 `claim→renew→complete`、harness 实际认领、firebird-sea 仓库写、CI/QA/安全门禁与独立验收、回滚演练；自动周期派发（T1 调度层）未接线，当前为总监手动派发。A6 十角色注册/成员派发/异构模型读回与 Qoder 设置页重贴仍待人工。以上均**不得**写成已完成。 | Qoder 总监 | 待 Arvin 审 |
+
+## 2026-10-21 11:30 并行工作流状态总表（台账新增顶部总览）
+
+技术依据：Arvin「更新一下状态，有几个规划工作已经在同时进行了」。本节登记台账新增的「并行工作流状态」总览与「唯一红线告警」两节，以及据此收口的接管审批项。全部结论为本机只读实测（`git log`/`git worktree list`/`kubectl get deploy,pods`/`qoder_cron list`/`~/.hermes/cron/jobs.json`/看板 SQLite 副本只读查询/`gh pr view`）。
+
+| 日期 | 类型 | 内容 | 操作者 | Arvin审核 |
+|---|---|---|---|---|
+| 2026-10-21 | 新增 | 台账 `docs/internal/SYSTEM_STATUS.md` 新增顶部两节：**「⚠️ 唯一红线告警」**（live `GH_TOKEN` 明文两次泄进会话记录，仓库/台账/变更日志字面量 0 处，但 live env 仍无 `valueFrom` → 值仍有效，吊销轮换待 Arvin）与**「并行工作流状态」总览表**（7 条并行线：接管部署线 / 旧调度停领线 / Qoder 值班巡检线 / Qoder 智能体团队线 / GitOps-PR 队列线 / 看板遗留线 / 自动化派发线，逐条列当前状态、下一跳、阻塞与未验证项）。目的是并行推进期能一眼看全，避免只散落在巡检历史里。 | Qoder 总监 | 待 Arvin 审 |
+| 2026-10-21 | 核验 | **并行面实测（11:26–11:30）**：① 接管部署线——镜像 `arvino:e8fa6e6f3839` 已在跑，api/worker 各 1/1 Running、0 重启（age 46m），`ARVINO_TAKEOVER_EXTERNAL_ONLY=true` 在两者**均生效**，`/healthz` 200，活库 schema `c3d4e5f6a7b8`；**尚无 live claim→complete 实证**。② 旧调度停领线——`0c82db48c322`、`1ee96fd19f7f`（3m）、`1972eac66c26`（夜间）三个 job **全部 `enabled=False`**；看板 **0 running / 0 ready**，近 90 分钟 `task_events` **0 条**。③ Qoder 值班巡检线——本地 job `10ea8cf0-46f9-4014-b4a4-6d3293d39b7a` 已改为 `*/15 * * * *` 全天候并接管旧 job 职责，作业指导书 `contrib/qoder-agent-team/status-inspection-prompt.md`。④ PR 队列——PR#29（本分支）已大改为 **36 文件 +4044/−34、head `bd78bccf`、MERGEABLE**，此前"仅 5 个 docs 可安全合并"口径作废需重审。⑤ 看板遗留——11 blocked + 5 todo 全部无人领取，调度停后**无执行者**。 | Qoder 总监 | 待 Arvin 审 |
+| 2026-10-21 | 偏差记录 | **停并发写者的衍生问题**：为关闭 firebird-sea 的第二个并发写者（§7.4），firebird 的 3 分钟 PR 审核与夜间流程**一并停用**，目前 **firebird-sea 的 PR 审核与夜间推进无自动接管者**；同理看板 11 blocked + 5 todo 在调度停后**无执行者**。停得干净但归属需补，需明确这两块由谁接。 | Qoder 总监 | 待 Arvin 审 |
+| 2026-10-21 | 修改 | `takeover-approval-request.md` 收口：§7.1（B3）标注已定案已部署；§7.2 / §7.3 标注 2026-10-21 10:42 以整体停用三个 job 方式关闭，原推荐的"独立 board/tenant"与"N=4"不再适用；§7.4 标注已关闭（两个 firebird 值守 job 已随之停用）并记入衍生归属问题；状态表补入"部署 + B3 + 停调度已完成"与"剩余唯一缺口 = 一条真实 claim→complete 端到端实证"。 | Qoder 总监 | 待 Arvin 审 |

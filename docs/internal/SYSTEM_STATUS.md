@@ -8,6 +8,26 @@
 
 **红线收窄为单条**：Arvin 在对话中就"红线目前只保留 不泄密 不输出密钥"连续两次经 clarify 工具明确确认。`PROJECT_CHARTER.md` §3.3 已同步改写——红线只剩**不输出密钥/不泄密**；原"不花钱、不动架构决策、不碰生产集群写操作、不绕过QA门禁、不自己合并PR"五条取消，覆盖并取代此前的"红线分级放行规则"（L0/L1/L2/L3 分级同步作废）。详见 `CHANGELOG_FRAMEWORK.md` 2026-10-21"治理规则生效(覆盖上条)"条目。**仍需人工把本条同步到 Qoder 设置页十角色的工作指令字段**（仓库文件与 Qoder UI 是两处，不会自动生效）。
 
+## ⚠️ 唯一红线告警（2026-10-21 11:30，最高优先级）
+
+**live `GH_TOKEN` 明文两次泄进会话记录，吊销与轮换仍未执行。** 起因是两次只读读取 Deployment env 的命令把该值带入输出（一次是核对 B3 开关时被过滤条件带出）。已核验：**仓库、台账、变更日志中该值字面量均为 0 处**（`grep -rIE "gh[pousr]_[A-Za-z0-9]{20,}"` 仅命中 gitleaks 自身的规则定义）；但 **live env 的 `GH_TOKEN` 仍无 `valueFrom`，即仍是明文 literal**——被泄出的值依然有效。
+**处置要求**：① 立即在 GitHub 侧吊销并重新签发该 token；② 合并 PR#222 / PR#219，把 `GH_TOKEN` 与 `ARVINO_DATABASE_URL` 改为 `secretKeyRef`（`ARVINO_AGENT_TOKEN`、`ARVINO_OWNER_TOKEN`、`ARVINO_NIGHTINGALE_WEBHOOK_TOKEN` 已是 secretKeyRef，无需动）；③ 后续任何命令**只允许读键名，不得打印 env 值**。此项由总监记录、未执行轮换动作（吊销需 Arvin 在 GitHub 侧操作）。
+
+## 并行工作流状态（2026-10-21 11:30 实测；几条线在同时推进，此表为总览，明细见各节与巡检历史）
+
+| # | 工作流 | 载体 | 当前状态（实测） | 下一跳 | 阻塞 / 未验证 |
+|---|---|---|---|---|---|
+| 1 | **接管部署线** | 候选分支 `candidate/t1-step-leases`（`e8fa6e6`）→ 镜像 `arvino:e8fa6e6f3839` | ✅ 镜像已上线：api/worker 各 1/1 Running、**0 重启**（age 46m）；`ARVINO_TAKEOVER_EXTERNAL_ONLY=true` 在 api 与 worker **均已生效**；活库 schema `c3d4e5f6a7b8`；`/healthz` 200 | 跑通**一条真实 claim→complete 端到端** | 尚无 live claim-to-complete 实证；harness 未部署 |
+| 2 | **旧调度停领线** | Hermes cron 三个 job | ✅ 10:42 起全部 `enabled=False`：`0c82db48c322`（看板总监值守 15m）、`1ee96fd19f7f`（firebird PR 审核 3m）、`1972eac66c26`（firebird 夜间流程）。实证：看板 **0 running / 0 ready**；近 90 分钟 `task_events` **0 条**（无新认领） | 明确 firebird PR 审核的接管归属 | **副作用**：firebird PR 审核与夜间推进目前**无自动接管者**，firebird-sea 的 PR 流程归属待定 |
+| 3 | **Qoder 值班巡检线** | Qoder 本地 job `10ea8cf0-46f9-4014-b4a4-6d3293d39b7a` | ✅ 每 15 分钟全天候（`*/15 * * * *` Asia/Shanghai）、Auto Approval；已接管旧 job 的巡检 + 台账 + commit/push + 24h 提醒；作业指导书 `contrib/qoder-agent-team/status-inspection-prompt.md`；最近一轮 succeeded（348s） | 把「调度层」表行的负责人从已停用的 `0c82db48c322` 改为现役 job id | 值班 job 与本会话并发写台账时需互斥（已有 `.inspection.lock` 12 分钟锁约定） |
+| 4 | **Qoder 智能体团队线** | 设置页「Arvino 研发交付组」（team_profile_id `562925f0-…`） | 🟡 团队已注册（1 leader + 4 member）；**单条红线口径与 lead 派发契约已写入仓库 13 份角色文件**（旧措辞残留 0 处） | Arvin 手工重贴十角色工作指令 → 跑一次必须由成员动手的团队任务 | **云端工作指令仍是旧版**（仓库文件 ≠ 设置页，不自动生效）；成员派发未实证；tester 异构模型无实证；tester/security 工具权限未读回 |
+| 5 | **GitOps / PR 队列线** | Gitea + ArgoCD + 5 个 open PR | 🟡 **PR#29（本分支）已大改：36 文件 +4044/−34、head `bd78bccf`、MERGEABLE**，此前「仅 5 个 docs、可安全合并」口径**作废**，需重审；另 PR#28 / #26 / #25 / #23 open。ArgoCD：agent-canvas-gke、ai-sre-canary、alert-gateway、alertmanager 均 Synced+Healthy；argocd-image-updater Unknown/Healthy | 重审并合并 PR#29（含全量 contrib 与台账） | PR#29 内容已变，未按新内容独立审过 |
+| 6 | **看板遗留线** | arvino 看板 11 blocked + 5 todo | 🟡 **0 running / 0 ready**，全部未解且无人领取；最老三项仍等凭据/登录/合并：`t_a36d7ed7` 35h+、`t_477917c2` 与 `t_f2717f22` 34h+ | 逐项决定：补凭据、恢复执行或取消 | 调度已停，这些任务**当前无执行者**；需明确由谁领取 |
+| 7 | **自动化派发线** | `contrib/qoder-agent-team/automation-dispatch-design.md` | ⚪ 仅 T0 只读巡检已实装；**T1 账本心跳、T2 事件触发未创建** | 视接管线进展决定是否建 T1 | 依赖接管线端到端跑通 |
+
+> 本表由总监登记，作为并行推进期的总览；**任何一行的状态变更须以实测为准，不得沿用上一行结论**。各线明细分别见：接管线见 `contrib/qoder-agent-team/t1-step-leases-evidence.md` 与 `0de9c59`；巡检线见巡检历史；团队线见 `registration-verification.json`；治理口径见「治理公告」与 `CHANGELOG_FRAMEWORK.md` 同日条目。
+> 口径提醒：「调度层(唯一)」表内 Hermes 行仍把负责人写作 `cron 0c82db48c322`，该 job 已于 10:42 disabled，现役巡检为 Qoder 本地 job `10ea8cf0-46f9-4014-b4a4-6d3293d39b7a`。该表由值班巡检维护，此处仅作差异登记。
+
 ## 调度层(唯一)
 
 | 组件 | 健康检查 | 最后确认 | 状态 | 负责人 |

@@ -13,10 +13,11 @@
 > | §7.1 待批 B1/B2/B3 | **已定案 B3**，commit `e7e58a7`（`ARVINO_TAKEOVER_EXTERNAL_ONLY`，接管期内只走外部执行路径） |
 > | "引擎与 API 改造未实施" | **已实施**于候选分支 `candidate/t1-step-leases`（远程 head `e8fa6e6`）：`src/arvino/engine.py` +711、`api.py` +72、`db.py` +29、`scripts/agent-harness.sh` +125、迁移 `c3d4e5f6a7b8`（`steps` 加 5 租约列 + `repo_write_locks` 表） |
 > | "A1–A6 全部未执行" | **A1–A4 已有测试与压测证据**：`tests/test_step_leases.py` 15 项 + `tests/test_bootstrap.py` B3 4 项 + `scripts/test_agent_harness_lease.sh` 14 断言 + Postgres 并发压测 16 worker 同步骤 1 胜 15 冲突；A5 随账本映射实现，A6 **仍阻塞于 UI 注册与异构模型实证** |
-> | "活库迁移、部署、停旧调度仍未执行" | **已更正**：活库迁移 `c3d4e5f6a7b8` 已于 2026-10-21 09:40 执行并验收通过（`alembic_version` `b1c2d3e4f5a6`→`c3d4e5f6a7b8`；5 个可空租约列 + `repo_write_locks` 就位；关键表行数不变；pods 0 新增重启；`/healthz` 200；旧镜像未变）。**部署候选分支/B3 开关与停旧调度仍未执行** |
+> | "活库迁移、部署、停旧调度仍未执行" | **已更正**：活库迁移 `c3d4e5f6a7b8` 已于 2026-10-21 09:40 执行并验收通过（`alembic_version` `b1c2d3e4f5a6`→`c3d4e5f6a7b8`；5 个可空租约列 + `repo_write_locks` 就位；关键表行数不变；pods 0 新增重启；`/healthz` 200；旧镜像未变）。**部署候选分支 + B3 开关与停旧调度亦已于 10:42–10:47 完成**：镜像 `arvino:e8fa6e6f3839` 已上线，`ARVINO_TAKEOVER_EXTERNAL_ONLY=true` 在 api/worker 生效，三个 Hermes job（`0c82db48c322` / `1ee96fd19f7f` / `1972eac66c26`）全部 `enabled=False`，看板 0 running / 0 ready、近 90 分钟无新认领。**剩余唯一缺口：一条真实 claim→complete 端到端实证** |
 > | "红线不变（5 条逐条批准）" | **红线已收窄为 1 条**（仅不泄密/不输出密钥），见 `CHANGELOG_FRAMEWORK.md` 同日两条治理条目与 `redline-release-policy-proposal.md`；本文件原有的审批分级措辞随之作废 |
-> | §7.2 S1 停取手段 / §7.3 N 量化 | **仍开放**，是 Hermes 侧列出的待批项，未见定案 |
-> | §7.4 firebird 值守 job 并发写 | **仍开放，且因接管已接近切换而更紧要**——本项未被并行实施覆盖 |
+> | §7.2 S1 停取手段 / §7.3 N 量化 | **已关闭（2026-10-21 10:42）**：旧调度以**整体停用三个 job** 的方式停领（`0c82db48c322` / `1ee96fd19f7f` / `1972eac66c26` 全部 `enabled=False`），末次 firebird 执行 10:40:24 完成；本文件原推荐的"独立 board/tenant"与"N=4≈60 分钟"随之不再适用。**遗留副作用**：firebird PR 审核与夜间推进当前无自动接管者，归属待定 |
+> | §7.4 firebird 值守 job 并发写 | **已关闭（2026-10-21 10:42）**：本项指出的第二个并发写者 `1ee96fd19f7f`（每 3 分钟）与 `1972eac66c26`（夜间）**已随旧调度一并停用**，Arvino 侧 `repo_write_locks` 覆盖不到的并发写窗口随之关闭。**衍生问题**：firebird-sea 的 PR 审核/夜间推进**目前无执行者**，需明确归属 |
+> | §7.1 B1/B2/B3 | **已定案 B3**（commit `e7e58a7`），部署已生效；本项关闭 |
 >
 > 仍开放项的权威清单以 `contrib/qoder-agent-team/t1-step-leases-evidence.md` §7 为准；本文件 §7.4 补充了那份清单没有覆盖的**第二个并发写者**。
 >
