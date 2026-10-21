@@ -1,6 +1,6 @@
 # Arvino 接管进度 · 一页速览
 
-> **更新：2026-10-21 17:30 PST** · 维护：Qoder 总监值班
+> **更新：2026-10-21 17:48 PST** · 维护：Qoder 总监值班
 > 这是**当前快照**，不是历史日志；有实质进展时覆盖更新。
 > 技术细节与逐轮证据：[SYSTEM_STATUS.md](../../docs/internal/SYSTEM_STATUS.md) · [CHANGELOG_FRAMEWORK.md](../../docs/internal/CHANGELOG_FRAMEWORK.md)
 
@@ -14,7 +14,7 @@
 
 ## 进行中
 
-- **PR 队列**：PR#29（本分支）已扩到全量 contrib + 台账，需按新内容重审后合并；另有 4 个 open PR 排队。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
+- **PR 队列**：PR#29（本分支）已扩到全量 contrib + 台账，需按新内容重审后合并；另有 4 个 GitHub open PR 排队，Gitea homelab 新增 #224（hermes-feishu 换 Teams bot，可合并）待评审。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - **Qoder 团队启用**：团队已注册（1 leader + 4 member），等 UI 指令重贴后跑一次必须由成员动手的任务。→ [注册核验](registration-verification.json)
 
 ## 已完成
