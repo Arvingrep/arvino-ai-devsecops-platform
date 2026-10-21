@@ -18,19 +18,13 @@
 | 2026-10-16 | 修复 | 告警通道从群-5351926143(从未真正送达)改为telegram DM 2057618975(@wcd_admin_bot,已用curl验证message_id真实送达) | 总监会话 | ⬜ 待审 |
 | 2026-10-16 | 待办 | @wcd_admin_bot 尚未加入Arvino群,群内角色动态播报功能未激活,需Arvin手动拉群 | — | ⬜ 待办 |
 | 2026-10-16 | 修复 | PR#17(CI lint修复)、PR#19(CI全部lint修复)已合并;PR#115/#116/#117(firebird-sea QA门禁+canary路由修复+/shop 500修复)待Arvin审 | 总监会话 | ⬜ 待审 |
-<<<<<<< HEAD
-| 2026-10-17 | 废弃 | 移除 Plane 集成:删除 Plane webhook 解析/路由/事件、PLANE_* 配置、deploy/helm-values/plane.yaml、deploy/secrets-examples/plane-*、plane_project_id 列(alembic c3d4e5f6a7b8)、测试 fixtures 与 payloads。IssueTracker 端口保留,默认实现改为 GitHub。文档(README/ADRs/实现计划/系统状态)已更新 | chore/remove-plane | ⬜ 待审 |
-=======
+| 2026-10-17 | 废弃 | 移除 Plane 集成:删除 Plane webhook 解析/路由/事件、PLANE_* 配置、deploy/helm-values/plane.yaml、deploy/secrets-examples/plane-*、plane_project_id 列(alembic d4e5f6a7b8c9)、测试 fixtures 与 payloads。IssueTracker 端口保留,默认实现改为 GitHub。文档(README/ADRs/实现计划/系统状态)已更新 | chore/remove-plane | ⬜ 待审 |
 | 2026-10-20 | 调研 | 6个custom(阿里云百炼/qwen3.8-flash,按token计费)角色切订阅方案调研结论:openai-codex当前429封墙(5.5天后恢复),唯一可用订阅为anthropic-oauth-1;建议:openai-codex恢复后分流(部分切anthropic,部分留codex),当前不改配置、维持现状避免触发anthropic新429 | arvino-architect | ⬜ 待Arvin/orchestrator审核后方可执行 |
 | 2026-10-20 | 执行 | provider分配方案按新规则("非红线决策不用问")直接拍板执行:devops+tester切anthropic-oauth-1;backend/frontend/researcher/design维持custom(等openai-codex 429解除后再切,当前429剩5.5天,不急);architect/orchestrator/security/smartcontract维持openai-codex。理由:避免10角色全挤一个池再触429;devops是最高频角色单独走anthropic比混进codex池更稳;不花钱(anthropic走订阅非按量)不碰生产不涉合并,属非红线运营决策 | arvino-orchestrator | 已验证✅ (arvino-devops task t_1f8ffb8b: 两个profile config.yaml已从provider:custom/qwen3.8-flash切为provider:anthropic/claude-sonnet-4-20250514,auth走anthropic-oauth-1 priority=0;hermes chat -q echo测试两个profile各独立跑通,exit 0,session各2s) |
-
 | 2026-10-20 | 规则变更 | **决策权收窄生效**:非红线类决策(技术方案选择/代码合并非生产/测试环境操作/provider-LLM路由等运营细节)一律"不用问Arvin,总监直接拍板执行+事后在本文件/Telegram报告",不再逐条clarify或等Telegram回复。红线不变且不受此条影响:不花钱、不碰生产集群写操作、不输出密钥、不绕过QA门禁、不自己合并PR——这5条任何时候都必须Arvin逐条单独批准。本条由Arvin在对话中直接授权("把需要我授权的规则都去掉,按实现目标为最高级别...",总监当场说明红线不可豁免并澄清范围,Arvin确认"只把非红线类决策...全部改成不用问,直接做+事后报告,红线不动") | arvino-orchestrator | ✅ Arvin已在对话中确认 |
-
 | 2026-10-21 | 接管 | Hermes cron `0c82db48c322`(看板每15分钟只读巡检)保持暂停,由 Qoder 本地定时任务 job `10ea8cf0-46f9-4014-b4a4-6d3293d39b7a` 接管同等范围的只读健康检查,并继续只增不删地写 SYSTEM_STATUS.md；周期 `*/15 * * * *`(Asia/Shanghai),Auto Approval(非 Full Access),到期 2026-12-31；指导书 `contrib/qoder-agent-team/status-inspection-prompt.md`；回退方式是 `hermes cron resume 0c82db48c322`(两条巡检不得同时启用)；首跑证据在 SYSTEM_STATUS.md 11:15/11:19 PST 条目 | Qoder 总监值班 | ⬜ 待审 |
 | 2026-10-21 | 修复 | 首跑发现 Auto Approval 分类器拦截 inline keychain 读取,导致 Gitea PR 无法检查；新增只读脚本 `scripts/gitea-open-prs.sh`(运行时读 keychain、token 不回显不落盘、退出即失效),巡检指导书 §4 改为调用该脚本,不再自行拼 curl | Qoder 总监值班 | ⬜ 待审 |
-
 | 2026-10-21 | 新增 | 面向人类的单页状态快照 `contrib/qoder-agent-team/STATUS_SUMMARY.md`：只保留「进行中/已完成/未开始/被阻塞」四段，每项一行，技术证据外链；**覆盖式更新，无实质进展不动**；巡检第 7 步在实质进展时同步更新并随台账提交；SYSTEM_STATUS.md 与 README 增加入口。台账 SYSTEM_STATUS.md 仍保持只增不删 | Qoder 总监值班 | ⬜ 待审 |
->>>>>>> origin/main
 
 ## 变更规则(后续所有LLM/Agent必须遵守,写入skill同步生效)
 
