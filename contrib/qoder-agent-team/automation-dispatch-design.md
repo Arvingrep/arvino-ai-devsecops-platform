@@ -94,6 +94,8 @@ T0 的边界：**不认领、不派发、不完成任何任务**，只产出可�
 
 > **2026-10-21 红线收窄后的更新**：巡检 job 的只读范围不变（仍是只读巡检），但上面的 prompt 已把表格引用改为“当前执行队列”。已保存的 cron job 仍带旧 prompt，需在 Qoder 设置页重贴后才会使用新版本；未重贴不影响 job 的只读性质，只影响它对模板字段的解析。
 
+> **2026-10-21 11:15 更新**：§4 的频率/成本选择、§5 的“巡检不得写仓库”边界、§6 的已保存 T0 定义已被 **§11（巡检接管实施记录）** 取代；以上内容作为历史保留，不再代表当前运行配置。
+
 ## 7. 启用前置与首次运行验证
 
 1. **用户确认**：位置（local）、计划、prompt、输出模式与到期日逐项确认后才 `add`。
@@ -149,3 +151,60 @@ T0 的边界：**不认领、不派发、不完成任何任务**，只产出可�
 3. 报告里"需 Arvin 决策事项"第 2 条（`.qoder/` 与 `contrib/` 的提交时机）属于在途工作提醒，不构成提交授权。
 4. 本记录只覆盖**一次**真实运行；异常路径（报告目录不可写、旧看板不可读、连续失败熔断）尚未被真实触发验证。
 5. T0 仍不具备任何派发能力；T1/T2 未实现、未批准。
+
+## 11. 巡检接管实施记录（2026-10-21 11:15，取代 §4/§6）
+
+### 11.1 背景与授权
+
+- 原 Hermes cron `0c82db48c322`（arvino 看板总监值守，每 15 分钟）已于 2026-10-21 10:42 `paused`，同时暂停的还有 firebird 值守 `1ee96fd19f7f` 与夜间 `1972eac66c26`。
+- Arvin 明确要求：由 Arvino 研发交付组接管其**只读健康巡检**与 `SYSTEM_STATUS.md` 持续更新；周期建议约 15 分钟；若使用团队自己的自动化机制，必须在台账中记录接管方式、执行主体和周期。
+- 唯一红线仍是**不泄密/不输出密钥**；本任务不因红线收窄而获得改业务状态的授权。对看板/集群/ArgoCD/PR 的核查保持只读。
+
+### 11.2 当前任务定义（Qoder 本地自动化，非 Hermes cron）
+
+| 项 | 值 |
+|---|---|
+| 任务 ID | `10ea8cf0-46f9-4014-b4a4-6d3293d39b7a` |
+| 名称 | Arvino 总监值班（15m 只读巡检 + 台账） |
+| 执行主体 | Arvino 研发交付组 / Qoder 总监值班自动会话 |
+| 位置 | local；workspace `818c008c-4c94-4564-a93a-50eefaf42333`；cwd 为本仓库 |
+| 计划 | `*/15 * * * *`，`Asia/Shanghai`（24/7，约 96 次/日） |
+| 到期 | `2026-12-31T23:59:59+08:00` |
+| 输出模式 | `independent` |
+| 权限模式 | `auto`（Auto Approval，非 Full Access） |
+| 模型键 | `qfmodel`（不据此推断实际模型或价格） |
+| 权威指导书 | `contrib/qoder-agent-team/status-inspection-prompt.md` |
+
+cron 的 prompt 只负责让每次运行先完整读取上述指导书；文件缺失或不可读即停，不凭记忆执行。这样扫描范围、命令白名单、台账格式和“只增不删”规则都版本化在仓库里，改动作业指导书即可，不必在设置页手工同步长 prompt。
+
+### 11.3 检查范围
+
+1. **Kanban 只读**：SQLite `mode=ro`（必要时 `immutable=1`）；status 计数、`running` 明细、近 60 分钟 `claimed`、blocked 年龄、stranded、`consecutive_failures`。不 dispatch、不认领、不 unblock、不清 guard。
+2. **GKE/Temporal**：arvino pods/Deployments/StatefulSet 的 Ready、重启、镜像；Temporal pod 数与重启；api/worker 镜像必须为 `e8fa6e6f3839`；B3 readback 必须为 `True/queue`；`alembic_version=c3d4e5f6a7b8`、`executor_*` 5 列、`repo_write_locks` 存在。
+3. **HTTP**：arvino `healthz/readyz/docs/dashboard/ui`、n8n healthz、canary `/shop` `/house`、`git.k8shome.com`、`gitea.k8shome.com`、本机 agent-canvas 8080。
+4. **ArgoCD**：`arvino-orchestrator-gke` 的 sync/health/revision/lastTransitionTime 与资源级健康；`firebird-canary`、`firebird-manila`、`argocd-image-updater`。应用级陈旧 `Degraded` 不直接当新故障。
+5. **PR**：GitHub `gh pr list`；Gitea homelab 与 firebird-sea open PR（keychain 凭据，只输出 number/state/mergeable/title 前缀，绝不输出 token）。
+6. **24 小时提醒**：blocked/stranded ≥24h 且距上次提醒 ≥24h 的任务，汇总成一条 Telegram 消息；健康/镜像/schema/ArgoCD 真实异常同样 24h 去重。首次运行只建立基线，不群发。
+
+### 11.4 写入与提交策略
+
+- 台账 `docs/internal/SYSTEM_STATUS.md` **只增不删**，追加到文件末尾；每次运行都写一条（无变化写紧凑条目）。
+- `git add` 仅台账；`git commit --only docs/internal/SYSTEM_STATUS.md`，提交信息带 `[skip ci]`；推送当前分支 `fix/system-status-ssot-persistence`（PR#29）。
+- 提交失败一次时 `fetch + rebase` 后重试一次；冲突则 `rebase --abort`，保留本地 commit 并报告；不 force push。
+- 同步 `~/.hermes/kanban/boards/arvino/ledger/SYSTEM_STATUS.md` 副本；更新 `ops-reports/.tick-state.json`；用 `ops-reports/.inspection.lock` 做 12 分钟互斥。
+- 不 commit 其他文件、不使用 `git add -A`、不 merge、不创建 PR。
+
+### 11.5 不越界与已知基线
+
+- 不认领/派发/完成/关闭/编辑 kanban 任务；不 unblock；不清 `consecutive_failures`；不 `hermes kanban dispatch`。
+- 不启停或恢复 Hermes 三个 paused job；两条巡检不得同时启用。
+- 不做 kubectl 写操作；不读 Deployment/Pod env 或 Secret；不打印任何密钥。
+- 已知基线不重复告警：`gitea.k8shome.com` 525、审批 webhook 404、`arvino-orchestrator-gke` 应用级陈旧 `Degraded`（`2026-10-19T15:31:37Z`）、`argocd-image-updater` ComparisonError、`firebird-manila` 以 GitHub main 为源、agent-canvas 仅本机 8080。
+- 发现异常只记录并提醒，修复另立任务；同一命令失败 2 次即停。
+
+### 11.6 验证状态与局限
+
+- **尚未完成首跑验收**：任务已更新为上述定义，并在登记期间临时 `disable`；下一步 `enable` + `run` 触发一次，验证其能读取指导书、追加台账、commit/push、更新状态文件。首跑通过前不得宣称巡检接管已完整验收。
+- 本地任务依赖 Qoder app 与宿主运行；app 关闭或 Mac 休眠时不触发，台账会断档（下次运行标记断档分钟数）。
+- Gitea API 依赖 keychain 中 `git.k8shome.com` 凭据；不可读时记录阻塞，不阻断其余检查。
+- 96 次/日会产生大量台账提交；提交信息带 `[skip ci]` 以避免 CI 重复跑。若噪音/成本不可接受，可下调为 30 分钟，但必须先在 `CHANGELOG_FRAMEWORK.md` 记录并同步台账。
