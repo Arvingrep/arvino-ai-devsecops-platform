@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 from typing import Annotated, Any, Literal
 
 import httpx
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse, Response
 from jose import ExpiredSignatureError, JWTError, jwt  # type: ignore[import-untyped]
@@ -359,6 +359,13 @@ def create_app(engine: Engine, settings: Settings) -> FastAPI:
     def run_events(run_id: str) -> list[EventView]:
         engine.get_run(run_id)
         return [EventView.model_validate(e) for e in engine.events(run_id)]
+
+    @app.get("/events", dependencies=[any_auth])
+    def events(
+        limit: Annotated[int, Query(ge=1, le=500)] = 50,
+    ) -> list[EventView]:
+        """Global recent-event feed (dashboard realtime ledger), newest first."""
+        return [EventView.model_validate(e) for e in engine.recent_events(limit)]
 
     @app.post("/runs/{run_id}/advance", dependencies=[operator])
     def advance(run_id: str) -> RunView:

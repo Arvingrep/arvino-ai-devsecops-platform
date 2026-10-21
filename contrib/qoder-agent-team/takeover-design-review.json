@@ -1,0 +1,147 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "independent_static_review_receipt_not_approval_or_test_report",
+  "subject": {
+    "path": "contrib/qoder-agent-team/takeover-design-proposal.md",
+    "sha256": "e40003ae3489e6442c2f7ff8a9f5bc77a53c4026508d9e1644f2c71aed2efde7",
+    "lines": 197,
+    "state_reviewed": "post_correction_final"
+  },
+  "related_evidence": {
+    "takeover-preflight.json_sha256": "9aa722f2c4a01742b459810b7ee222fc15d00bd7d2baeb80899c26563551da27"
+  },
+  "reviewer_independence": {
+    "type": "separate_agent_static_review",
+    "participated_in_writing_subject": false,
+    "reviewed_business_code_or_runtime": false,
+    "written_scope": "只读审查；未修改、创建或删除任何文件；未 commit/push/建 Issue/动数据库/执行迁移"
+  },
+  "result": {
+    "verdict_on_first_pass": "pass_with_minor_findings",
+    "verdict_after_corrections": "findings_addressed_pending_recheck_by_reviewer",
+    "blocking_findings_after_correction": 0,
+    "approval_implied": false
+  },
+  "findings": [
+    {
+      "id": 1,
+      "severity": "major",
+      "location": "proposal §3.5, §7",
+      "issue": "原稿称'拟新增只读路由适配层'，但仓内已有 src/arvino/adapters/role_router.py（_ROLE_MAP + fail-closed RoleRouter，bootstrap.py:169-171 已接线），新建会形成第二套 role 映射，与 §3.5 自身'不实现第二套状态机'矛盾。",
+      "fix_applied": "§3.5 改为'扩展现有 RoleRouter，不另建映射'，并列出 _ROLE_MAP 现缺 lead/tester/design/smartcontract；§7 拟改模块清单改为 role_router.py（扩展现有）。"
+    },
+    {
+      "id": 2,
+      "severity": "major",
+      "location": "proposal §2, §3.5, §7",
+      "issue": "原稿遗漏引擎内建执行路径 engine._dispatch → RoleRouter → OpenHands/ClaudeCode，该路径不经 /work 与 /complete；原稿的 claim/renew/release 与 CompleteIn.lease_token（必填）只覆盖外部拉取路径。",
+      "fix_applied": "§2 补内建路径事实；§3.5 新增内建路径兼容三选一（B1 仅外部路径强制租约 / B2 内建路径也纳入租约 / B3 接管期停用内建执行器），列为需批准事项第 7 条；§6 声明 A1-A4 默认只覆盖外部路径；§7 补 openhands.py / claude_code.py 行。"
+    },
+    {
+      "id": 3,
+      "severity": "minor",
+      "location": "proposal §3.2, §6 A2",
+      "issue": "claim 拒绝条件缺'旧租约已过期但未确认旧执行者停止'；release 之外无回收路径，A2 要求'显式回收前须证明旧执行停止'但全文未定义谁可回收、如何证明。",
+      "fix_applied": "§3.2 新增第四个接口 reclaim（operator 身份，缺停止证据时拒绝），并在要点中写明'停止证据'的三种来源与'仅租约超时不算停止证据'；§6 A2 判定方式同步改写。"
+    },
+    {
+      "id": 4,
+      "severity": "minor",
+      "location": "proposal §3.2 要点",
+      "issue": "原稿写'对齐 Hermes 存活且已登记执行者延期的既有做法'只对一半：Hermes 的 release_stale_claims 仅对本机、已登记且存活的 worker 延期，对无存活本机 PID 的外部执行者会直接回收并重派。",
+      "fix_applied": "改写为'比 Hermes 现状更严格'并注明 Hermes 行为与其源码行号；§4 方案 B 补第 5 条回收语义补齐项。"
+    },
+    {
+      "id": 5,
+      "severity": "minor",
+      "location": "proposal §3.1, §3.4",
+      "issue": "新增 repo_key 未说明取值来源；仓内已有 ProjectRow.repo_full_name（db.py:65），engine.py:580 已用作 repo 身份。",
+      "fix_applied": "§2 与 §3.1 写明 repo_key 由 projects.repo_full_name 规范化派生，不另造来源。"
+    },
+    {
+      "id": 6,
+      "severity": "nit",
+      "location": "proposal §2",
+      "issue": "list_work 描述漏了 engine.py:1553 的 and st.role 条件（role 为空的 AGENT 步不入列表）。",
+      "fix_applied": "§2 补'AND role 非空'并注明原因。"
+    },
+    {
+      "id": 7,
+      "severity": "nit",
+      "location": "proposal §2",
+      "issue": "JWT role claim 映射实际在 api.py:198-206，不在被引的 214-231 区间内。",
+      "fix_applied": "§2 单列 api.py:198-206 的 owner/agent/system 映射与未知 role 直接 401。"
+    },
+    {
+      "id": 8,
+      "severity": "nit",
+      "location": "proposal §6",
+      "issue": "'Qoder UI 注册通道恢复前'预设通道已损坏；preflight 只记'批量导入/注册 API 在已阅文档中未记载'且 runtime_ui_inspected_this_turn=false。",
+      "fix_applied": "改为'在 UI 注册路径经实证确认前'。"
+    },
+    {
+      "id": 9,
+      "severity": "nit",
+      "location": "proposal §5 S1",
+      "issue": "'恢复取任务开关'无对应控制面：已审 Hermes 源码中 dispatch 取全部 ready 任务，tasks 表无'写任务'类型列（kanban_db.py:804-844）；'N 个调度周期'未量化。",
+      "fix_applied": "§5 补'停取手段尚不存在、须先定案'，列出三个可选手段并要求量化 N 的来源；§8 增第 8 条需批准事项。"
+    },
+    {
+      "id": 10,
+      "severity": "nit",
+      "location": "docs/internal/CHANGELOG_FRAMEWORK.md 新增节",
+      "issue": "内容列单条过长，与文件规则 #2'10 秒看懂的一句话'张力大。",
+      "fix_applied": "新增节压缩为一句白话并补一条返修记录；历史行零修改（git diff -U0 统计 0 删除 / 36 新增），表格 5 列格式一致。"
+    }
+  ],
+  "reviewer_verified_pass": [
+    "engine.py 503-525 / 916-936 / 1543-1568、api.py 88-95 / 214-231 / 283 / 373-390、db.py 88-141、agent-harness.sh 292-359 引用命中且解读正确",
+    "Hermes kanban_db.py 1021-1028 / 2151-2230 / 2318-2341 / 2660-2764(2712)、kanban.py 312-317、kanban_db_dispatch.py 611-646 引用命中且解读正确",
+    "看板快照数值与 takeover-preflight.json 一致；I1-I7 现状列与源码一致",
+    "租约到期不重派与 repo_key 互斥均处于方案 A 提案语境，未伪装为既有事实",
+    "全文无'已注册/已具备异构模型/已拥有 owner 锁/已迁移/已上线'类断言（仅出现在 §9 否定句）",
+    "A1-A6 与 preflight offline_acceptance_plan_not_executed 六条一一对应；A2 与 S1-S5 贯彻一致；A6 与注册阻塞状态一致",
+    "CHANGELOG 新节为纯追加，5 列格式与前两节一致，历史行零修改"
+  ],
+  "director_reverification_after_correction": {
+    "command": ".venv/bin/python -B（只读断言脚本，无写操作）",
+    "citation_checks_total": 29,
+    "citation_checks_failed": 0,
+    "citation_checked_paths": [
+      "src/arvino/engine.py", "src/arvino/api.py", "src/arvino/db.py",
+      "src/arvino/adapters/role_router.py", "src/arvino/bootstrap.py",
+      "scripts/agent-harness.sh",
+      "/Users/arvin/.hermes/hermes-agent/hermes_cli/kanban_db.py",
+      "/Users/arvin/.hermes/hermes-agent/hermes_cli/kanban_db_dispatch.py",
+      "/Users/arvin/.hermes/hermes-agent/hermes_cli/kanban.py"
+    ],
+    "changelog_removed_lines": 0,
+    "changelog_added_lines": 36,
+    "changelog_new_section_table_columns_ok": true,
+    "git_diff_check_exit_code": 0,
+    "overclaim_scan": "仅命中 §9 的否定句（不主张…），无正向断言"
+  },
+  "reviewer_limitations": [
+    "未运行测试、迁移或服务，全部结论限于静态源码与文件文本；运行时行为（租约语义、并发 claim）未验证",
+    "未连接 Hermes 看板 DB，只采信 preflight 记录的 2026-10-20T17:27:18Z 只读快照，未独立复核当前状态",
+    "未核验 Hermes 源码磁盘内容与 preflight 记录的 sha256/HEAD（v0.22.2-dirty / d923a5eb）是否一致，仅按行号读取比对",
+    "未核验 Qoder UI 实际注册能力、账号模型资格、异构模型可绑定性与费用边界（preflight 亦记未检视）",
+    "未进入 firebird-sea 业务仓比对，无法独立确认'未改业务仓库'；仅确认平台仓改动仅两个 docs 文件",
+    "未访问 GitHub 复核 issue #67 / 项目板当前状态；.qoder/ 目录内容未做语义审查（范围外）"
+  ],
+  "scope_out_observations": {
+    "docs/internal/SYSTEM_STATUS.md": "未提交改动为外部 cron 巡检条目（00:57/01:14/01:30 PST），非本轮产物，未处理",
+    ".qoder/repowiki/knowledge/zh": "Qoder 工具产物，非业务仓库改动，未处理",
+    "contrib/qoder-agent-team": "仅角色 md、TEAM.md、roles.yaml 与 JSON/MD 证据，无可执行文件、无凭据、无业务写脚本"
+  },
+  "unperformed_actions": [
+    "修改任何源码、配置或数据库",
+    "执行迁移、启动服务、运行测试套件",
+    "认领或派发任务",
+    "修改或停用旧调度",
+    "commit/push/merge",
+    "访问 GitHub 写操作或业务仓写操作",
+    "生产写、付费"
+  ],
+  "next_gate": "本回执只证明设计稿已完成一轮独立静态审查并按意见修正，不构成方案批准、迁移批准、注册/模型/权限核验完成或接管可实施；这些仍需按 §8 逐项取得批准。"
+}

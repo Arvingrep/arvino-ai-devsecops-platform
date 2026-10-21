@@ -1,0 +1,120 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "read_only_takeover_preflight_evidence_not_task_ledger_or_approval",
+  "assessment": "read_only_preflight_complete_runtime_takeover_blocked",
+  "scope": "核验既有Hermes认领机制复用条件、当前并发及工作区基线；不修改调度或业务实现",
+  "previous_stage_receipt": "stage-1-verification.json",
+  "hermes_interface_observed": {
+    "entrypoint": "/Users/arvin/.local/bin/hermes",
+    "resolved_executable": "/Users/arvin/.hermes/hermes-agent/.hermes/bin/hermes",
+    "source_root": "/Users/arvin/.hermes/hermes-agent",
+    "help_exit_code": 0,
+    "claim_cli": "hermes kanban --board arvino claim TASK_ID --ttl SECONDS",
+    "claim_default_ttl_seconds": 900,
+    "documented_storage": "durable SQLite-backed board",
+    "documented_claim": "atomic claim of a ready task",
+    "claim_actually_called": false,
+    "implementation_review": "completed_static_source_review_not_live_claim_test",
+    "current_running_tasks": 0,
+    "repository_exclusion": "not_enforced_by_the_reviewed_single_task_claim",
+    "external_principal_binding": "host_pid_or_caller_supplied_claimer_not_authenticated_external_principal"
+  },
+  "hermes_source_snapshot": {
+    "source_git_describe": "v0.22.2-dirty",
+    "source_head": "d923a5eb487a17c0a68801bba9ef0f56c81040a8",
+    "source_file_sha256": {
+      "hermes_cli/kanban.py": "14131a7111cf9d30b735cdbc9c44f979228a8b1311b67c8c00c0f92cc33bc72d",
+      "hermes_cli/kanban_db.py": "5f704a0395290a4c8983f0249c6a275f6560f5ae9623d53c08086a862373bc54",
+      "hermes_cli/kanban_db_connect.py": "5c60aa69a63357cde6991ad5b651179e835a7f2d6ad746c0e2450aeafb188559",
+      "hermes_cli/kanban_db_dispatch.py": "e03f12eed7aa398a2fc40209ce0e616609e81e89609f791e5d340d21088988ab",
+      "hermes_cli/kanban_db_workspace.py": "b7ea2b55439aee4e64384c42af9755f95c9bc85374af8843dedd6128a854e970"
+    },
+    "claim_evidence": "kanban_db.py:2151–2230在事务中以ready/claim_lock为空进行CAS，创建task_runs及current_run_id；这保护同一任务认领，不是仓库写互斥。",
+    "claimer_evidence": "kanban_db.py:1021–1028默认host:pid，claim_task亦接受caller-supplied claimer；这不是Qoder外部执行者的认证身份或秘密token。",
+    "cli_claim_evidence": "kanban.py:735–747不直接spawn，但解析/创建workspace；claim_task:2229触发hook。CLI未返回运行ID/token或登记Qoder监督进程，不可把此命令当无副作用探针。",
+    "renewal_distinction": "库中kanban_db.py:2318–2341的heartbeat_claim可按相同claim_lock延长task及run TTL；但CLI heartbeat在kanban.py:312–317调用kanban_db_dispatch.py:611–646的heartbeat_worker，仅记录活动和last_heartbeat_at，不延長TTL。不能泛称Hermes无续租，也不能认为跨CLI进程heartbeat自动保护Qoder租约。",
+    "completion_evidence": "kanban_db.py:2660–2764的expected_run_id可选，传入时增加current_run_id条件拒绝旧run；未传run时对有活worker PID的claim阻止无所有权完成，但force=True是显式操作者覆盖例外（2712），本轮不使用。外部Qoder尚未建立强制run/身份绑定，不能把可选run ID当认证token。",
+    "expiry_review": "源代码复核发现本机已登记worker的存活检查与延期；远端/无PID及手动回收路径不能单独证明Qoder执行已停止。未实际执行回收或竞争测试。",
+    "ledger_boundary": "Hermes tasks/task_runs与Arvino run/step是两套账本，现查schema无专用Arvino关联；metadata能力不代表映射已接线。",
+    "readonly_cli_warning": "kanban_db_connect.py:716–784非fenced常规connect可初始化/迁移；部分list另重算ready。本轮未用stats/list查状态，使用原生SQLite URI mode=ro及query_only。",
+    "qualification": "本次安装源码的局部事实，不等于全系统不存在其他外部锁；未查询凭据、任务正文、评论或claim字符串。"
+  },
+  "readonly_board_snapshot": {
+    "observed_at_utc": "2026-10-20T17:27:18.642479+00:00",
+    "database_uri": "file:/Users/arvin/.hermes/kanban/boards/arvino/kanban.db?mode=ro",
+    "query_only": 1,
+    "schema_verified": "PRAGMA table_info(tasks)确认安全查询字段存在",
+    "query": "SELECT status,count(*) AS n FROM tasks GROUP BY status ORDER BY status",
+    "status_counts": {"archived": 1, "blocked": 11, "done": 159, "todo": 5, "running": 0},
+    "running_tasks": [],
+    "command_exit_code": 0,
+    "task_body_or_claim_string_read": false,
+    "qualification": "只读时间点快照；0个running不证明未来不会被旧调度认领，也不证明仓库互斥。"
+  },
+  "model_and_permission_documentation": {
+    "sources": [
+      "https://docs.qoder.com/zh/qoder/custom-agent-teams",
+      "https://docs.qoder.com/zh/qoder/model-selector",
+      "https://docs.qoder.com/zh/qoder/security-and-authorization"
+    ],
+    "observed_documented_capabilities": [
+      "团队由一名负责人和一至四名额外成员组成；团队成员需启用并绑定本机，团队任务需设备在线。",
+      "可选择自动档位或直接指定可用模型；自定义模型可出现在任务、Agent及自动化模型选择器。",
+      "Credit消耗取决于Token、档位或模型、参数和工具调用，不能假设所有模型或工具运行免费。"
+    ],
+    "not_documented_in_reviewed_pages": ["逐成员硬绑定模型家族", "每次实际模型的可审计运行记录", "逐智能体工具/文件路径白名单及worktree强制隔离", "本地角色文件批量导入或注册API"],
+    "qualification": "未说明不等于能力不存在；文档可见选项不等于当前账号资格。Auto不证明异构条件。",
+    "runtime_ui_inspected_this_turn": false,
+    "registration_status": "prepared_not_registered",
+    "api_key_or_paid_connector_added": false,
+    "model_or_credential_probe_executed": false
+  },
+  "external_delegation_environment": {
+    "checked_values": "presence_only_no_secret_values",
+    "CODEXHOST_CLI_PATH_present": false,
+    "CODEXHOST_RUNTIME_ENDPOINT_present": false,
+    "CODEXHOST_RUNTIME_TOKEN_present": false,
+    "runtime_or_model_call_executed": false
+  },
+  "workspace_snapshot": {
+    "observed_at_utc": "2026-10-20T17:24:53.581312+00:00",
+    "command_method": "git status --porcelain=v1 -z / branch --show-current / rev-parse HEAD；只输出计数与版本，不读业务文件正文",
+    "git_exit_codes": [0, 0, 0],
+    "workspaces": [
+      {"path": "/Users/arvin/Documents/arvino/ai-devsecops-platform", "branch": "fix/system-status-ssot-persistence", "head": "c08dde0cb9601c8467e22c70d31bdf4816d69e27", "porcelain_entries": 4, "untracked_entries": 2, "modified_entries": 2, "deleted_entries": 0, "is_clean": false},
+      {"path": "/Users/arvin/Documents/firebird-sea", "branch": "fix/ci-qa-gate-arvino-branch", "head": "7616997675fd5030cb798f864e5288d5f3c2ed78", "porcelain_entries": 1794, "untracked_entries": 1557, "modified_entries": 2, "deleted_entries": 235, "is_clean": false},
+      {"path": "/Users/arvin/firebird-sea", "branch": "fix/security-audit-s003-s008-s010", "head": "d491b68862a023547ddc6f61e6b750ee1b05e7ac", "porcelain_entries": 0, "untracked_entries": 0, "modified_entries": 0, "deleted_entries": 0, "is_clean": true}
+    ],
+    "qualification": "干净不等于正确任务基线；任何实现仍须核对目标base并获准使用隔离worktree。",
+    "external_status_commit": {"sha": "c08dde0cb9601c8467e22c70d31bdf4816d69e27", "git_show_exit_code": 0, "changed_path": "docs/internal/SYSTEM_STATUS.md", "changes": "499 insertions, 10 deletions", "qoder_created_this_commit": false, "reverted_or_amended": false}
+  },
+  "claim_acceptance_requirements_not_yet_tested": [
+    "同任务并发认领只允许一个真实执行者获租约",
+    "同一仓库的不同任务和不同board仍最多一个实现者写入",
+    "执行身份、租约和候选版本可验证，不只依靠prompt自报owner",
+    "租约到期回收须确认旧执行者停止，旧租约回执不得覆盖新结果",
+    "Qoder可以在授权后作为外部执行者使用锁，不触发旧Hermes额外spawn",
+    "Hermes任务与Arvino run/step/attempt的映射和权威账本边界清晰",
+    "注册、权限、真实模型家族和费用边界满足后才允许写任务"
+  ],
+  "architecture_recommendation_not_approved": {
+    "status": "proposal_only_no_implementation_or_authorization",
+    "recommended_path": "复用Arvino现有持久化账本、事务/CAS/attempt隔离与CI/OPA/GitOps，补外部executor claim/lease、认证主体、强制完成栅栏、仓库互斥及Qoder执行桥；Qoder负责理解、拆派和追踪。",
+    "alternative": "HermesDB作为过渡可复用单任务claim及库续租，但仍需主体校验、执行监督、强制run fencing、仓库锁和跨账本映射，并不比直接接Arvino简单。",
+    "proposed_modules_not_changed": ["src/arvino/db.py", "src/arvino/engine.py", "src/arvino/api.py", "受批准的Qoder外部执行桥与角色路由适配器"],
+    "historical_data_policy": "不删除或搬走旧Hermes历史，后续通过幂等映射关联task/run与Arvino run/step。",
+    "switch_gate": "方案、注册/模型/权限、隔离验收齐备并获具体批准后，才对firebird-sea旧调度停领、排空并核验无遗留执行，再切唯一Qoder调度；本轮不关闭或改Hermes。",
+    "approval_dependencies": ["架构方案", "角色及最小权限", "数据库迁移", "旧调度停领/排空及切换回退"],
+    "offline_acceptance_plan_not_executed": ["同任务竞争只一方获租约", "失联旧执行隔离且未停止不重派", "旧token/attempt或run回执被拒", "跨任务/跨board同仓库互斥", "账本映射幂等且历史完整", "十职责最小权限与研发/验收隔离"]
+  },
+  "independent_record_review": {
+    "type": "separate_agent_static_review_not_heterogeneous_business_qa",
+    "result": "pass_with_documented_scope_after_force_exception_correction",
+    "checked": ["完整读取本预检JSON", "源版本/HEAD及5文件hash", "claim、CLI入口、库续租、完成run条件及connect副作用的指定源码范围", "运行接管未完成和方案未获批准边界"],
+    "command_results": {"json_and_hash_exit_code": 0, "git_describe_exit_code": 0, "git_rev_parse_exit_code": 0, "one_interpreter_path_lookup_exit_code": 2},
+    "correction": "审查指出completion摘要遗漏force覆盖例外；已依据kanban_db.py:2712补充且明确本轮不使用。总监另核读heartbeat_worker:611–646，确认CLI活动记录不延长TTL。",
+    "limitations": ["审查者未重复现场看板/工作区查询，仅核历史快照；现场读数由总监SQLite mode=ro取得", "部分到期/回收、账本关联及文档能力陈述仅原只读调查与总监查证，未在此次审查重复全文核查", "最初解释器路径检查失败，但后续JSON/hash验证成功；总监已用本仓库现有.venv完成结构和源码指纹核验", "真实模型家族/权限、领取竞争及端到端均未验证"]
+  },
+  "unperformed_actions": ["claim", "dispatch", "heartbeat", "reclaim", "complete", "创建或修改旧看板任务", "关闭旧调度", "运行业务模型", "安装或新增付费服务", "UI权限绕过", "业务代码或生产写", "commit/push/merge", "清理或checkout业务工作区"],
+  "next_gate": "只读核验已完成，直接CLI认领不足以解除接管阻塞；架构方案及运行身份/权限/模型/一致性认领条件齐备前不启动写任务，不把本建议当修改API、迁移数据库或停旧调度的授权。"
+}

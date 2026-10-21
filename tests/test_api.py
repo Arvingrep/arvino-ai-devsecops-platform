@@ -82,7 +82,7 @@ def test_health_is_open_everything_else_needs_a_token(api: tuple[TestClient, Env
     c, _ = api
     assert c.get("/healthz").status_code == 200
     assert c.get("/readyz").json()["status"] == "ready"
-    for path in ("/projects", "/runs", "/approvals", "/workflows", "/work"):
+    for path in ("/projects", "/runs", "/approvals", "/workflows", "/work", "/events"):
         assert c.get(path).status_code == 401
         assert c.get(path, headers={"Authorization": "Bearer nope"}).status_code == 401
 
@@ -141,6 +141,30 @@ def test_run_lifecycle_and_idempotent_creation(api: tuple[TestClient, Env]) -> N
     cancelled = c.post(f"/runs/{run_id}/cancel", headers=OWNER_H).json()
     assert cancelled["status"] == "cancelled"
     assert c.get("/runs?active=true", headers=OWNER_H).json() == []
+
+
+def test_events_feed_returns_recent_events_newest_first(api: tuple[TestClient, Env]) -> None:
+    c, env = api
+    run = {"project_id": env.project_id, "issue_id": env.issue_id, "profile": "fast"}
+    run_id = c.post("/runs", json=run, headers=OWNER_H).json()["id"]
+
+    r = c.get("/events", headers=OWNER_H)
+    assert r.status_code == 200
+    body = r.json()
+    assert isinstance(body, list) and body
+    assert body[0]["run_id"] == run_id  # newest event belongs to the run just created
+    mine = [e for e in body if e["run_id"] == run_id]
+    assert any(e["type"] == "run.created" for e in mine)
+    ids = [e["id"] for e in body]
+    assert ids == sorted(ids, reverse=True)
+
+    # agent token may read the feed too (any_auth), limit is clamped by the schema
+    assert c.get("/events", headers=AGENT_H).status_code == 200
+    assert c.get("/events?limit=0", headers=OWNER_H).status_code == 422
+    assert len(c.get("/events?limit=1", headers=OWNER_H).json()) == 1
+
+    # wrong token is rejected before any data is returned
+    assert c.get("/events", headers={"Authorization": "***"}).status_code == 401
 
 
 def test_agent_harness_pull_model_work_and_completion(env: Env) -> None:

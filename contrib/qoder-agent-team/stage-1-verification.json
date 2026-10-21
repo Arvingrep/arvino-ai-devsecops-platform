@@ -1,0 +1,78 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "stage_verification_receipt_not_task_ledger_or_approval",
+  "scope": "Qoder十职责本地配置、独立只读匿名试点及授权看板草稿记录",
+  "overall_stage_assessment": "local_preparation_and_readonly_audit_complete_runtime_takeover_blocked",
+  "role_registration_status": "prepared_not_registered",
+  "candidate_version": {
+    "modified_configuration_file_count": 12,
+    "modified_configuration_sha256": "0cb629a2dce7db277c97e9f71c0aea5c0209c80fd852dc0c82a1d8a03bff1301",
+    "reviewed_material_file_count": 17,
+    "reviewed_material_sha256": "aaae8be917e1f61e843e4c8039c24cc9585a59549b15d28a0df0b1593f31b44d",
+    "anonymous_baseline_sha256": "5270512d55b1f62a266a587e78475e99fc67df8871ad19a285fdd56984c32756",
+    "fingerprint_algorithm": "按仓库相对路径排序，逐文件拼接路径UTF-8、NUL、字节长度ASCII、NUL、文件原始字节，再取SHA-256。",
+    "modified_configuration_scope": "TEAM.md、十个正式角色md、CHANGELOG_FRAMEWORK.md；不含roles.yaml、legacy与审计证据。",
+    "reviewed_material_scope": "本目录15个配置文件（TEAM、十正式角色、三个legacy、roles.yaml）、匿名基线JSON及CHANGELOG_FRAMEWORK.md；本回执不纳入自身指纹。",
+    "commit_created": false,
+    "approval_granted_for_candidate": false
+  },
+  "checks": [
+    {
+      "name": "编写者自查",
+      "result": "pass",
+      "commands": ["PYTHONDONTWRITEBYTECODE=1 .venv/bin/python -B -：YAML/frontmatter/十角色/legacy/追加记录校验", "git diff --check"],
+      "exit_codes": [0, 0],
+      "qualification": "实现者自查，不是独立验收"
+    },
+    {
+      "name": "总监实际文件及快照复核",
+      "result": "pass",
+      "checked": ["实际TEAM、tester、researcher文件及治理diff", "10正式角色/3个legacy/工具候选/禁止自动提交发布标记", "12文件快照与编写者报告一致", "基线JSON的21路径统计及owner锁未验字段", "全部17份审查材料指纹", "git diff --check"],
+      "exit_codes": [0, 0],
+      "qualification": "记录与静态校验，不证明运行时权限强制"
+    },
+    {
+      "name": "独立只读看板与基线记录审查",
+      "result": "pass_after_boundary_correction",
+      "checked": ["JSON完整读取及21路径统计", "gh api graphql直接读取新ProjectV2Item的DraftIssue和原Issue", "公开正文不含本机路径、私人账号、密钥或执行会话ID", "原Issue仍OPEN且updatedAt不变"],
+      "exit_codes": [0, 0],
+      "finding_and_fix": "首轮指出owner锁未验证需显式列出；已补assessment.owner_lock_and_atomic_claim_verification=not_verified及not_verified中的CAS/原子认领项，后续独立配置审查确认修复。",
+      "qualification": "未重新访问canary；仅记录审查，不是业务异构QA或安全门禁"
+    },
+    {
+      "name": "独立十角色全文静态审查",
+      "result": "pass",
+      "checked": ["TEAM、roles、十正式角色和三个legacy全文", "CHANGELOG_FRAMEWORK第41行起及PROJECT/章程适用规则", "十职责唯一、研发/测试/安全分离", "Fast必要security、Standard/Governed必经security及适用CI/OPA策略", "候选版本、真实PR/head SHA及逐动作审批边界", "3次同型失败跨会话计数及硬缺口阻塞", "授权公开读取与模型/费用/凭据权限区别", "合约逐动作审批、草稿不是锁", "基线owner锁未验修复及12文件指纹"],
+      "exit_codes": [0, 0],
+      "static_blockers": [],
+      "not_covered": ["CHANGELOG历史第1–40行真实性", "线上功能/登录/CI执行", "实际权限隔离和异构模型", "运行账本认领与单调度切换"],
+      "qualification": "未参与编写的不同执行会话审查；真实模型家族未核，不能宣称满足章程异构验收"
+    }
+  ],
+  "project_record": {
+    "project_url": "https://github.com/users/Arvingrep/projects/3",
+    "draft_title": "Qoder 试点：Issue #67 匿名基线审计",
+    "project_item_id": "PVTI_lAHOAuOIfM4BmVo3zhCLYmI",
+    "original_issue_url": "https://github.com/Arvingrep/firebird-sea/issues/67",
+    "original_issue_state": "OPEN",
+    "original_project_status": "Todo",
+    "original_issue_updated_at_utc": "2026-10-10T07:49:18Z",
+    "original_issue_modified": false,
+    "repository_issue_created": false,
+    "business_delivery_complete": false,
+    "authority_boundary": "草稿是授权审计记录，不是业务owner锁、完整字段接线或第二份权威账本。"
+  },
+  "blocking_conditions": [
+    {"category": "技术配置", "condition": "Qoder UI注册工具在用户明确授权后仍拒绝；本轮不重复、不绕过。", "release_evidence": "界面工具通道解除后实际读取并核验注册结果。"},
+    {"category": "模型与权限", "condition": "真实实现者/验收者模型家族、现有可用资格/成本、最小工具和隔离权限未核。", "release_evidence": "真实配置及权限证据，不通过业务模型或付费探针猜测资格。"},
+    {"category": "账本与并发", "condition": "执行者独占认领、仓库写入互斥及Hermes/Qoder共同锁/交接未验证。", "release_evidence": "先只读核对已有外部锁可否复用；若不可复用，架构先批准最小认领/续租/释放与过期隔离契约，再受控实施和验收。"}
+  ],
+  "read_only_wiring_findings": {
+    "existing_mechanisms_to_reuse": ["engine.py:503–525步骤派发CAS", "engine.py:916–936 attempt fencing", "现有持久化账本、CI/OPA/GitOps门禁"],
+    "execution_claim_gap": "api.py:388–390的/work仅列RUNNING步骤；CompleteIn没有执行者claim token；scripts/agent-harness.sh:313–357轮询后直接执行。引擎派发CAS不等于执行者独占认领。",
+    "external_lock_status": "外部Hermes真实锁未知，不能仅凭本地API和表结构断言全系统无锁。",
+    "recommendation_status": "只读架构建议，不授权新增字段、数据库迁移、权限、连接器、生产动作或停旧调度。"
+  },
+  "unperformed_actions": ["实际十角色注册", "业务实现或修复", "登录内页验收", "demo/生产验收", "生产写", "付费", "commit/push/merge", "关闭或修改Hermes调度", "修改业务仓库", "修改SYSTEM_STATUS.md或.qoder既有内容"],
+  "next_execution_gate": "注册、模型/权限及真实一致性认领和单调度条件齐备前，不启动业务写任务；由总监集中汇报和申请绑定动作版本的必要批准。"
+}
