@@ -97,6 +97,24 @@ def test_all_role_map_entries_resolve() -> None:
         assert outcome.status == "succeeded", f"role {role!r} failed: {outcome.error}"
 
 
+def test_every_builtin_workflow_agent_role_is_routable() -> None:
+    """Every agent role used by a built-in workflow must be in _ROLE_MAP.
+
+    A missing mapping fails runs at dispatch time ("no executor configured"),
+    which the local governed rehearsal exposed for triage/product/developer.
+    """
+    from arvino.domain import StepKind
+    from arvino.workflows.model import load_registry
+
+    agent_roles = {
+        step.role.value
+        for workflow in load_registry().all()
+        for step in workflow.steps
+        if step.kind is StepKind.AGENT and step.role is not None
+    }
+    assert agent_roles - set(_ROLE_MAP) == set()
+
+
 # ------------------------------------------------------------------ reconcile_all
 
 

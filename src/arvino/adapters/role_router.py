@@ -5,19 +5,23 @@ Design decision (set by orchestrator): single registry, fail-closed.
 
 from __future__ import annotations
 
+from arvino.domain import Role
 from arvino.ports import AgentExecutor, StepOutcome, StepRequest
 
-_ROLE_MAP: dict[str, str] = {
-    # Role value -> adapter key
-    "backend": "claude_code",
-    "architect": "claude_code",
-    "qa": "claude_code",
-    "security": "claude_code",
-    "reviewer": "claude_code",
-    "devops": "claude_code",
-    "frontend": "claude_code",
-    "researcher": "claude_code",
-}
+# Every workflow role must be routable: an unmapped role fails the run
+# immediately ("no executor configured").  Cover the full Role enum so the
+# built-in fast/standard/governed definitions cannot drift out of sync again.
+# Extra ten-team role names are kept for custom workflows.
+_ROLE_MAP: dict[str, str] = {role.value: "claude_code" for role in Role}
+_ROLE_MAP.update(
+    {
+        "devops": "claude_code",
+        "tester": "claude_code",
+        "design": "claude_code",
+        "smartcontract": "claude_code",
+        "lead": "claude_code",
+    }
+)
 
 
 class RoleRouter:
