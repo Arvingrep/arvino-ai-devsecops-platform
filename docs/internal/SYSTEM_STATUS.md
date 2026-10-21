@@ -1146,3 +1146,15 @@
   - 24h 提醒：**未发送**。11 项 blocked 的 reminders 与 health/image/b3/db/argocd alerts 基线均为 03:20:41Z 首跑建立，距今约 25 分钟 <24h，本轮无 due 项；各检查项与基线一致，无新异常，故无「⚠ Arvino 巡检异常」消息。
   - 与上一条台账（11:30）差异：系统状态无变化（看板/GKE/B3/DB/HTTP/ArgoCD/GitHub/Gitea 各项计数与取值全部一致，blocked age 仅随时间自然增长）。距 `state.last_run_utc`(03:35:00Z) 约 10 分钟，<45 分钟，**无巡检断档**。
   - 本条目由 Qoder 本地定时任务 job 10ea8cf0-46f9-4014-b4a4-6d3293d39b7a 生成；只读巡检，未 dispatch/未认领/未恢复 Hermes。
+
+- **2026-10-21 12:02 PST（本次，无状态变化：看板/GKE/B3/DB/HTTP/ArgoCD/GitHub/Gitea 全部与 11:45 基线一致）**
+  - 看板（只读，ro 模式）：done 159 / blocked 11 / todo 5 / archived 1，running 0、ready 0、triage 0、review 0；`claimed_60m`=0，stranded ready=0 → **无双调度风险**。11 项 blocked 全部 24h+：`t_a36d7ed7` 103.9h、`t_0f5b931b` 103.2h、`t_188c5a78` 98.7h、`t_ecaabae7` 65.0h（consecutive_failures=2，「pid 22099 not alive」worker 掉线，非新错误）、`t_477917c2` 63.5h、`t_f2717f22` 63.4h、`t_f01dcf8f` 36.9h、`t_b4e33024` 34.5h、`t_a18cdf9c` 32.5h、`t_071d0e68` 32.4h、`t_71f47a4b` 32.3h；其余 10 项 fails=0。未 dispatch、未 unblock、未清 consecutive_failures。
+  - **观测受限记录（非系统异常）**：`mode=ro` 连接本轮两次报 `unable to open database file (SQLITE_CANTOPEN)`，按指导书以 `?mode=ro&immutable=1` 重试成功；疑为主库存在 WAL/热日志时只读打开受限。另该库 `created_at` 存 epoch 整数且 SQLite 版本不支持 `unixepoch()`，age 改为本地计算，已核对与 11:45 条目一致。
+  - GKE：arvino 命名空间 4 pods 全 Running/Ready、restarts 全 0（与基线持平）；deploy/sts 副本 1/1 全部满足。api 与 worker 镜像 `arvino:e8fa6e6f3839`，**无镜像漂移**；opa `latest-static`、postgres `16-alpine` 不变。Temporal 7 pods 全 Running、非 Running 0，仅 frontend 有历史 3 次重启（6d ago），与基线相同。
+  - B3 读回：`takeover_external_only= True`、`adapters= queue`，符合期望。DB：alembic `c3d4e5f6a7b8`、steps `executor%` 列 5、`repo_write_locks` 存在，三项符合期望。
+  - HTTP（仅状态码）：healthz/readyz/docs/dashboard/ui 全 200；n8n healthz 200；canary /shop、/house 200；`git.k8shome.com` 302（未登录跳 authentik SSO，跟进后 200，已知基线）；本机 8080 agent-canvas 200；`gitea.k8shome.com` 525（已知基线）。**无退化**。
+  - ArgoCD：`arvino-orchestrator-gke` Synced/Degraded@`f075222c82`，`lastTransitionTime` 仍 `2026-10-19T15:31:37Z`、conditions 为空、`reconciledAt`=2026-10-21T04:02:49Z → 应用级陈旧状态位，非新故障；`status.resources` 15/15 `Synced`（该字段本轮不下发 per-resource health，资源级以 sync=Synced 且无非 Healthy 记录为准）。`firebird-canary` Synced/Healthy@`6f52a6fc46`、`firebird-manila` Synced/Healthy@`213c486a39`（仍以 GitHub main 为源，已知基线）、`argocd-image-updater` Unknown/Healthy（已知 ComparisonError，PR#218 待修）。集群内其余 38 个 Application 均 Synced/Healthy。未 sync、未改 Application。
+  - PR（只读）：GitHub open 5 / mergeable 5（#29 #28 #26 #25 #23）；Gitea `homelab` open 14 / mergeable 8，`firebird-sea` open 2 / mergeable 2，与基线一致。Gitea 走 `./scripts/gitea-open-prs.sh`，本轮凭据可用、输出无凭据。未创建/合并/评论 PR。
+  - 24h 提醒：**未发送**。11 项 blocked 的 reminders 与 health/image/b3/db_schema/argocd 的 alerts 基线均为 `2026-10-21T03:20:41Z`（接管首跑建立），距今约 42 分钟 <24h，本轮无 due 项；各检查项取值与基线完全一致，无「正常→异常」变化，故无「⚠ Arvino 巡检异常」消息。
+  - 与上一条台账（11:45）差异：系统状态**无变化**；仅 blocked 年龄随时间自然增长（最旧 98.7→103.9h 区间位移），以及本轮新增一项巡检自身的观测注记（kanban ro 打开受限需 immutable 重试、per-resource health 字段缺省）。距 `state.last_run_utc`(03:49:09Z) 约 13 分钟，<45 分钟，**无巡检断档**。
+  - 本条目由 Qoder 本地定时任务 job 10ea8cf0-46f9-4014-b4a4-6d3293d39b7a 生成；只读巡检，未 dispatch/未认领/未恢复 Hermes。
