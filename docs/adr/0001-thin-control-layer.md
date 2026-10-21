@@ -4,7 +4,7 @@ Status: Accepted (2026-10-15)
 
 ## Context
 `PROJECT.md` describes a multi-project AI development/operations platform for a
-single DevOps/Kubernetes architect. Plane (portfolio/issues), Temporal (durable
+single DevOps/Kubernetes architect. GitHub Project (portfolio/issues), Temporal (durable
 execution), OpenHands/Claude Code (agent sandboxes), Gitea/GitHub (SCM + CI),
 OPA/Conftest/Trivy (gates), Argo CD (deploy) and Nightingale (alerts) already
 solve their own problems. Rebuilding any of them would burn a solo operator's
@@ -20,7 +20,7 @@ only what no existing tool owns:
    audit event — the cross-tool join record.
 3. The **invariants** that must hold across tools (approval blocking, separation
    of duties, idempotent intake, retry/timeout fencing, fail-closed policy).
-4. **Webhook adapters** that normalise Plane/Gitea/CI/Argo CD/Nightingale
+4. **Webhook adapters** that normalise Gitea/GitHub/CI/Argo CD/Nightingale
    notifications into typed events.
 
 Everything else is reached through narrow **ports** (Python `Protocol`s):
@@ -33,7 +33,7 @@ by tests; production adapters are added per integration and must be labelled
 * Small codebase (a few thousand lines) that one person can hold in their head.
 * Every external dependency can be mocked, so the invariants are testable
   without any cluster, network, or credentials.
-* Live adapters for OpenHands/Claude Code, Plane, Gitea and Argo CD are
+* Live adapters for OpenHands/Claude Code, Gitea and Argo CD are
   explicitly *pending* until exercised; the README tracks the status of each.
 * Git remains the source of truth: artifacts store URIs + digests that point to
   Git/CI objects, not copies of chat output.

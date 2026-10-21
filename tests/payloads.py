@@ -13,7 +13,6 @@ from arvino.webhooks.auth import sign
 
 FIXTURES = Path(__file__).parent / "fixtures" / "webhooks"
 
-PLANE_SECRET = "plane-test-secret"
 GITEA_SECRET = "gitea-test-secret"
 GITHUB_SECRET = "github-test-secret"
 CI_TOKEN = "ci-test-token"
@@ -29,24 +28,6 @@ def _load_json(name: str) -> dict[str, Any]:
 
 def raw(payload: dict[str, Any]) -> bytes:
     return json.dumps(payload, separators=(",", ":")).encode()
-
-
-def plane_issue(
-    project: str = "plane-proj-1",
-    issue: str = "11111111-aaaa",
-    labels: list[str] | None = None,
-    action: str = "created",
-    state_group: str = "unstarted",
-) -> dict[str, Any]:
-    base = _load_json("plane_issue_created.json")
-    data = base["data"]
-    data["id"] = issue
-    data["project"] = project
-    data["state"]["group"] = state_group
-    if labels is not None:
-        data["labels"] = [{"id": f"l{i}", "name": n} for i, n in enumerate(labels)]
-    base["action"] = action
-    return base
 
 
 def git_pr(

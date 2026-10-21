@@ -3,14 +3,14 @@
 Status: Accepted (2026-10-15)
 
 ## Context
-Argo CD is the deployer; the repo must contain manifests for Plane, Temporal and
+Argo CD is the deployer; the repo must contain manifests for Temporal and
 the orchestration service, but no cluster is touched tonight and no secret may be
 committed.
 
 ## Decision
 * `deploy/base/<component>` + `deploy/overlays/{dev,staging,production}` with
   Kustomize (validated offline by `kubectl kustomize` and `kubeconform`).
-  Helm is not used for our own service; Plane and Temporal are deployed from
+  Helm is not used for our own service; Temporal is deployed from
   minimal Deployments/StatefulSets here for MVP reproducibility, with the
   upstream Helm charts named as the Phase 3 replacement.
 * `deploy/argocd/` holds `AppProject` + `Application`/`ApplicationSet`
@@ -24,7 +24,7 @@ committed.
 * Containers: non-root, read-only root FS, dropped capabilities, resource limits,
   pinned image tags (never `:latest`); enforced by Conftest policy.
 * Docker Compose (`compose.yaml`) is the local verification stack: Postgres,
-  OPA, the orchestration service. Plane/Temporal in Compose are behind the
+  OPA, the orchestration service. Temporal in Compose is behind the
   optional `full` profile (large images; not exercised in CI).
 
 ## Consequences

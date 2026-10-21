@@ -3,7 +3,7 @@
 Status: Accepted (2026-10-15)
 
 ## Context
-Five inbound notification sources: Plane (issues), Gitea/GitHub (PRs, pushes,
+Five inbound notification sources: GitHub/Gitea (issues, PRs, pushes,
 statuses), CI completion, Argo CD (app health/sync), Nightingale (alerts).
 Payloads differ and change.
 
@@ -16,8 +16,8 @@ Payloads differ and change.
 * One **dispatcher** (`arvino.webhooks.dispatch`) maps events onto engine
   actions. Deduplication is by `(source, delivery_id)` in `webhook_deliveries`;
   business handlers are *also* idempotent, so replay is harmless.
-* Authentication: HMAC-SHA256 over the raw body for Plane (`X-Plane-Signature`),
-  Gitea (`X-Gitea-Signature`) and GitHub (`X-Hub-Signature-256`); a shared
+* Authentication: HMAC-SHA256 over the raw body for Gitea (`X-Gitea-Signature`)
+  and GitHub (`X-Hub-Signature-256`); a shared
   secret header (`X-Arvino-Token`, constant-time compare) for CI, Argo CD
   notifications and Nightingale, whose webhook features cannot sign bodies.
   A missing secret configuration means **reject** (fail closed).

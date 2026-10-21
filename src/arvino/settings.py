@@ -43,8 +43,8 @@ class Settings(BaseSettings):
     # Webhook credentials. Unset -> that source is rejected.
     gitea_webhook_secret: SecretStr | None = None
     github_webhook_secret: SecretStr | None = None
-    # Plane 集成已确定下线(2026-10-16决策,见PR#25全量移除),此字段暂留仅为
-    # 兼容api.py里还没清理掉的plane webhook路由,不属于本PR范围,不新增功能。
+    # Plane 集成已下线(2026-10-16决策,见 PR#25 全量移除)。此字段仅保留以兼容
+    # 仍读取 ARVINO_PLANE_WEBHOOK_SECRET 的部署环境,不再有代码消费。
     plane_webhook_secret: SecretStr | None = None
     ci_webhook_token: SecretStr | None = None
     argocd_webhook_token: SecretStr | None = None

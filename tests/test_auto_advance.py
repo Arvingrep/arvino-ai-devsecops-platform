@@ -22,8 +22,8 @@ def _make_request(role: str) -> StepRequest:
         repo="acme/app",
         issue={  # type: ignore[arg-type]
             "id": "iss-000000000001",
-            "source": "plane",
-            "external_id": "PLANE-1",
+            "source": "github",
+            "external_id": "GH-1",
             "title": "test issue",
         },
     )

@@ -57,7 +57,6 @@ MAX_WEBHOOK_BYTES = 1_000_000
 class ProjectIn(BaseModel):
     key: str = Field(pattern=r"^[a-z0-9][a-z0-9-]{0,62}$")
     name: str
-    plane_project_id: str | None = None
     repo_full_name: str | None = Field(default=None, pattern=r"^[\w.-]+/[\w.-]+$")
     default_branch: str = "main"
     argocd_apps: dict[str, str] = Field(default_factory=dict)
@@ -455,46 +454,6 @@ def create_app(engine: Engine, settings: Settings) -> FastAPI:
             }
 
         return await run_in_threadpool(work)
-
-    def _authenticate_plane(
-        authorization: str | None,
-        x_plane_signature: str | None,
-        plane_secret: str | None,
-        owner_token: str | None,
-    ) -> Callable[[bytes], None]:
-        def verify(body: bytes) -> None:
-            # Bearer token auth (n8n relay path)
-            if authorization and authorization.startswith("Bearer "):
-                token = authorization[7:]
-                if owner_token and hmac.compare_digest(
-                    hashlib.sha256(owner_token.encode()).digest(),
-                    hashlib.sha256(token.encode()).digest(),
-                ):
-                    return
-                raise wauth.WebhookAuthError("bearer token mismatch")
-            # HMAC signature auth (direct Plane-to-arvino path)
-            wauth.verify_hmac_sha256(plane_secret, body, x_plane_signature)
-
-        return verify
-
-    @app.post("/webhooks/plane")
-    async def hook_plane(
-        request: Request,
-        x_plane_signature: Annotated[str | None, Header()] = None,
-        authorization: Annotated[str | None, Header()] = None,
-    ) -> dict[str, Any]:
-        return await process(
-            "plane",
-            request,
-            lambda b: _authenticate_plane(
-                authorization,
-                x_plane_signature,
-                secret(settings.plane_webhook_secret),
-                secret(settings.owner_token),
-            )(b),
-            parsers.parse_plane,
-            "x-plane-delivery",
-        )
 
     @app.post("/webhooks/gitea")
     async def hook_gitea(

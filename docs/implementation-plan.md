@@ -16,22 +16,22 @@ Status key: ✅ done & verified · 🟡 done, pending live verification · ⬜ n
 
 ## Phase 2 — Policy & webhooks ✅
 * Rego policy (`policy/`) with `opa test`; OPA CLI + HTTP clients; fail-closed.
-* Webhook parsers + dispatcher for Plane, Gitea/GitHub, CI, Argo CD, Nightingale.
+* Webhook parsers + dispatcher for Gitea/GitHub, CI, Argo CD, Nightingale.
 * Real webhook fixtures captured from live systems.
 * Conftest policy for Kubernetes manifests (positive + negative controls).
 
 ## Phase 3 — Delivery packaging ✅
 * Dockerfile, `compose.yaml` (Postgres + OPA + service).
-* Kustomize bases/overlays for orchestrator, Plane, Temporal, OPA.
+* Kustomize bases/overlays for orchestrator, Temporal, OPA.
 * Argo CD AppProject/Applications — deployed to GKE.
 * CI workflow (GitHub Actions: lint + test + policy + build + push via OIDC WIF).
 * Trivy image + IaC scan integrated in CI.
 
 ## Phase 4 — Live integrations ✅
 1. ✅ Temporal: deployed to GKE, worker connected, kill/restart verification.
-2. ✅ **n8n as integration bus**: 3 webhook relay workflows active (Plane/Gitea/Nightingale → arvino).
+2. ✅ **n8n as integration bus**: 3 webhook relay workflows active (Gitea/GitHub/Nightingale → arvino).
 3. ✅ Gitea/GitHub: GitHubProvider + GiteaProvider adapters (17 tests). GitHub webhook on firebird-sea active.
-4. ✅ Plane: CE deployed, workspace "Arvino" + project "Firebird SEA" created, webhook → n8n → arvino verified.
+4. ✅ GitHub: issue tracking on firebird-sea active, webhook → arvino verified.
 5. ✅ **Telegram Bot Agent Interface**: TelegramAgentExecutor adapter built. 10 bots verified in group. Owner /approve /reject tested.
 6. ✅ OpenHands / Claude Code: ClaudeCodeExecutor (22 tests) + OpenHandsExecutor (ADR 0007). Agent harness script for local execution.
 7. ✅ Argo CD: ArgoCDPromoter adapter (commits to GitOps repo only, never syncs).
@@ -50,7 +50,7 @@ Status key: ✅ done & verified · 🟡 done, pending live verification · ⬜ n
   into run ledger (BmadArtifactKind enum, transitive ancestor traversal, 20 tests).
 
 ## Phase 6 — Portfolio features ✅
-* ✅ Cross-project cycles/roadmap views in Plane fed by run ledger.
+* ✅ Cross-project roadmap views in GitHub Project fed by run ledger.
 * ✅ Cost/budget tracking; spending-change approval kind enforced by policy.
 * ✅ Self-service workflow definition PRs with automatic safety-lint.
 * ✅ Director logic programmatized into arvino engine (RoleRouter, ReconcileDriver,

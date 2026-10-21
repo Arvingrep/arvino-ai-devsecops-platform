@@ -47,7 +47,6 @@ CRDS='https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{
 (( FAST )) || step "kubeconform argocd CRDs" kubeconform -strict -summary -schema-location default -schema-location "$CRDS" deploy/argocd
 if (( ! FAST )); then
   step "helm template temporal + kubeconform" bash -c "helm template temporal temporal --repo https://go.temporal.io/helm-charts --version 1.7.0 -n temporal -f deploy/helm-values/temporal.yaml > $TMP/temporal.yaml && kubeconform -strict -summary -kubernetes-version 1.30.0 $TMP/temporal.yaml"
-  step "helm template plane + kubeconform"    bash -c "helm template plane-app plane-ce --repo https://helm.plane.so/ --version 1.8.5 -n plane -f deploy/helm-values/plane.yaml > $TMP/plane.yaml && kubeconform -strict -summary -kubernetes-version 1.30.0 $TMP/plane.yaml"
 fi
 
 # Negative controls: the policies must actually reject known-bad manifests.

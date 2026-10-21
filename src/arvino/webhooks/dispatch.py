@@ -127,7 +127,7 @@ class Dispatcher:
             return self._deployment(event)
         return self._alert(event)
 
-    # -- Plane
+    # -- Git (GitHub / Gitea)
 
     @staticmethod
     def _profile_from_labels(labels: list[str]) -> tuple[Profile | None, str | None]:
@@ -145,12 +145,9 @@ class Dispatcher:
 
     def _issue(self, ev: IssueUpserted) -> DispatchResult:
         # --- locate project ---
-        if ev.source in ("github", "gitea"):
-            if not ev.repo:
-                return DispatchResult(status="ignored", detail="git issue has no repo field")
-            project = self.engine.find_project(repo_full_name=ev.repo)
-        else:
-            project = self.engine.find_project(plane_project_id=ev.plane_project_id or "")
+        if not ev.repo:
+            return DispatchResult(status="ignored", detail="git issue has no repo field")
+        project = self.engine.find_project(repo_full_name=ev.repo)
         if project is None:
             return DispatchResult(status="ignored", detail="unknown project")
         issue, _ = self.engine.upsert_issue(

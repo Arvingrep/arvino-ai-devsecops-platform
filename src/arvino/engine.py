@@ -159,7 +159,6 @@ class Engine:
         key: str,
         name: str,
         *,
-        plane_project_id: str | None = None,
         repo_full_name: str | None = None,
         default_branch: str = "main",
         argocd_apps: dict[str, str] | None = None,
@@ -170,7 +169,6 @@ class Engine:
                     id=f"prj-{uuid.uuid4().hex[:12]}",
                     key=key,
                     name=name,
-                    plane_project_id=plane_project_id,
                     repo_full_name=repo_full_name,
                     default_branch=default_branch,
                     argocd_apps=argocd_apps or {},
@@ -196,14 +194,10 @@ class Engine:
                 for p in s.scalars(select(ProjectRow).order_by(ProjectRow.key))
             ]
 
-    def find_project(
-        self, *, plane_project_id: str | None = None, repo_full_name: str | None = None
-    ) -> ProjectView | None:
+    def find_project(self, *, repo_full_name: str | None = None) -> ProjectView | None:
         with transaction(self._sf) as s:
             stmt = select(ProjectRow)
-            if plane_project_id is not None:
-                stmt = stmt.where(ProjectRow.plane_project_id == plane_project_id)
-            elif repo_full_name is not None:
+            if repo_full_name is not None:
                 stmt = stmt.where(ProjectRow.repo_full_name == repo_full_name)
             else:
                 return None

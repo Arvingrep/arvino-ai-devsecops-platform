@@ -61,7 +61,6 @@ class ProjectRow(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     key: Mapped[str] = mapped_column(String(64), unique=True)
     name: Mapped[str] = mapped_column(String(200))
-    plane_project_id: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
     repo_full_name: Mapped[str | None] = mapped_column(String(200), unique=True, nullable=True)
     default_branch: Mapped[str] = mapped_column(String(100), default="main")
     argocd_apps: Mapped[dict[str, str]] = mapped_column(JSON, default=dict)
@@ -74,7 +73,7 @@ class IssueRow(Base):
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     project_id: Mapped[str] = mapped_column(ForeignKey("projects.id"))
-    source: Mapped[str] = mapped_column(String(32))  # plane | nightingale | api
+    source: Mapped[str] = mapped_column(String(32))  # github | gitea | nightingale | api
     external_id: Mapped[str] = mapped_column(String(200))
     kind: Mapped[str] = mapped_column(String(32), default="task")  # task | incident
     title: Mapped[str] = mapped_column(String(500))

@@ -23,7 +23,6 @@ def make_settings(**over: Any) -> Settings:
         "database_url": "sqlite://",
         "owner_token": SecretStr(P.OWNER_TOKEN),
         "agent_token": SecretStr(P.AGENT_TOKEN),
-        "plane_webhook_secret": SecretStr(P.PLANE_SECRET),
         "gitea_webhook_secret": SecretStr(P.GITEA_SECRET),
         "github_webhook_secret": SecretStr(P.GITHUB_SECRET),
         "ci_webhook_token": SecretStr(P.CI_TOKEN),
@@ -37,13 +36,6 @@ def make_settings(**over: Any) -> Settings:
 
 @pytest.fixture
 def api(env: Env) -> tuple[TestClient, Env]:
-    # Give the shared test project a Plane id so Plane webhooks resolve.
-    from arvino.db import ProjectRow, transaction
-
-    with transaction(env.engine._sf) as s:
-        row = s.get(ProjectRow, env.project_id)
-        assert row is not None
-        row.plane_project_id = "plane-proj-1"
     return TestClient(create_app(env.engine, make_settings())), env
 
 
@@ -251,21 +243,23 @@ def test_workflows_listing_exposes_all_profiles(api: tuple[TestClient, Env]) -> 
 
 def test_webhooks_reject_bad_or_missing_credentials(api: tuple[TestClient, Env]) -> None:
     c, _ = api
-    body = P.raw(P.plane_issue(labels=["arvino:fast"]))
-    assert c.post("/webhooks/plane", content=body).status_code == 401
-    assert (
-        c.post("/webhooks/plane", content=body, headers={"X-Plane-Signature": "0" * 64}).status_code
-        == 401
-    )
+    body = P.raw(P.github_issue(labels=["arvino:fast"]))
+    assert c.post("/webhooks/github", content=body).status_code == 401
     assert (
         c.post(
-            "/webhooks/gitea", content=b"{}", headers={"X-Gitea-Signature": "0" * 64}
+            "/webhooks/github", content=body, headers={"X-Hub-Signature-256": "sha256=" + "0" * 64}
         ).status_code
         == 401
     )
     assert (
         c.post(
             "/webhooks/github", content=b"{}", headers={"X-Hub-Signature-256": "sha256=" + "0" * 64}
+        ).status_code
+        == 401
+    )
+    assert (
+        c.post(
+            "/webhooks/gitea", content=b"{}", headers={"X-Gitea-Signature": "0" * 64}
         ).status_code
         == 401
     )
@@ -281,9 +275,11 @@ def test_webhooks_reject_bad_or_missing_credentials(api: tuple[TestClient, Env])
 
 def test_webhook_source_without_configured_secret_is_rejected(env: Env) -> None:
     c = TestClient(
-        create_app(env.engine, make_settings(plane_webhook_secret=None, ci_webhook_token=None))
+        create_app(env.engine, make_settings(github_webhook_secret=None, ci_webhook_token=None))
     )
-    r = post_signed(c, "/webhooks/plane", P.plane_issue(), "", "X-Plane-Signature")
+    r = post_signed(
+        c, "/webhooks/github", P.github_issue(), "", "X-Hub-Signature-256", prefix="sha256="
+    )
     assert r.status_code == 401
     assert (
         post_token(c, "/webhooks/ci", P.ci_completion(SHA, {"lint": "success"}), "").status_code
@@ -313,27 +309,46 @@ def test_invalid_payload_is_422_and_recorded_as_rejected(api: tuple[TestClient, 
         assert row is not None and row.status == "rejected"
 
 
-# ----------------------------------------------------------------------------- Plane
+# ----------------------------------------------------------------------------- GitHub issue webhooks
 
 
-def test_plane_label_starts_run_and_replays_are_idempotent(api: tuple[TestClient, Env]) -> None:
+def test_github_issue_label_starts_run_and_replays_are_idempotent(
+    api: tuple[TestClient, Env],
+) -> None:
     c, env = api
-    payload = P.plane_issue(labels=["arvino:fast"])
-    h = {"X-Plane-Delivery": "d-1"}
-    r1 = post_signed(c, "/webhooks/plane", payload, P.PLANE_SECRET, "X-Plane-Signature", extra=h)
+    payload = P.github_issue(labels=["arvino:fast"], repo="acme/app")
+    h = {"X-GitHub-Delivery": "d-1", "X-GitHub-Event": "issues"}
+    r1 = post_signed(
+        c,
+        "/webhooks/github",
+        payload,
+        P.GITHUB_SECRET,
+        "X-Hub-Signature-256",
+        prefix="sha256=",
+        extra=h,
+    )
     assert r1.status_code == 200 and r1.json()["results"][0]["detail"] == "run created"
     run_id = r1.json()["results"][0]["run_ids"][0]
     # Same delivery replayed: deduplicated at the delivery layer.
-    r2 = post_signed(c, "/webhooks/plane", payload, P.PLANE_SECRET, "X-Plane-Signature", extra=h)
+    r2 = post_signed(
+        c,
+        "/webhooks/github",
+        payload,
+        P.GITHUB_SECRET,
+        "X-Hub-Signature-256",
+        prefix="sha256=",
+        extra=h,
+    )
     assert r2.json()["status"] == "duplicate"
     # New delivery id, same business event: deduplicated by the run idempotency key.
     r3 = post_signed(
         c,
-        "/webhooks/plane",
+        "/webhooks/github",
         payload,
-        P.PLANE_SECRET,
-        "X-Plane-Signature",
-        extra={"X-Plane-Delivery": "d-2"},
+        P.GITHUB_SECRET,
+        "X-Hub-Signature-256",
+        prefix="sha256=",
+        extra={"X-GitHub-Delivery": "d-2", "X-GitHub-Event": "issues"},
     )
     assert r3.json()["results"][0]["detail"] == "run already exists"
     assert r3.json()["results"][0]["run_ids"] == [run_id]
@@ -342,36 +357,61 @@ def test_plane_label_starts_run_and_replays_are_idempotent(api: tuple[TestClient
 
 
 @pytest.mark.parametrize(
-    ("labels", "detail"),
+    ("labels", "detail", "expect_runs"),
     [
-        ([], "no run requested"),
-        (["bug"], "no run requested"),
-        (["arvino:fast", "arvino:governed"], "multiple"),
-        (["arvino:yolo"], "unknown profile"),
+        ([], "run created", True),  # auto-inferred as Standard
+        (["bug"], "run created", True),  # auto-inferred as Fast
+        (["arvino:fast", "arvino:governed"], "multiple", False),
+        (["arvino:yolo"], "unknown profile", False),
     ],
 )
-def test_plane_without_exactly_one_valid_profile_label_starts_nothing(
-    api: tuple[TestClient, Env], labels: list[str], detail: str
+def test_github_issue_without_exactly_one_valid_profile_label_starts_nothing(
+    api: tuple[TestClient, Env], labels: list[str], detail: str, expect_runs: bool
 ) -> None:
     c, env = api
     r = post_signed(
-        c, "/webhooks/plane", P.plane_issue(labels=labels), P.PLANE_SECRET, "X-Plane-Signature"
+        c,
+        "/webhooks/github",
+        P.github_issue(labels=labels, repo="acme/app"),
+        P.GITHUB_SECRET,
+        "X-Hub-Signature-256",
+        prefix="sha256=",
+        extra={"X-GitHub-Event": "issues"},
     )
     assert r.status_code == 200 and detail in r.json()["results"][0]["detail"]
-    assert env.engine.list_runs() == []
+    if expect_runs:
+        assert len(env.engine.list_runs()) == 1
+    else:
+        assert env.engine.list_runs() == []
 
 
-def test_plane_completed_issue_and_unknown_project_start_nothing(
+def test_github_issue_closed_and_unknown_project_start_nothing(
     api: tuple[TestClient, Env],
 ) -> None:
     c, env = api
-    done = P.plane_issue(labels=["arvino:fast"], state_group="completed")
+    done = P.github_issue(labels=["arvino:fast"], state="closed", repo="acme/app")
     assert (
-        post_signed(c, "/webhooks/plane", done, P.PLANE_SECRET, "X-Plane-Signature").status_code
+        post_signed(
+            c,
+            "/webhooks/github",
+            done,
+            P.GITHUB_SECRET,
+            "X-Hub-Signature-256",
+            prefix="sha256=",
+            extra={"X-GitHub-Event": "issues"},
+        ).status_code
         == 200
     )
-    other = P.plane_issue(project="other-project", labels=["arvino:fast"])
-    r = post_signed(c, "/webhooks/plane", other, P.PLANE_SECRET, "X-Plane-Signature")
+    other = P.github_issue(repo="other/repo", labels=["arvino:fast"])
+    r = post_signed(
+        c,
+        "/webhooks/github",
+        other,
+        P.GITHUB_SECRET,
+        "X-Hub-Signature-256",
+        prefix="sha256=",
+        extra={"X-GitHub-Event": "issues"},
+    )
     assert r.json()["results"][0]["status"] == "ignored"
     assert env.engine.list_runs() == []
 
@@ -384,10 +424,12 @@ def test_fast_pipeline_end_to_end_over_webhooks(api: tuple[TestClient, Env]) -> 
     env.executor.script("pull_request", env.pr_script())
     r = post_signed(
         c,
-        "/webhooks/plane",
-        P.plane_issue(labels=["arvino:fast"]),
-        P.PLANE_SECRET,
-        "X-Plane-Signature",
+        "/webhooks/github",
+        P.github_issue(labels=["arvino:fast"], repo="acme/app"),
+        P.GITHUB_SECRET,
+        "X-Hub-Signature-256",
+        prefix="sha256=",
+        extra={"X-GitHub-Event": "issues"},
     )
     run_id = r.json()["results"][0]["run_ids"][0]
     branch = f"arvino/{run_id}/pull_request"
