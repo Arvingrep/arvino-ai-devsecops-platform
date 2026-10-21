@@ -35,10 +35,7 @@
 
 4. PR 列表（只读）
 - GitHub：/opt/homebrew/bin/gh pr list --state open --limit 10 --json number,title,headRefName,isDraft,mergeable,updatedAt；只输出摘要。
-- Gitea：TOKEN="$(/usr/bin/security find-internet-password -s git.k8shome.com -w 2>/dev/null)"；为空则记录「Gitea 凭据不可读」。否则用 /usr/bin/curl -s --max-time 12 -H "Authorization: token $TOKEN" 请求：
-  https://git.k8shome.com/api/v1/repos/gitea_admin/homelab/pulls?state=open&limit=50
-  https://git.k8shome.com/api/v1/repos/gitea_admin/firebird-sea/pulls?state=open&limit=50
-  只输出 number/state/mergeable/title 前 60 字；绝不 echo TOKEN 或 Authorization header；结束后 unset TOKEN。
+- Gitea：直接运行仓库内只读脚本 `./scripts/gitea-open-prs.sh`（不要自己拼 keychain/curl 命令）。脚本从 macOS keychain 运行时读取 git.k8shome.com 凭据，token 不落盘、不回显、退出即失效；输出仅 number/state/mergeable/title 前 60 字，覆盖 gitea_admin/homelab 与 gitea_admin/firebird-sea。若输出 `GITEA_CRED_UNAVAILABLE` 或 `GITEA_API_*`，按原样记录为「Gitea 本轮不可读」并继续，不要尝试读取 keychain 绕过。
 - 记录 open PR 总数与 mergeable 数；不创建、不合并、不评论 PR。
 
 5. 24h 提醒与告警
