@@ -2,7 +2,7 @@
 
 日期：2026-10-21
 执行者：总监（Qoder）
-状态：**候选代码完成并推送，离线验收通过；活库迁移已执行并验收；候选镜像已于 2026-10-21 10:45 部署并生效（B3）；尚未做过 live `claim → renew → complete` 端到端演练**（原文“尚未部署”为 09:45 时的状态，10:45 已更新）
+状态：**候选代码完成并推送，离线验收通过；活库迁移已执行并验收；候选镜像已于 2026-10-21 10:45 部署并生效（B3）；2026-10-21 14:51 已在活库完成 live `claim → renew → complete` 演练（§8）；真实业务仓库写仍未执行**（原文“尚未部署”为 09:45 时的状态，10:45 已更新）
 
 ## 1. 范围与隔离
 
@@ -153,4 +153,29 @@ Arvin 通过按键确认批准两项：T1 租约设计稿定稿；在隔离 work
 | 5 | S1 停取手段与 N | 总监可自行定案 | 建议独立 board + N=4（约 60 分钟） |
 | 6 | A6 十角色/异构模型 | 技术阻塞（UI 注册、成员派发、模型读回） | 不是审批阻塞，补齐后继续 |
 
-结论：T1 的账本侧离线可用，执行侧候选已改为“先 claim 再执行”并通过桩测试与本地全链路演练，内建路径按 B3 关闭并在启动时强制校验，总寿命与冲突审计已补齐并用真实 Postgres 压测过；演练还暴露并修复了角色路由缺口。活库迁移、候选镜像部署与 B3 开关、旧 Hermes 调度暂停均已完成并验收；**真实业务仓库写尚未执行**，自动周期派发（T1 调度层）也尚未接线，当前由总监手动派发 + 外部 harness 认领。**尚未在活库做过一次真实的 claim→renew→complete 端到端演练**，首次真实任务须按此路径留证。
+结论：T1 的账本侧离线可用，执行侧已改为“先 claim 再执行”，并在活库完成一次真实的 `claim → renew → complete` 演练（§8）；租约字段清理、审计事件与 B3 外部执行约束均符合设计。活库迁移、候选镜像部署、旧 Hermes 调度暂停均已完成并验收。**真实业务仓库写与自动周期派发（T1 调度层）仍未开始**，当前由总监手动派发 + 外部 harness 认领。
+
+## 8. Live claim → renew → complete 实测（2026-10-21 14:51–14:53 PST）
+
+环境：GKE `arvino`，api/worker 镜像 `arvino:e8fa6e6f3839`，B3 `takeover_external_only=True`、`adapters=queue`，活库 `alembic=c3d4e5f6a7b8`。范围仅 Arvino 自身账本；未写业务仓库、未碰 firebird-sea、未改集群配置。
+
+| 项 | 结果 |
+|---|---|
+| Run | `run-ffb5465ea777`（project `prj-f23df584e70d`，issue `iss-d3cadacc5485`，profile `fast`） |
+| Step | `triage`，attempt 1，role `triage` |
+| 种子方式 | **非公开 API**：`POST /runs` 以 live token 返回 403；改在 `arvino-api` pod 内用生产 `build_engine().start_run(...)` 创建（原因见下） |
+| claim | HTTP 200；principal `agent:harness`；`role_verified=false`；TTL 90s；`lease_expires_at=2026-10-21T06:53:12.364957Z`；token 明文仅返回一次，长度 43，未落盘、未打印 |
+| renew | HTTP 200（claim 后约 5s）；TTL 120s；`lease_expires_at=2026-10-21T06:53:48.331019Z`（延长约 36s）；attempt 仍为 1 |
+| complete | HTTP 200；`{"result":"applied"}`；`step.succeeded` 事件 06:51:51.173Z；lease_token 被接受 |
+| 收尾 | 引擎自动推进 `develop` 为 running；总监以 SYSTEM principal 取消 run（06:53:02Z），最终 `cancelled`，其余步骤全部 `cancelled` |
+| 租约清理 | 活库只读核查：triage `succeeded`、attempt=1、executor_attempt=1、principal=`agent:harness`、claimed_at 保留、`lease_expires_at=NULL`、`token_hash=NULL`；`repo_write_locks=0` |
+| HTTP/exit | GET 200 / claim 200 / renew 200 / complete 200 / GET 200；API 客户端 exit 0。seed/cancel 的 `kubectl exec` 未报失败，等价 `build_engine` 探针 EXIT=0；两次 exec 在输出完成后记录 pyo3/Temporal teardown panic，属一次性脚本收尾噪音，未影响写入 |
+
+**结论**：live `claim → renew → complete` 路径走通；一次性明文 token、续租、回执消费、租约字段清理与审计事件均符合设计。
+
+**新发现的两个阻塞/限制**：
+
+1. **operator API 静态 token 被合并**：`arvino-api` 的 `ARVINO_OWNER_TOKEN` 与 `ARVINO_AGENT_TOKEN` 都引用 `arvino-api-secret/token`（同一值）。Authenticator 对相同 token 的最后一个 principal 生效（agent），因此 `POST /runs` 返回 403 `agent principals may not perform this action`；建 issue、cancel、reclaim 同样不可用。**这不影响 claim/renew/complete**，但意味着目前无法通过公开 API 正常创建/取消 run；本次种子与取消只能走 pod 内生产 engine。修复：为 owner 与 agent 使用不同 secret key（如 `owner-token`/`agent-token`），更新 Deployment env 并滚动重启 api；属配置变更，待另立任务。
+2. **静态 agent token 无角色声明**：claim 返回 `role_verified=false`，即 `agent:harness` 没有 role claims，按兼容路径可认领任意 agent step（设计 §8.4 已注明运行时权限模型另议）。在多角色/多 tester 场景下，账本无法区分实现方与验收方身份；不影响本次单步验证，但不能作为异构模型证据。
+
+**Tester 异构模型**：本次测试**不涉及验收环节**（triage 由同一外部 harness 完成，没有 tester/QA 步骤），因此**不能**判断实现方与验收方的模型家族是否不同；tester 异构模型仍未实证，继续列在“未开始/待验证”，需另跑一条带 QA/tester 的真实任务。

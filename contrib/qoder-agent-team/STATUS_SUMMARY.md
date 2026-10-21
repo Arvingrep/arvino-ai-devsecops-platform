@@ -1,10 +1,10 @@
 # Arvino 接管进度 · 一页速览
 
-> **更新：2026-10-21 14:30 PST** · 维护：Qoder 总监值班
+> **更新：2026-10-21 14:53 PST** · 维护：Qoder 总监值班
 > 这是**当前快照**，不是历史日志；有实质进展时覆盖更新。
 > 技术细节与逐轮证据：[SYSTEM_STATUS.md](../../docs/internal/SYSTEM_STATUS.md) · [CHANGELOG_FRAMEWORK.md](../../docs/internal/CHANGELOG_FRAMEWORK.md)
 
-**一句话**：旧调度已停、只读巡检已接管、B3 与租约已上线；现在卡在「一条真实认领闭环」和几个只有 Arvin 能做的动作上。
+**一句话**：旧调度已停、只读巡检已接管、B3/租约/真实认领闭环都已跑通；现在卡在 operator token 配置和几个人工动作上。
 
 ## 需要 Arvin 动手（按优先级）
 
@@ -14,7 +14,6 @@
 
 ## 进行中
 
-- **真实认领闭环**：镜像、B3、租约均已上线，还差一条 live `claim → renew → complete` 实测。→ [证据](t1-step-leases-evidence.md)
 - **PR 队列**：PR#29（本分支）已扩到全量 contrib + 台账，需按新内容重审后合并；另有 4 个 open PR 排队。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - **Qoder 团队启用**：团队已注册（1 leader + 4 member），等 UI 指令重贴后跑一次必须由成员动手的任务。→ [注册核验](registration-verification.json)
 
@@ -23,6 +22,7 @@
 - 旧 Hermes 三个 cron job 全部暂停；10:42 起看板 0 running、0 新认领。
 - B3 接管模式上线：api/worker 运行 `e8fa6e6f3839`，`takeover_external_only=True`、`adapters=queue`。
 - 活库迁移 `c3d4e5f6a7b8` 已执行：`executor_*` 5 列 + `repo_write_locks` 就位。
+- **真实认领闭环已打通**：2026-10-21 14:51 live `run-ffb5465ea777` 的 `triage` 完成 claim→renew→complete（HTTP 200/200/200，token 未落盘，租约字段已清理）；run 已取消收尾（因 operator token 阻塞，run 由 pod 内 engine 种子）。→ [证据](t1-step-leases-evidence.md)
 - T1 租约离线验收通过：claim/renew/release/reclaim、token 哈希、4h 总寿命、冲突审计、16 路并发压测。
 - 只读巡检已接管并持续运行（每 15 分钟；首跑、Gitea 脚本、11:30 轮次均验收通过；已连续多轮无退化；24h 提醒基线已建，下次到点约 10-22 11:20）。→ [指导书](status-inspection-prompt.md)
 - 单条治理红线已写入仓库 13 份角色文件；旧五条红线与 L0–L3 分级作废。
@@ -30,16 +30,17 @@
 
 ## 未开始
 
-- **T1 账本心跳 / 自动派发**：等真实认领闭环跑通后再接。→ [设计](automation-dispatch-design.md)
-- **firebird-sea 业务写试点**：等认领闭环与 PR 审核归属确定。
+- **T1 账本心跳 / 自动派发**：真实认领闭环已跑通，可以开始接线；尚未动手。→ [设计](automation-dispatch-design.md)
+- **firebird-sea 业务写试点**：等 PR 审核归属确定。
 - **外部 harness 部署**：等 T1 稳定后再做。
-- **十角色异构模型与成员派发实证**：等 UI 重贴后补。
+- **十角色异构模型与成员派发实证**：等 UI 重贴后补；本次 lease 测试没有验收环节，不能作为 tester 异构模型证据。
 
 ## 被阻塞
 
 - **GH_TOKEN 轮换**：只有 Arvin 能在 GitHub 侧操作；在此之前泄漏值仍有效。→ [告警](../../docs/internal/SYSTEM_STATUS.md)
+- **operator API 被 token 配置阻塞**：owner 与 agent 共用同一 secret key，静态 token 一律认证为 agent；`POST /runs`、建 issue、cancel/reclaim 均 403。需拆分 owner/agent 两个 secret key 并滚动重启 api（总监/devops 可执行，约 1 分钟中断）；不影响 claim/renew/complete。→ [证据](t1-step-leases-evidence.md)
 - **Qoder UI 指令**：需要 Arvin 手工重贴，云端不会读仓库。
-- **11 个看板任务**：调度已停，当前无执行者；最老已 106h，需逐项决定。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
+- **11 个看板任务**：调度已停，当前无执行者；最老已 107h，需逐项决定。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - **firebird PR 审核 / 夜间流程**：原 Hermes job 已停，暂无接管者。
 - **PR#29 合并**：不是故障，等一次独立重审后合并。
 
