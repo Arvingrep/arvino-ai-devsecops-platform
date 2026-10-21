@@ -1202,3 +1202,14 @@
   - 24h 提醒：**未发送**。11 项 blocked 的 `reminders` 与 health/image/b3/db_schema/argocd 的 `alerts` 基线均为接管首跑建立的 `2026-10-21T03:20:41Z`，距今约 101 分钟 <24h，本轮无 due 项；各检查项取值与基线一致，无「正常→异常」变化，故亦无「⚠ Arvino 巡检异常」消息。下一批提醒到期时间约 `2026-10-22T03:20:41Z`。
   - 与上一条台账（12:45）差异：系统状态**无变化**。仅 blocked 年龄随时间自然增长（最旧 104.7→104.9h）、GitHub #29 `updatedAt` 因本分支台账 commit 推送前移；另本轮看板 DB 再次出现单次 `immutable=1` 回退（数据本身一致）。距 `state.last_run_utc`(04:49:18Z) 约 13 分钟，<45 分钟，**无巡检断档**。
   - 本条目由 Qoder 本地定时任务 job 10ea8cf0-46f9-4014-b4a4-6d3293d39b7a 生成；只读巡检，未 dispatch/未认领/未恢复 Hermes。
+
+- **2026-10-21 13:15 PST（本次，无状态变化：看板/GKE/B3/DB/HTTP/ArgoCD/GitHub/Gitea 全部与 13:02 基线一致）**
+  - 看板（只读，`mode=ro` 一次打开成功）：done 159 / blocked 11 / todo 5 / archived 1，running 0、ready 0、triage 0、review 0；`claimed_60m`=0、stranded ready=0 → **无双调度风险**。11 项 blocked 全部 24h+（age 按 created_at）：`t_a36d7ed7` 105.1h、`t_0f5b931b` 104.4h、`t_188c5a78` 100.0h、`t_ecaabae7` 66.2h（consecutive_failures=2，`pid 22099 not alive`，与基线同一 worker 掉线错误，非新增）、`t_477917c2` 64.7h、`t_f2717f22` 64.6h、`t_f01dcf8f` 38.1h、`t_b4e33024` 35.7h、`t_a18cdf9c` 33.7h、`t_071d0e68` 33.7h、`t_71f47a4b` 33.6h；其余 10 项 cf=0。未 dispatch、未 unblock、未清 cf。
+  - GKE 无退化：arvino 4 pods 全 Running/Ready、restarts 全 0（与 state 一致）；deploy/sts 副本 1/1 全满足；api/worker 镜像 `…/arvino:e8fa6e6f3839` **无镜像漂移**；opa `latest-static`、postgres `16-alpine` 不变。Temporal 7 pods 全 Running、非 Running=0，frontend 历史 3 次重启（6d1h ago）未增加。
+  - B3 读回：`takeover_external_only=True` / `adapters=queue`（符合期望）。DB：alembic `c3d4e5f6a7b8`、steps `executor%` 列=5、`repo_write_locks` 存在（全符合）。
+  - HTTP 关键码（只输出码）：arvino `healthz/readyz/docs/dashboard/ui`=200、n8n=200、canary `/shop`/`/house`=200、`git.k8shome.com`=302、agent-canvas(8080)=200、`gitea.k8shome.com`=525（已知基线）→ **无退化**。审批 webhook 为 POST 检查、越出只读边界，本轮不重测，沿用 state 基线值 404（与 13:02 轮次同口径）。
+  - ArgoCD 无真实变化：`arvino-orchestrator-gke` Synced/Degraded@`f075222c82`，应用级 `health.lastTransitionTime` 仍 `2026-10-19T15:31:37Z`、conditions 为空、`reconciledAt=2026-10-21T05:15:04Z`；资源级复核 15/15 全 Synced、无非 Healthy 资源（陈旧状态位，已知基线）。`firebird-canary` Synced/Healthy@`6f52a6fc46`、`firebird-manila` Synced/Healthy@`213c486a39`（GitHub main 为源，已知）、`argocd-image-updater` Unknown/Healthy（ComparisonError 已知，PR#218 待修）。其余 39 个应用全 Synced/Healthy。未 sync、未改 Application。
+  - PR（只读）：GitHub open 5 / mergeable 5 / 0 draft（#29 #28 #26 #25 #23；#29 `updatedAt=05:02:39Z` 系本分支台账 commit `bc7f86e` 推送所致，非外部变更）。Gitea 经 `./scripts/gitea-open-prs.sh` 实读成功：`homelab` open 14 / mergeable 8，`firebird-sea` open 2 / mergeable 2，与基线一致，输出无凭据。未创建/合并/评论 PR。
+  - 24h 提醒：**未发送**。11 项 blocked 的 reminders 与 health/image/b3/db_schema/argocd 的 alerts 基线均为 `2026-10-21T03:20:41Z`，距今约 115 分钟 <24h，本轮无 due 项；各检查项取值与基线完全一致，无「正常→异常」变化，故无「⚠ Arvino 巡检异常」消息。下一提醒窗口约 `2026-10-22T03:20:41Z`。
+  - 与上一条台账（13:02）差异：系统状态**无变化**；仅 blocked 年龄随时间自然增长（最旧 104→105.1h 区间位移）。距 `state.last_run_utc`(05:02:53Z) 约 12 分钟，<45 分钟，**无巡检断档**。
+  - 本条目由 Qoder 本地定时任务 job 10ea8cf0-46f9-4014-b4a4-6d3293d39b7a 生成；只读巡检，未 dispatch/未认领/未恢复 Hermes。
