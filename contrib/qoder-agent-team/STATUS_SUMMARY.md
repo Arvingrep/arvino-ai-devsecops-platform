@@ -1,14 +1,14 @@
 # Arvino 接管进度 · 一页速览
 
-> **更新：2026-10-21 15:04 PST** · 维护：Qoder 总监值班
+> **更新：2026-10-21 15:20 PST** · 维护：Qoder 总监值班
 > 这是**当前快照**，不是历史日志；有实质进展时覆盖更新。
 > 技术细节与逐轮证据：[SYSTEM_STATUS.md](../../docs/internal/SYSTEM_STATUS.md) · [CHANGELOG_FRAMEWORK.md](../../docs/internal/CHANGELOG_FRAMEWORK.md)
 
-**一句话**：旧调度已停、只读巡检已接管、B3/租约/真实认领闭环都已跑通；新发现 api Deployment 带外漂移且 Telegram 提醒通道不可达，叠加 operator token 配置等人工动作待办。
+**一句话**：旧调度已停、只读巡检已接管、B3/租约/真实认领闭环都已跑通；ArgoCD 带外漂移已被 git 侧收敛（15:14 自动 sync main@88b32039），但提交来源待确认，叠加 Telegram 提醒通道不可达等人工动作待办。
 
 ## 需要 Arvin 动手（按优先级）
 
-1. **排查 `Deployment/arvino-api` 带外改动**：巡检 15:00 发现 ArgoCD `arvino-orchestrator-gke` 由 Synced 转 OutOfSync（git main@f075222c82 未变），疑与 PR#222 所述注入 GH_TOKEN 的带外修改相关；确认来源后决定 git 侧收敛或集群侧回正。
+1. **确认 GitOps 提交 `88b32039f43d`（内网 Gitea homelab main）**：15:00 轮发现 `arvino-orchestrator-gke` OutOfSync（Deployment/arvino-api 疑带外注入 GH_TOKEN，关联 PR#222）；15:14 该应用自动 sync 到 main@88b32039 恢复 Synced，即差异已被 git 侧收敛。外网 Gitea 525 导致本轮无法核实提交作者与内容，需确认是否接受该收敛、以及 PR#222 secretKeyRef 改造是否仍要做。
 2. **修复 hermes Telegram 提醒通道**：`hermes send --to telegram:-1004348153434` 报 Chat not found（2 次），阻塞异常告警与 10-22 起的 24h blocked 提醒送达。
 3. **吊销并重新签发泄漏的 `GH_TOKEN`**（GitHub 侧，旧值仍有效），随后合并 PR#222/#219 改为 `secretKeyRef`。
 4. **在 Qoder 设置页重贴十个角色的工作指令**（仓库文件已改，UI 不会自动同步）。
@@ -26,9 +26,9 @@
 - 活库迁移 `c3d4e5f6a7b8` 已执行：`executor_*` 5 列 + `repo_write_locks` 就位。
 - **真实认领闭环已打通**：2026-10-21 14:51 live `run-ffb5465ea777` 的 `triage` 完成 claim→renew→complete（HTTP 200/200/200，token 未落盘，租约字段已清理）；run 已取消收尾（因 operator token 阻塞，run 由 pod 内 engine 种子）。→ [证据](t1-step-leases-evidence.md)
 - T1 租约离线验收通过：claim/renew/release/reclaim、token 哈希、4h 总寿命、冲突审计、16 路并发压测。
-- 只读巡检已接管并持续运行（每 15 分钟；连续多轮无退化，15:00 轮首次捕获 ArgoCD 漂移；24h 提醒基线已建，下次到点约 10-22 11:20）。→ [指导书](status-inspection-prompt.md)
+- 只读巡检已接管并持续运行（每 15 分钟；15:00 轮捕获 ArgoCD 漂移、15:15 轮确认已 git 收敛恢复 Synced；24h 提醒基线已建，下次到点约 10-22 11:20）。→ [指导书](status-inspection-prompt.md)
 - 单条治理红线已写入仓库 13 份角色文件；旧五条红线与 L0–L3 分级作废。
-- 除 `arvino-orchestrator-gke`（见「需要 Arvin 动手」#1）外，ArgoCD 其余 Application 均 Synced/Healthy；仅已知陈旧状态位与 image-updater ComparisonError 例外。
+- ArgoCD 全部 Application 均 Synced（含 `arvino-orchestrator-gke`，见「需要 Arvin 动手」#1 的收敛确认）；仅已知陈旧状态位 Degraded 与 image-updater ComparisonError 例外。
 
 ## 未开始
 
@@ -48,8 +48,8 @@
 
 ## 已知但不阻塞
 
-- ArgoCD `arvino-orchestrator-gke` 应用级 `Degraded` 是 2026-10-19 的陈旧状态位（15:00 轮 `lastTransitionTime` 未变）；同轮新出现的 `Deployment/arvino-api` OutOfSync 已升级为待办 #1，不属于此项。
-- `gitea.k8shome.com` 525、审批 webhook 404、agent-canvas 仅本机 8080：均为已知基线。
+- ArgoCD `arvino-orchestrator-gke` 应用级 `Degraded` 是 2026-10-19 的陈旧状态位（15:15 轮 `lastTransitionTime` 仍未变、15/15 资源 Synced 且无非 Healthy）。
+- `gitea.k8shome.com` 525、审批 webhook 404、agent-canvas 仅本机 8080：均为已知基线；Gitea open PR 核查在 525 期间不可读（GITEA_API_EMPTY）。
 - 巡检每 15 分钟产生一次 `[skip ci]` 台账提交（约 96 次/日）；嫌吵可降为 30 分钟。
 - canary `/house` 偶发单次 curl 000、重试即 200：判为瞬时抖动，继续观察。
 
