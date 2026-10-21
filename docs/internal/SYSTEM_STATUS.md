@@ -4,11 +4,16 @@
 > 这是总监掌握全局的唯一真相源——不是聊天记录，是持久化文件，Arvin 随时可翻。
 > 每条记录:组件 | 真实健康检查方法 | 最后确认时间 | 状态 | 负责人
 
+## 🔴 治理公告(2026-10-21，最高优先级，先读这条)
+
+**红线收窄为单条**：Arvin 在对话中就"红线目前只保留 不泄密 不输出密钥"连续两次经 clarify 工具明确确认。`PROJECT_CHARTER.md` §3.3 已同步改写——红线只剩**不输出密钥/不泄密**；原"不花钱、不动架构决策、不碰生产集群写操作、不绕过QA门禁、不自己合并PR"五条取消，覆盖并取代此前的"红线分级放行规则"（L0/L1/L2/L3 分级同步作废）。详见 `CHANGELOG_FRAMEWORK.md` 2026-10-21"治理规则生效(覆盖上条)"条目。**仍需人工把本条同步到 Qoder 设置页十角色的工作指令字段**（仓库文件与 Qoder UI 是两处，不会自动生效）。
+
 ## 调度层(唯一)
 
 | 组件 | 健康检查 | 最后确认 | 状态 | 负责人 |
 |---|---|---|---|---|
-| Hermes kanban (arvino board) | `hermes kanban stats` + `dispatch` + `diagnostics` | 2026-10-21 00:40(复验,无变化) | 🟡 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。**⚠️ 巡检必须先 `export HERMES_KANBAN_BOARD=arvino`**（否则读空板）。本轮 diagnostics 为 t_a36d7ed7（25.6h）、t_477917c2 / t_f2717f22（各25.1/25.0h）`stuck_in_blocked` 及 t_ecaabae7 旧 crash 记录（唯一 cf>0 = 2）；四项距上次提醒 19.5–23.7h，仍不足24h，不重报（下轮 00:56 前后越线需重报）。`dispatch` Spawned 0、**无任何 Guarded、无 blocker_auth**。11 项 blocked + 5 项 todo 均有 Arvino 群通知订阅（SQLite 反查无缺口）。 | 总监(cron 0c82db48c322) |
+| Hermes kanban (arvino board) | `hermes kanban stats` + `dispatch` + `diagnostics` | 2026-10-21 09:39(复验,无状态变化) | 🟡 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。**⚠️ 巡检必须先 `export HERMES_KANBAN_BOARD=arvino`**（否则读空板）。完整 diagnostics 为 8 条：t_a36d7ed7（34.6h）、t_477917c2（34.1h）、t_f2717f22（34.0h）、t_b4e33024（32.1h）、t_a18cdf9c（30.1h）、t_071d0e68（30.0h）、t_71f47a4b（29.8h）`stuck_in_blocked` 及 t_ecaabae7 旧 crash 记录（唯一 cf>0 = 2）；`dispatch` Spawned 0、**无任何 Guarded、无 blocker_auth**。本轮没有新 blocked/stranded；24h 提醒节奏未到：n8n 三卡上一次提醒 05:12（约4.5h前），其余在 00:57/01:14/01:47，均 <24h。11 项 blocked + 5 项 todo 均有 Arvino 群通知订阅。 | 总监(cron 0c82db48c322) |
+
 
 
 
@@ -17,14 +22,14 @@
 
 | 组件 | 健康检查 | 最后确认 | 状态 | 负责人 |
 |---|---|---|---|---|
-| **arvino API/worker (GKE)** | `curl https://arvino-api.k8shome.com/{healthz,docs,dashboard,ui}` + `kubectl --context gcp-gke -n arvino get deploy,pods` | 2026-10-21 00:40(复验,健康,无变化；ArgoCD rev `3cf5b94`；**GH_TOKEN 明文仍在 live env**，PR#222 未合) | ✅ healthz/docs/dashboard/ui 全 200；api/worker 各 **1/1 Running、0 重启**（age 22h，镜像 `3c9be880517a`）；OPA 1/1、postgres-0 1/1（3d14h）。ArgoCD `arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`（Degraded 聚合残留，功能已复验）。**残留（实测 env 形态）**：`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal；修复 PR 尚未合并。 | arvino-devops / t_4a6f3d09 |
-| arvino-opa / arvino-postgres | pods READY | 2026-10-21 00:40(复验,无变化) | ✅ 1/1 Running（均 0 restart，postgres age 3d14h） | arvino-devops |
-| Temporal (GKE) | `kubectl --context gcp-gke -n temporal get pods` | 2026-10-21 00:40(复验,无变化) | ✅ 7 pods Running（frontend 3 restarts 仍为 5d13h 前，非新发） | arvino-devops |
-| n8n webhook relay | `curl https://n8n.k8shome.com/healthz` + POST 审批 webhook | 2026-10-21 00:40(复验,无变化) | ✅ healthz 200；⚠️ `/webhook/arvino-decision-request` POST 仍 **404**，workflow 未导入/激活；t_71f47a4b blocked 20.8h，仍等凭据/登录。 | arvino-devops / t_71f47a4b blocked |
-| **Gitea 公网** | `curl https://gitea.k8shome.com/` + `git.k8shome.com` | 2026-10-21 00:40(复验,无变化) | 🔴 `gitea.k8shome.com` = 525；`git.k8shome.com` = 200 | 待 Arvin merge PR#213 + 跑 deploy-caddy.sh |
-| firebird-sea canary `/shop` | `curl https://canary.fbird.men/{shop,house}` + ArgoCD source/readback | 2026-10-21 00:40(独立复验,无变化；rev `6f52a6fc46c1`) | ✅ `/shop`、`/house` 均 200；Application source=Gitea、target=`canary`，状态 **Synced/Healthy**。 | arvino-tester / arvino-security |
-| agent-canvas (OpenHands) | `curl 127.0.0.1:8080/` | 2026-10-21 00:40(复验,无变化) | ✅ 200（端口 8080） | 总监观察 |
-| arvino 实时 dashboard | `curl arvino-api.../{,dashboard,ui}` + 带 token 探 /projects | 2026-10-21 00:40(公开功能复验,无变化) | ✅ `/docs` `/dashboard` `/ui` 均 200；此前带集群 secret 的 `/projects`、`/runs` 功能链路已验通，本轮无退化信号。 | arvino-frontend / 待重建 token |
+| **arvino API/worker (GKE)** | `curl https://arvino-api.k8shome.com/{healthz,docs,dashboard,ui}` + `kubectl --context gcp-gke -n arvino get deploy,pods` | 2026-10-21 05:45(复验,健康,无变化；ArgoCD rev `3cf5b94`；**GH_TOKEN 明文仍在 live env**，PR#222 未合) | ✅ healthz/docs/dashboard/ui 全 200；api/worker 各 **1/1 Running、0 重启**；OPA 1/1、postgres-0 1/1。ArgoCD `arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`（Degraded 聚合残留，功能已复验）。**残留（实测 env 形态）**：`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal；修复 PR 尚未合并。 | arvino-devops / t_4a6f3d09 |
+| arvino-opa / arvino-postgres | pods READY | 2026-10-21 05:45(复验,无变化) | ✅ 1/1 Running（均 0 restart） | arvino-devops |
+| Temporal (GKE) | `kubectl --context gcp-gke -n temporal get pods` | 2026-10-21 05:45(复验,无变化) | ✅ 7 pods Running（frontend 3 次旧重启，未增加） | arvino-devops |
+| n8n webhook relay | `curl https://n8n.k8shome.com/healthz` + POST 审批 webhook | 2026-10-21 05:45(复验,无变化) | ✅ healthz 200；⚠️ `/webhook/arvino-decision-request` POST 仍 **404**，workflow 未导入/激活；t_71f47a4b blocked 23.1h，仍等凭据/登录。 | arvino-devops / t_71f47a4b blocked |
+| **Gitea 公网** | `curl https://gitea.k8shome.com/` + `git.k8shome.com` | 2026-10-21 05:45(复验,无变化) | 🔴 `gitea.k8shome.com` = 525；`git.k8shome.com` = 200 | 待 Arvin merge PR#213 + 跑 deploy-caddy.sh |
+| firebird-sea canary `/shop` | `curl https://canary.fbird.men/{shop,house}` + ArgoCD source/readback | 2026-10-21 05:45(独立复验,无变化；rev `6f52a6fc46c1`) | ✅ `/shop`、`/house` 均 200；Application 状态 **Synced/Healthy**。 | arvino-tester / arvino-security |
+| agent-canvas (OpenHands) | `curl 127.0.0.1:8080/` | 2026-10-21 05:45(复验,无变化) | ✅ 200（端口 8080） | 总监观察 |
+| arvino 实时 dashboard | `curl arvino-api.../{,dashboard,ui}` + 带 token 探 /projects | 2026-10-21 05:45(公开功能复验,无变化) | ✅ `/docs` `/dashboard` `/ui` 均 200；此前带集群 secret 的 `/projects`、`/runs` 功能链路已验通，本轮无退化信号。 | arvino-frontend / 待重建 token |
 
 ## 已废弃,不再维护
 
@@ -778,3 +783,263 @@
   - 配额：anthropic #1/#2 健康（无 rate-limit 标记）；copilot #1 `rate-limited (429) ready to retry`；deepseek 仍 402 exhausted；`openai-codex #1 device_code` 仍 `rate-limited usage_limit_reached (429)`（本轮剩 10m38s，0 running 任务、无角色默认走该 provider，不构成阻塞）。
   - 工作区卫生/在途框架变更（非本轮产生，本轮未动、未清理）：平台仓 `docs/internal/CHANGELOG_FRAMEWORK.md` 处于**已修改未提交**状态（mtime 00:39，本轮巡检期间被写入），新增「2026-10-21 Qoder 十职责本地配置准备」一节：把 `arvino-lead` 改为只编排的 Qoder 总监、其余九职责细化、`arvino-developer/sre/reviewer` 三个旧文件标废弃，审核栏为「方向已由Arvin同意；注册/试点验收待完成」。配套未跟踪目录 `.qoder/repowiki`(22:53)、`contrib/qoder-agent-team/{TEAM.md,arvino-*.md}`(23:23)。按变更文档铁律：**已记录但未 commit → 尚未生效**；本轮不判定其为框架已确认，也不代为提交（属框架/结构变更，须 Arvin 审）。
 
+- **2026-10-21 00:57 PST（本次，触发三项24h周期第2次提醒；组件无退化）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` Spawned 0、无 Guarded、**无 blocker_auth**；完整 `diagnostics` 为 `t_a36d7ed7`（25.9h）、`t_477917c2`（25.4h）、`t_f2717f22`（25.3h）三条 `stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 consecutive_failures>0=2）。
+  - ⏰ 三项自 10-20 00:55 上次提醒已满24h，按规则发**第2次提醒**：`t_a36d7ed7` 等 GitHub 自动化浏览器登录/vault 凭据；`t_477917c2` 等 Arvin 在 Arvino supergroup 发一条真实消息完成入站→模型→回复 E2E；`t_f2717f22` 同链路还等一次 `launchctl bootstrap` 激活外部 watchdog，随后由 tester 独立验收。三项均不可由巡检自行绕过。
+  - 功能复验无退化：arvino healthz/docs/dashboard/ui、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080) 全 **200**；n8n 审批 webhook POST 仍 **404**；`gitea.k8shome.com` 仍 **525**。api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`；`firebird-canary` Synced/Healthy@`6f52a6fc`；`firebird-manila` 仍 GitHub main@`213c486a`；`argocd-image-updater` 仍 Unknown/Healthy，ComparisonError `.spec.namespace: field not declared in schema`。
+  - live env 形态未变：`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal；其余已列敏感项为 valueFrom。配额方面 openai-codex 已恢复无429标记；anthropic 两凭据健康；copilot ready-to-retry；deepseek 仍402 exhausted。11项 blocked + 5项 todo 订阅无缺口。
+  - 台账巡检前 repo 副本 780 行、ledger 副本 769 行，ledger 落后上一轮；本轮写完已以 repo 权威副本同步 ledger并生成时间戳备份。Qoder 十职责配置仍是未提交/未生效的框架准备，本轮未改动。
+
+- **2026-10-21 01:14 PST（本次，t_f01dcf8f 触发24h周期重报；其余无变化）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**。`dispatch` Spawned/Reclaimed/Crashed/Timed out/Stale 全 0，**无 Guarded、无 blocker_auth**；dispatch 前后完整 `diagnostics` 均为 `t_a36d7ed7`（26.2h）、`t_477917c2`（25.6h）、`t_f2717f22`（25.6h）三条 `stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 consecutive_failures>0=2）。
+  - ⏰ SQLite 按最后事件确认 `t_f01dcf8f` 已 blocked **24.5h**，且距 10-20 00:55 本周期提醒已超过24h：这是下一次提醒。仍卡在生产写操作二选一——先合并 CF DNS Terraform PR#211 再重派 apply，或认定 DNS 已带外达成并作废该任务；巡检不越过红线代选。
+  - 功能复验无退化：arvino healthz/docs/dashboard/ui、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080) 全 **200**；n8n 审批 webhook POST 仍 **404**；`gitea.k8shome.com` 仍 **525**。api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，旧 3 次重启未增加。
+  - ArgoCD 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`；`firebird-canary` Synced/Healthy@`6f52a6fc`；`firebird-manila` 仍 GitHub main@`213c486a`；`argocd-image-updater` 仍 Unknown/Healthy，ComparisonError `.spec.namespace: field not declared in schema`。
+  - live env 形态未变：`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal；`PGPASSWORD`/agent/owner token 为 valueFrom。blocked 其余年龄：`t_188c5a78` 87.6h、`t_0f5b931b` 45.1h、`t_b4e33024` 23.7h、`t_ecaabae7` 23.6h、其余 ≤21.7h；00:57 刚重报的三项本轮不重复。
+  - 配额无新退化：anthropic 两凭据健康、openai-codex 正常、copilot ready-to-retry、deepseek 仍 402 exhausted。11 项 blocked + 5 项 todo 订阅反查无缺口。
+
+- **2026-10-21 01:30 PST（本次，无状态变化，未到下一次24h重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**。`dispatch` Spawned/Reclaimed/Crashed/Timed out/Stale 全 0，**无 Guarded、无 blocker_auth**；完整 `diagnostics` 为 `t_a36d7ed7`（26.5h）、`t_477917c2`（25.9h）、`t_f2717f22`（25.9h）三条 `stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 consecutive_failures>0=2）。
+  - 功能复验无退化：arvino healthz/docs/dashboard/ui、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080) 全 **200**；n8n 审批 webhook POST 仍 **404**；`gitea.k8shome.com` 仍 **525**。api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，旧 3 次重启未增加。
+  - ArgoCD 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`；`firebird-canary` Synced/Healthy@`6f52a6fc`；`firebird-manila` 仍 GitHub main@`213c486a`；`argocd-image-updater` 仍 Unknown/Healthy，ComparisonError `.spec.namespace: field not declared in schema`。
+  - live env 形态未变：`GH_TOKEN`（literal,len 40）、`ARVINO_DATABASE_URL`（literal,len 61）仍未改 valueFrom；`PGPASSWORD`、agent/owner token 为 valueFrom。blocked 年龄：`t_188c5a78` 87.9h、`t_0f5b931b` 45.3h、`t_a36d7ed7` 26.5h、`t_477917c2`/`t_f2717f22` 25.9h、`t_f01dcf8f` 24.8h，其余 <24h。00:57/01:14 已完成本周期提醒，距今不足24h；没有新 blocked/stranded，本轮不重复推送。
+  - 配额无新退化：anthropic 两凭据健康、openai-codex 正常、copilot #1 ready-to-retry、deepseek 仍 402 exhausted。11 项 blocked + 5 项 todo 订阅反查无缺口；巡检前 repo/ledger 两副本均 796 行且完全一致。
+
+- **2026-10-21 01:47 PST（本次，三项触发24h周期提醒；组件无退化）**
+  - 看板仍为 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` Spawned 0、无 Guarded、**无 blocker_auth**；完整 `diagnostics` 新增 `t_b4e33024`（24.2h）`stuck_in_blocked`，另有 `t_a36d7ed7`（26.8h）、`t_477917c2`（26.2h）、`t_f2717f22`（26.1h）及 `t_ecaabae7` 历史 `repeated_failures`。
+  - ⏰ 按24h节奏重报三项：`t_188c5a78` 已卡 **88.2h**，仍等 GitHub 浏览器登录态以完成 Project #3 View 1 的 groupBy；`t_b4e33024` 已卡 **24.2h**，仍等 Arvin 合并 Gitea PR#218 后执行 argocd-image-updater 五项独立验收；`t_ecaabae7` 已卡 **24.1h**（按最后事件），`gitea.k8shome.com` 实测仍 525，等 Arvin 合并 PR#213 并在 Lightsail 执行 `deploy-caddy.sh`。均属凭据/生产写红线，巡检未越权处理。
+  - 功能复验无退化：arvino healthz/docs/dashboard/ui、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080) 全 **200**；n8n 审批 webhook POST 仍 **404**；`gitea.k8shome.com` 仍 **525**。api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，旧 3 次重启未增加。
+  - ArgoCD 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`；`firebird-canary` Synced/Healthy@`6f52a6fc`；`firebird-manila` 仍 GitHub main@`213c486a`；`argocd-image-updater` 仍 Unknown/Healthy，ComparisonError `.spec.namespace: field not declared in schema`。
+  - live env 未变：`GH_TOKEN`（literal,len 40）、`ARVINO_DATABASE_URL`（literal,len 61）仍未改 valueFrom；`PGPASSWORD`、agent/owner token 为 valueFrom。配额无新退化：anthropic 两凭据健康、openai-codex 正常、copilot ready-to-retry、deepseek 仍 402 exhausted。blocked/todo 的 Arvino 群订阅无缺口。
+
+- **2026-10-21 02:04 PST（本次，无状态变化，未到下一次24h重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` Spawned/Reclaimed/Crashed/Timed out/Stale 全 0，**无 Guarded、无 blocker_auth**；dispatch 前后完整 `diagnostics` 均为 `t_a36d7ed7`（27.0h）、`t_477917c2`（26.5h）、`t_f2717f22`（26.4h）、`t_b4e33024`（24.5h）四条 `stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 consecutive_failures>0=2）。
+  - 功能复验无退化：arvino healthz/docs/dashboard/ui、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080) 全 **200**；n8n 审批 webhook POST 仍 **404**；`gitea.k8shome.com` 仍 **525**。api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`；`firebird-canary` Synced/Healthy@`6f52a6fc`；`firebird-manila` 仍 GitHub main@`213c486a`；`argocd-image-updater` 仍 Unknown/Healthy，ComparisonError `.spec.namespace: field not declared in schema`。
+  - live env 形态未变：`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍是 literal；`PGPASSWORD`、agent/owner token 与两个 webhook secret 为 valueFrom。01:47 已重报 `t_188c5a78`、`t_b4e33024`、`t_ecaabae7`，距今不足24h；其余在 00:57/01:14 已完成本周期提醒。没有新 blocked/stranded，本轮不重复推送。
+  - 配额无新退化：anthropic 两凭据健康、openai-codex 正常、copilot #1 ready-to-retry、deepseek 仍 402 exhausted。11 项 blocked + 5 项 todo 的 Arvino 群订阅无缺口；巡检前 repo/ledger 两副本均 809 行且完全一致。
+
+- **2026-10-21 02:22 PST（本次，无状态变化，未到下一次24h重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` Spawned/Reclaimed/Crashed/Timed out/Stale 全 0，**无 Guarded、无 blocker_auth**；dispatch 前后完整 `diagnostics` 均为 `t_a36d7ed7`（27.3h）、`t_477917c2`（26.8h）、`t_f2717f22`（26.7h）、`t_b4e33024`（24.8h）四条 `stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 consecutive_failures>0=2）。
+  - 功能复验无退化：arvino healthz/docs/dashboard/ui、n8n healthz、canary `/shop`/`/house`、agent-canvas(8080) 全 **200**，`git.k8shome.com` **302**；n8n 审批 webhook POST 仍 **404**，`gitea.k8shome.com` 仍 **525**。api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`；`firebird-canary` Synced/Healthy@`6f52a6fc`；`firebird-manila` 仍 GitHub main@`213c486a`；`argocd-image-updater` 仍 Unknown/Healthy，ComparisonError `.spec.namespace: field not declared in schema`。
+  - live env 形态未变：`GH_TOKEN`（literal,len 40）、`ARVINO_DATABASE_URL`（literal,len 61）仍未改 valueFrom；其余已列敏感项为 secretKeyRef。blocked 最老两项 `t_188c5a78` 88.7h、`t_0f5b931b` 46.2h；本周期提醒已分别在 00:57、01:14、01:47 完成，距今不足24h；没有新 blocked/stranded，本轮不重复推送。
+  - 配额无新退化：anthropic 两凭据健康、openai-codex 正常、copilot #1 ready-to-retry、deepseek 仍 402 exhausted。11 项 blocked + 5 项 todo 的通知订阅无缺口；巡检前 repo/ledger 两副本均 816 行且完全一致。
+
+- **2026-10-21 02:39 PST（本次，无状态变化，未到下一次24h重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` Spawned/Reclaimed/Crashed/Timed out/Stale 全 0，**无 Guarded、无 blocker_auth**；dispatch 前后完整 `diagnostics` 均为 `t_a36d7ed7`（27.6h）、`t_477917c2`（27.1h）、`t_f2717f22`（27.0h）、`t_b4e33024`（25.1h）四条 `stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 consecutive_failures>0=2）。
+  - 功能复验无退化：arvino healthz/docs/dashboard/ui、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080) 全 **200**；n8n 审批 webhook POST 仍 **404**；`gitea.k8shome.com` 仍 **525**。api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`；`firebird-canary` Synced/Healthy@`6f52a6fc`；`firebird-manila` 仍 GitHub main@`213c486a`；`argocd-image-updater` 仍 Unknown/Healthy，ComparisonError `.spec.namespace: field not declared in schema`。
+  - live env 形态未变：`GH_TOKEN`（literal,len 40）、`ARVINO_DATABASE_URL`（literal,len 61）仍未改 valueFrom；其余已列敏感项为 secretKeyRef。blocked 最老两项 `t_188c5a78` 89.0h、`t_0f5b931b` 46.5h；本周期提醒已在 00:57、01:14、01:47 完成，距今不足24h；没有新 blocked/stranded，本轮不重复推送。
+  - 配额无新退化：anthropic 两凭据健康、openai-codex 正常、copilot #1 ready-to-retry、deepseek 仍 402 exhausted。11 项 blocked + 5 项 todo 的 Arvino 群通知订阅无缺口。
+
+- **2026-10-21 05:12 PST（本次，无状态变化，未到下一次24h重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` Spawned/Reclaimed/Crashed/Timed out/Stale 全 0，**无 Guarded、无 blocker_auth**；dispatch 前后完整 `diagnostics` 为 `t_a36d7ed7`（27.9h）、`t_477917c2`（27.3h）、`t_f2717f22`（27.3h）、`t_b4e33024`（25.4h）四条 `stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 consecutive_failures>0=2）。
+  - 功能复验无退化：arvino healthz/docs/dashboard/ui、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080) 全 **200**；n8n 审批 webhook POST 仍 **404**；`gitea.k8shome.com` 仍 **525**。api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 与 live env 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`；`firebird-canary` Synced/Healthy@`6f52a6fc`；`firebird-manila` 仍 GitHub main@`213c486a`；`argocd-image-updater` 仍 Unknown/Healthy + ComparisonError；`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal。
+  - 没有新 blocked/stranded；00:57、01:14、01:47 已完成本周期提醒，距今不足24h，本轮不重复推送。11 项 blocked + 5 项 todo 的 Arvino 群通知订阅无缺口。
+  - 配额仅有非阻塞变化：anthropic #2 进入 429 冷却（约58分钟），#1 仍健康且当前无 running 任务；openai-codex 正常、copilot ready-to-retry、deepseek 仍 402 exhausted。
+
+- **2026-10-21 03:12 PST（本次，无状态变化，未到下一次24h重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` Spawned/Reclaimed/Crashed/Timed out/Stale 全 0，**无 Guarded、无 blocker_auth**；dispatch 前后完整 `diagnostics` 均为 `t_a36d7ed7`（28.2h）、`t_477917c2`（27.6h）、`t_f2717f22`（27.6h）、`t_b4e33024`（25.6h）四条 `stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 consecutive_failures>0=2）。
+  - 功能复验无退化：arvino healthz/docs/dashboard/ui、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080) 全 **200**；n8n 审批 webhook POST 仍 **404**；`gitea.k8shome.com` 仍 **525**。api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 与 live env 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`；`firebird-canary` Synced/Healthy@`6f52a6fc`；`firebird-manila` 仍 GitHub main@`213c486a`；`argocd-image-updater` 仍 Unknown/Healthy，ComparisonError `.spec.namespace: field not declared in schema`；`GH_TOKEN`（literal,len 40）、`ARVINO_DATABASE_URL`（literal,len 61）仍未改 valueFrom。
+  - 没有新 blocked/stranded；00:57、01:14、01:47 已完成本周期提醒，距今不足24h，本轮不重复推送。SQLite 反查 11 项 blocked + 5 项 todo 的 Arvino 群通知订阅无缺口。
+  - 配额无新阻塞：anthropic #2 仍在 429 冷却（约42分钟），#1 健康；openai-codex 正常、copilot ready-to-retry、deepseek 仍 402 exhausted。巡检前 repo/ledger 两副本均 838 行且一致。
+
+- **2026-10-21 03:29 PST（本次，无状态变化，未到下一次24h重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**。`dispatch` Spawned/Reclaimed/Crashed/Timed out/Stale 全 0，**无 Guarded、无 blocker_auth**；dispatch 前后完整 `diagnostics` 均为 `t_a36d7ed7`（28.5h）、`t_477917c2`（27.9h）、`t_f2717f22`（27.9h）、`t_b4e33024`（25.9h）四条 `stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 consecutive_failures>0=2）。
+  - 功能复验无退化：arvino healthz/docs/dashboard/ui、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080) 全 **200**；n8n 审批 webhook POST 仍 **404**；`gitea.k8shome.com` 仍 **525**。api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 与 live env 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`；`firebird-canary` Synced/Healthy@`6f52a6fc`；`firebird-manila` 仍 GitHub main@`213c486a`；`argocd-image-updater` 仍 Unknown/Healthy，ComparisonError `.spec.namespace: field not declared in schema`；`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal。
+  - blocked 最老两项为 `t_188c5a78` 89.9h、`t_0f5b931b` 47.3h；`t_a18cdf9c` 刚到 24.0h，但其关联 n8n 凭据缺口上次提醒距今仍不足24h。00:57、01:14、01:47 已完成其余本周期提醒；没有新 blocked/stranded，本轮不重复推送。11 项 blocked + 5 项 todo 的通知订阅无缺口。
+  - 配额无新阻塞：anthropic #2 仍在 429 冷却（约24分钟），#1 健康；openai-codex 正常、copilot ready-to-retry、deepseek 仍 402 exhausted。巡检前 repo/ledger 两副本均 845 行且一致。
+
+- **2026-10-21 03:46 PST（本次，无状态变化，未到下一次24h重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` Spawned/Reclaimed/Crashed/Timed out/Stale 全 0，**无 Guarded、无 blocker_auth**；dispatch 前后完整 `diagnostics` 共 7 条：`t_a36d7ed7`（28.7h）、`t_477917c2`（28.2h）、`t_f2717f22`（28.1h）、`t_b4e33024`（26.2h）、`t_a18cdf9c`（24.2h）、`t_071d0e68`（24.2h）`stuck_in_blocked`，以及 `t_ecaabae7` 历史 `repeated_failures`（唯一 consecutive_failures>0=2）。
+  - 功能复验无退化：arvino healthz/docs/dashboard/ui、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080) 全 **200**；n8n 审批 webhook POST 仍 **404**；`gitea.k8shome.com` 仍 **525**。api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 与 live env 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`；`firebird-canary` Synced/Healthy@`6f52a6fc`；`firebird-manila` 仍 GitHub main@`213c486a`；`argocd-image-updater` 仍 Unknown/Healthy，ComparisonError `.spec.namespace: field not declared in schema`；`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal，其余已列敏感项为 secretKeyRef。
+  - `t_a18cdf9c`、`t_071d0e68` 新越过 diagnostics 的 24h 阈值，但与 `t_71f47a4b` 属同一 n8n workflow/凭据缺口，10-20 05:12 已首次上报，距今约22.6h；其余 blocked 的本周期提醒已在 00:57、01:14、01:47 完成。没有新 blocker，按24h提醒节奏本轮不重复推送。
+  - 配额无新阻塞：anthropic #2 429 冷却仅余约7分钟、#1 健康；openai-codex 正常、copilot ready-to-retry、deepseek 仍 402 exhausted。SQLite 反查 11 项 blocked + 5 项 todo 的通知订阅无缺口；GitHub PR#28/#29 仍 OPEN/MERGEABLE（#29 仍仅 5 个文档文件）。巡检前 repo/ledger 两副本均 852 行且一致。
+
+- **2026-10-21 04:04 PST（本次，无状态变化，未到下一次24h重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**。`dispatch` Spawned/Reclaimed/Crashed/Timed out/Stale 全 0，**无 Guarded、无 blocker_auth**；dispatch 前后完整 `diagnostics` 共 8 条：`t_a36d7ed7`（29.0h）、`t_477917c2`（28.5h）、`t_f2717f22`（28.4h）、`t_b4e33024`（26.5h）、`t_a18cdf9c`（24.5h）、`t_071d0e68`（24.4h）、`t_71f47a4b`（24.2h）`stuck_in_blocked`，以及 `t_ecaabae7` 历史 `repeated_failures`（唯一 consecutive_failures>0=2）。
+  - 功能复验无退化：arvino healthz/docs/dashboard/ui、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080) 全 **200**；n8n 审批 webhook POST 仍 **404**；`gitea.k8shome.com` 仍 **525**。api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 与 live env 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`；`firebird-canary` Synced/Healthy@`6f52a6fc`；`firebird-manila` 仍 GitHub main@`213c486a`；`argocd-image-updater` 仍 Unknown/Healthy，ComparisonError `.spec.namespace: field not declared in schema`；`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal，其余已列敏感项为 secretKeyRef。
+  - `t_71f47a4b` 本轮新越过 diagnostics 的 24h 阈值，但与 `t_a18cdf9c`、`t_071d0e68` 属同一 n8n workflow/凭据缺口，10-20 05:12 已首次上报，距今约22.9h；其余 blocked 的本周期提醒已在 00:57、01:14、01:47 完成。没有新 blocker，按24h提醒节奏本轮不重复推送。
+  - 配额无新阻塞：anthropic #2、copilot 均为 ready-to-retry，#1 健康；openai-codex 正常、deepseek 仍 402 exhausted。SQLite 反查 blocked/todo 无订阅缺口；巡检前 repo/ledger 两副本均 859 行且一致。
+
+- **2026-10-21 04:20 PST（本次，无状态变化，未到下一次24h重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` Spawned/Reclaimed/Crashed/Timed out/Stale 全 0，**无 Guarded、无 blocker_auth**；dispatch 前后完整 `diagnostics` 共 8 条：`t_a36d7ed7`（29.3h）、`t_477917c2`（28.8h）、`t_f2717f22`（28.7h）、`t_b4e33024`（26.8h）、`t_a18cdf9c`（24.8h）、`t_071d0e68`（24.7h）、`t_71f47a4b`（24.5h）`stuck_in_blocked`，以及 `t_ecaabae7` 历史 `repeated_failures`（唯一 consecutive_failures>0=2）。
+  - 功能复验无退化：arvino healthz/docs/dashboard/ui、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080) 全 **200**；n8n 审批 webhook POST 仍 **404**；`gitea.k8shome.com` 仍 **525**。api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 与 live env 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`；`firebird-canary` Synced/Healthy@`6f52a6fc`；`firebird-manila` 仍 GitHub main@`213c486a`；`argocd-image-updater` 仍 Unknown/Healthy，ComparisonError `.spec.namespace: field not declared in schema`；`GH_TOKEN`（literal,len 40）、`ARVINO_DATABASE_URL`（literal,len 61）仍未改 valueFrom，其余已列敏感项为 secretKeyRef。
+  - 没有新 blocked/stranded；00:57、01:14、01:47 已完成其余本周期提醒。n8n 三卡与 10-20 05:12 首报的同一 workflow/凭据缺口距今约23.1h，未满24h，本轮不重复推送。
+  - 配额无新阻塞：anthropic #2、copilot 均为 ready-to-retry，#1 健康；openai-codex 正常、deepseek 仍 402 exhausted。SQLite 反查 11 项 blocked + 5 项 todo 的通知订阅无缺口；巡检前 repo/ledger 两副本均 866 行且一致。
+
+- **2026-10-21 04:37 PST（本次，无状态变化，未到下一次24h重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` Spawned/Reclaimed/Crashed/Timed out/Stale 全 0，**无 Guarded、无 blocker_auth**；完整 `diagnostics` 共 8 条：`t_a36d7ed7`（29.6h）、`t_477917c2`（29.0h）、`t_f2717f22`（29.0h）、`t_b4e33024`（27.0h）、`t_a18cdf9c`（25.1h）、`t_071d0e68`（25.0h）、`t_71f47a4b`（24.8h）`stuck_in_blocked`，以及 `t_ecaabae7` 历史 `repeated_failures`（唯一 consecutive_failures>0=2）。
+  - 功能复验无退化：arvino healthz/docs/dashboard/ui、n8n healthz、canary `/shop`/`/house`、agent-canvas(8080) 全 **200**；n8n 审批 webhook POST 仍 **404**；`gitea.k8shome.com` 仍 **525**。api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`；`firebird-canary` Synced/Healthy@`6f52a6fc`；`firebird-manila` 仍 GitHub main@`213c486a`；`argocd-image-updater` 仍 Unknown/Healthy，ComparisonError `.spec.namespace: field not declared in schema`。
+  - 没有新 blocked/stranded；00:57、01:14、01:47 已完成其余本周期提醒。n8n 三卡与 10-20 05:12 首报的同一 workflow/凭据缺口距今约23.4h，未满24h，本轮不重复推送。
+  - 配额无新阻塞：anthropic #2、copilot 均为 ready-to-retry，#1 健康；openai-codex 正常、deepseek 仍 402 exhausted。SQLite 反查 Arvino 群通知订阅无缺口。
+
+- **2026-10-21 04:55 PST（本次，无状态变化，未到下一次24h重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` Spawned/Reclaimed/Crashed/Timed out/Stale 全 0，**无 Guarded、无 blocker_auth**；dispatch 前后完整 `diagnostics` 均为 7 条 `stuck_in_blocked`：`t_a36d7ed7`（29.9h）、`t_477917c2`（29.3h）、`t_f2717f22`（29.3h）、`t_b4e33024`（27.3h）、`t_a18cdf9c`（25.4h）、`t_071d0e68`（25.3h）、`t_71f47a4b`（25.1h），另有 `t_ecaabae7` 历史 `repeated_failures`（唯一 consecutive_failures>0=2）。
+  - 功能复验无退化：arvino healthz/docs/dashboard/ui、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080) 全 **200**；n8n 审批 webhook POST 仍 **404**；`gitea.k8shome.com` 仍 **525**。api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 与 live env 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`；`firebird-canary` Synced/Healthy@`6f52a6fc`；`firebird-manila` 仍 GitHub main@`213c486a`；`argocd-image-updater` 仍 Unknown/Healthy，ComparisonError `.spec.namespace: field not declared in schema`；`GH_TOKEN`（literal,len 40）与 `ARVINO_DATABASE_URL`（literal,len 61）仍未改 valueFrom。
+  - 没有新 blocked/stranded。00:57、01:14、01:47 已完成其余本周期提醒；n8n 三卡与 10-20 05:12 首报的同一 workflow/凭据缺口距今约23.7h，未满24h，本轮不重复推送。
+  - 配额无新阻塞：anthropic #2、copilot 均 ready-to-retry，#1 健康；openai-codex 正常、deepseek 仍 402 exhausted。SQLite 反查 11 项 blocked + 5 项 todo 的通知订阅无缺口。
+
+- **2026-10-21 05:12 PST（本次，无组件状态变化；触发 1 条 24h 重报：n8n 三卡）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` Spawned/Reclaimed/Crashed/Timed out/Stale 全 0，**无 Guarded、无 blocker_auth**；完整 `diagnostics` 8 条：`t_a36d7ed7`（30.2h）、`t_477917c2`（29.6h）、`t_f2717f22`（29.5h）、`t_b4e33024`（27.6h）、`t_a18cdf9c`（25.7h）、`t_071d0e68`（25.6h）、`t_71f47a4b`（25.3h）`stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 consecutive_failures>0=2）。
+  - 功能复验无退化：arvino healthz/docs/dashboard/ui、n8n healthz、canary `/shop`/`/house`、agent-canvas(8080) 全 **200**；n8n 审批 webhook POST 仍 **404**；`gitea.k8shome.com` 仍 **525**；`git.k8shome.com` **302**（非 200，属正常重定向）。api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`；`firebird-canary` Synced/Healthy@`6f52a6fc`；`firebird-manila` 仍 GitHub main@`213c486a`；`argocd-image-updater` 仍 Unknown/Healthy，ComparisonError `.spec.namespace: field not declared in schema`。
+  - **本轮按 24h 规则重报 n8n 三卡**：`t_71f47a4b`（capability，block 事件 10-20 03:51）、`t_a18cdf9c`/`t_071d0e68`（initial_status blocked）真因同一条 —— n8n workflow 无法导入，无凭据。独立核实：`~/.hermes/cache/scratch/n8n-api-key.txt` **不存在**（skill 里记的路径已过期），故不是"worker 没用对 key"而是"确实没有 key"；三卡都缺同一件 Arvin 手工产物，合并为一条提醒，不拆分刷屏。
+  - 其余 blocked 本轮维持沉默：`t_a36d7ed7`/`t_477917c2`/`t_f2717f22`/`t_b4e33024` 的上一次提醒在 00:57/01:14/01:47，距今约 4h，未满 24h；`t_188c5a78`(88.7h)/`t_0f5b931b`(46.2h) 同理。GitHub PR#28/#29 仍 OPEN/MERGEABLE（未重新复核文件清单，待下轮）。
+  - 待 Arvin 的 6 个 Gitea PR 状态无变化（全部 open/mergeable）：#210、#211、#213、#218、#219、#222。live env 形态未变：`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal，其余已列敏感项为 secretKeyRef。
+  - 配额：anthropic #1 健康、#2 429 ready-to-retry、copilot ready-to-retry、**openai-codex 429 usage_limit_reached 剩 44m**（当前无 running 任务，不影响本轮）、deepseek 仍 402 exhausted。本项目角色均已切 anthropic，故 openai-codex 墙不阻塞现有 blocked 项。
+  - 台账同步：repo 主文件 887→897 行，写入后与 `~/.hermes/kanban/boards/arvino/ledger/SYSTEM_STATUS.md` 同步一致。
+
+- **2026-10-21 05:37 PST（本次，无组件状态变化，未到下一次24h重报周期；记一条 live env 值变化）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` Spawned/Reclaimed/Crashed/Timed out/Stale 全 0，**无 Guarded、无 blocker_auth**；完整 `diagnostics` 8 条：`t_a36d7ed7`（30.4h）、`t_477917c2`（29.9h）、`t_f2717f22`（29.8h）、`t_b4e33024`（27.9h）、`t_a18cdf9c`（25.9h）、`t_071d0e68`（25.9h）、`t_71f47a4b`（25.6h）`stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 consecutive_failures>0=2；另有 `t_2dfe0a4c` 存有旧 rate-limited 文案但 cf=0、非 blocked，不干预）。
+  - 功能复验无退化：arvino healthz/docs/dashboard/ui、n8n healthz、canary `/shop`/`/house`、agent-canvas(8080) 全 **200**；`git.k8shome.com` **302**；n8n 审批 webhook POST 仍 **404**；`gitea.k8shome.com` 仍 **525**。api/worker/OPA/Postgres 全 1/1 Running、0 重启（api/worker age 27h、postgres 3d19h）；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94`；`firebird-canary` Synced/Healthy、repoURL=Gitea、rev=`6f52a6fc46c1`；`firebird-manila` 仍 GitHub main@`213c486a`（生产 CD 源分叉未解决，等 Arvin A/B）；`argocd-image-updater` 仍 Unknown/Healthy，ComparisonError `.spec.namespace: field not declared in schema`（等 PR#218）。
+  - ⚠️ **live env 记录更正（非新决策点）**：`arvino-api` 的 `GH_TOKEN` 仍是 **literal（非 valueFrom）**，本轮精确实读值 = **掩码形态（len 13，内含 `...`，非可用 PAT）**，与台账此前写的 "len 40" 不同。由于 pod env 对运行中 pod 不可变、且该 pod age 27h 未重启，**此前 "len 40" 记录应属测量口径错误，以本轮读数为准**（不是新发生的替换）。结论不变：该 out-of-band 值不能用于任何 GitHub 调用，**根因仍是 PR#222 未合并**（合并后才由 GitOps 接管）。不新增请示，仅更正台账。
+  - `ARVINO_DATABASE_URL` 仍内联密码 literal（len 51），PR#219 未合；其余敏感项（PGPASSWORD、两个 webhook secret、AGENT/OWNER token）均为 secretKeyRef。
+  - 待 Arvin 的 PR 状态无变化：Gitea homelab **#210 #211 #213 #218 #219 #221 #222 #223** 全 open/mergeable=true（#217 仍 false 已作废），firebird-sea **#6** open/mergeable；GitHub 平台仓 **PR#28**（head `c4af6f2`）/ **PR#29**（head `a07e714`）仍 OPEN/MERGEABLE，属框架/治理变更只能 Arvin 合。
+  - 24h 提醒节奏：`t_188c5a78`(91.9h)、`t_0f5b931b`(49.3h)、`t_f01dcf8f`(28.7h)、`t_ecaabae7`(27.8h) 及 `t_a36d7ed7`/`t_477917c2`/`t_f2717f22`/`t_b4e33024` 的上次提醒分别在 00:57/01:14/01:47，n8n 三卡在 05:12，距今均 <24h → 本轮不重复推送。没有新 blocked/stranded。
+  - 配额无新阻塞：anthropic #1 健康、#2 429 ready-to-retry；copilot 两凭据 ready-to-retry；**openai-codex 仍 429 usage_limit_reached（剩约 27m）**，当前无 running 任务不影响；deepseek 仍 402 exhausted。SQLite 反查 11 项 blocked + 5 项 todo 的 Arvino 群通知订阅**无缺口**（112 条订阅）。
+  - 台账同步：repo 主文件 897→908 行，写入后与 `~/.hermes/kanban/boards/arvino/ledger/SYSTEM_STATUS.md` 同步一致。
+
+- **2026-10-21 05:45 PST（本次，无状态变化，未到 24h 重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` Spawned/Reclaimed/Crashed/Timed out/Stale 全 0，**无 Guarded、无 blocker_auth**；完整 `diagnostics` 8 条：`t_a36d7ed7`（30.7h）、`t_477917c2`（30.2h）、`t_f2717f22`（30.1h）、`t_b4e33024`（28.2h）、`t_a18cdf9c`（26.2h）、`t_071d0e68`（26.1h）、`t_71f47a4b`（25.9h）`stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 consecutive_failures>0=2）。
+  - 功能复验无退化：arvino `healthz/docs/dashboard/ui` 全 **200**、`/` 307；n8n healthz **200**；canary `/shop`、`/house` **200**；`git.k8shome.com` **302**；agent-canvas(8080) **200**；n8n 审批 webhook POST 仍 **404**；`gitea.k8shome.com` 仍 **525**。api/worker/OPA 各 1/1 Running、postgres-0 1/1，**全 0 重启**（api/worker age 27h、opa 30h、postgres 3d19h）；Temporal 7 pods Running，frontend 旧 3 次重启（5d18h 前）未增加。
+  - ArgoCD 实读（`mac-mini-orbstack`）无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94a10`（无 condition，聚合残留）；`firebird-canary` Synced/Healthy@`6f52a6fc46`（repoURL=Gitea）；`firebird-manila` Synced/Healthy@`213c486a39`（仍 GitHub main，生产 CD 源分叉未解决，等 Arvin A/B）；`argocd-image-updater` 仍 Unknown/Healthy，condition `ComparisonError: failed to calculate diff: error calculating structure`（等 PR#218）。
+  - live `arvino-api` env 实读：`GH_TOKEN` **literal len=40**、`ARVINO_DATABASE_URL` **literal len=61**（PR#222 / PR#219 未合，仍未修好）；`PGPASSWORD`、`ARVINO_AGENT_TOKEN`、`ARVINO_OWNER_TOKEN` 均 secretKeyRef。注：GH_TOKEN 长度读数在 13/40 间来回，形态判定（literal 明文、不可用于调用）两轮一致，长度差异属测量口径，不影响结论。
+  - 待 Arvin 的 PR 无变化：Gitea homelab open 14 个，其中 **#210 #211 #213 #218 #219 #221 #222 #223 mergeable=true**（#217/#206/#205/#188/#163/#156 false）；firebird-sea **#1 #6** mergeable=true；GitHub 平台仓 **PR#28**（head `c4af6f2`，仅 CHANGELOG+2 脚本）/ **PR#29**（head `a07e714`，仅 5 个 docs 文件）仍 OPEN/MERGEABLE，属框架/治理变更只能 Arvin 合。
+  - 配额：anthropic #1 健康、#2 429 ready-to-retry；copilot 两凭据 ready-to-retry；**openai-codex 429 usage_limit_reached 剩 10m43s**（当前无 running 任务，不影响）；deepseek 仍 402 exhausted。
+  - 24h 提醒节奏：n8n 三卡上次 05:12（33min）、`t_188c5a78`(≈93h)/`t_0f5b931b`(≈50h)/`t_f01dcf8f`/`t_ecaabae7` 与 `t_a36d7ed7`/`t_477917c2`/`t_f2717f22`/`t_b4e33024` 上次在 00:57/01:14/01:47，均 <24h → 本轮不重复推送。没有新 blocked/stranded。
+  - 台账同步：repo 主文件 908→919 行，写入后与 `~/.hermes/kanban/boards/arvino/ledger/SYSTEM_STATUS.md` 同步一致（巡检前两副本均 908 行、diff 一致）。
+
+- **2026-10-21 06:01 PST（本次，无状态变化，未到 24h 重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` 全部 0、**无 Guarded、无 blocker_auth**；完整 `diagnostics` 8 条：`t_a36d7ed7`（31.0h）、`t_477917c2`（30.4h）、`t_f2717f22`（30.4h）、`t_b4e33024`（28.4h）、`t_a18cdf9c`（26.5h）、`t_071d0e68`（26.4h）、`t_71f47a4b`（26.2h）`stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（cf=2）。
+  - 功能复验无退化：arvino 四端点、n8n healthz、canary `/shop`/`/house`、agent-canvas 均 **200**；`git.k8shome.com` 302；审批 webhook 404、`gitea.k8shome.com` 525 均未变化。arvino api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94a10`；`firebird-canary` Synced/Healthy@`6f52a6fc46`；`firebird-manila` Synced/Healthy@`213c486a39`；`argocd-image-updater` Unknown/Healthy，ComparisonError 仍为 `.spec.namespace: field not declared in schema`。
+  - 没有新 blocked/stranded。n8n 三卡距 05:12 提醒仅 49 分钟，其余本周期提醒在 00:57/01:14/01:47，均不足 24h，本轮不重复推送。11 项 blocked + 5 项 todo 的 Arvino 群通知订阅无缺口。
+  - 配额无新阻塞：anthropic #1 健康，#2 ready-to-retry；openai-codex 正常；copilot ready-to-retry；deepseek 仍 402 exhausted。
+
+- **2026-10-21 06:18 PST（本次，无状态变化，未到 24h 重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` 全部 0、**无 Guarded、无 blocker_auth**；完整 `diagnostics` 8 条：`t_a36d7ed7`（31.3h）、`t_477917c2`（30.7h）、`t_f2717f22`（30.7h）、`t_b4e33024`（28.7h）、`t_a18cdf9c`（26.8h）、`t_071d0e68`（26.7h）、`t_71f47a4b`（26.5h）`stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（cf=2）。
+  - 功能复验无退化：arvino 四端点、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas 均 **200**；审批 webhook 404、`gitea.k8shome.com` 525 均未变化。arvino api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94a10`；`firebird-canary` Synced/Healthy@`6f52a6fc46`；`firebird-manila` Synced/Healthy@`213c486a39`；`argocd-image-updater` Unknown/Healthy，ComparisonError 仍为 `.spec.namespace: field not declared in schema`。live env 形态未变：`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal，其余已列敏感项为 secretKeyRef。
+  - 没有新 blocked/stranded。n8n 三卡距 05:12 提醒约 1.1h，其余本周期提醒在 00:57/01:14/01:47，均不足 24h，本轮不重复推送。11 项 blocked + 5 项 todo 的 Arvino 群通知订阅无缺口。
+  - 配额无新阻塞：anthropic #1 健康，#2 ready-to-retry；openai-codex 正常；copilot ready-to-retry；deepseek 仍 402 exhausted。
+
+- **2026-10-21 06:34 PST（本次，无状态变化，未到 24h 重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` 全部 0，**无 Guarded、无 blocker_auth**；完整 `diagnostics` 仍为 8 条：`t_a36d7ed7`（31.5h）、`t_477917c2`（31.0h）、`t_f2717f22`（30.9h）、`t_b4e33024`（29.0h）、`t_a18cdf9c`（27.0h）、`t_071d0e68`（27.0h）、`t_71f47a4b`（26.7h）`stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（cf=2）。
+  - 功能复验无退化：arvino 四端点、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas 均 **200**；审批 webhook 仍 404、`gitea.k8shome.com` 仍 525。arvino api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94a10`；`firebird-canary` Synced/Healthy@`6f52a6fc46`（Gitea canary）；`firebird-manila` Synced/Healthy@`213c486a39`（仍 GitHub main）；`argocd-image-updater` Unknown/Healthy，ComparisonError 仍为 `.spec.namespace: field not declared in schema`。
+  - 没有新 blocked/stranded。n8n 三卡距 05:12 提醒约 1.4h，其余本周期提醒在 00:57/01:14/01:47，均不足 24h，本轮不重复推送。SQLite 反查 11 项 blocked + 5 项 todo 的 Arvino 群通知订阅无缺口。
+  - 配额无新阻塞：anthropic #1 健康，#2 ready-to-retry；openai-codex 正常；copilot ready-to-retry；deepseek 仍 402 exhausted。巡检前 repo/ledger 两副本均 932 行且一致。
+
+- **2026-10-21 06:50 PST（本次，无状态变化，未到 24h 重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` 全部 0，**无 Guarded、无 blocker_auth**；完整 `diagnostics` 仍为 8 条：`t_a36d7ed7`（31.8h）、`t_477917c2`（31.3h）、`t_f2717f22`（31.2h）、`t_b4e33024`（29.3h）、`t_a18cdf9c`（27.3h）、`t_071d0e68`（27.2h）、`t_71f47a4b`（27.0h）`stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（cf=2）。
+  - 功能复验无退化：arvino 四端点、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas 均 **200**；审批 webhook 仍 404、`gitea.k8shome.com` 仍 525。arvino api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94a10`；`firebird-canary` Synced/Healthy@`6f52a6fc46`；`firebird-manila` Synced/Healthy@`213c486a39`（仍 GitHub main）；`argocd-image-updater` Unknown/Healthy，ComparisonError 仍为 `.spec.namespace: field not declared in schema`。
+  - 没有新 blocked/stranded。n8n 三卡距 05:12 提醒约 1.6h，其余本周期提醒在 00:57/01:14/01:47，均不足 24h，本轮不重复推送。11 项 blocked + 5 项 todo 均有 Arvino 群通知订阅。
+  - 配额无新阻塞：anthropic #1 健康，#2 ready-to-retry；openai-codex 正常；copilot ready-to-retry；deepseek 仍 402 exhausted。巡检前 repo/ledger 两副本均 939 行且一致。
+
+- **2026-10-21 07:06 PST（本次，无状态变化，未到 24h 重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**。`dispatch` 全部 0，**无 Guarded、无 blocker_auth**；完整 `diagnostics` 仍为 8 条：`t_a36d7ed7`（32.1h）、`t_477917c2`（31.5h）、`t_f2717f22`（31.5h）、`t_b4e33024`（29.5h）、`t_a18cdf9c`（27.6h）、`t_071d0e68`（27.5h）、`t_71f47a4b`（27.3h）`stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（cf=2）。
+  - 功能复验无退化：arvino 四端点、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas 均 **200**；审批 webhook 仍 404、`gitea.k8shome.com` 仍 525。arvino api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 与 live env 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94a10`；`firebird-canary` Synced/Healthy@`6f52a6fc46`；`firebird-manila` Synced/Healthy@`213c486a39`；`argocd-image-updater` Unknown/Healthy，ComparisonError 仍为 `.spec.namespace: field not declared in schema`；`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal。
+  - 没有新 blocked/stranded。n8n 三卡距 05:12 提醒约 1.9h，其余本周期提醒在 00:57/01:14/01:47，均不足 24h，本轮不重复推送。11 项 blocked + 5 项 todo 的 Arvino 群通知订阅无缺口。
+  - 配额无新阻塞：anthropic #1 健康，#2 ready-to-retry；openai-codex 正常；copilot ready-to-retry；deepseek 仍 402 exhausted。
+
+- **2026-10-21 07:23 PST（本次，无状态变化，未到 24h 重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` 全部 0，**无 Guarded、无 blocker_auth**；完整 `diagnostics` 8 条：`t_a36d7ed7`（32.4h）、`t_477917c2`（31.8h）、`t_f2717f22`（31.8h）、`t_b4e33024`（29.8h）、`t_a18cdf9c`（27.9h）、`t_071d0e68`（27.8h）、`t_71f47a4b`（27.5h）`stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 cf>0=2）。
+  - 功能复验无退化：arvino `healthz/docs/dashboard/ui`、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas 均 **200**；审批 webhook 仍 **404**、`gitea.k8shome.com` 仍 **525**。arvino api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 与 live env 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94a10`；`firebird-canary` Synced/Healthy@`6f52a6fc46`；`firebird-manila` Synced/Healthy@`213c486a39`；`argocd-image-updater` Unknown/Healthy，ComparisonError 仍为 `.spec.namespace: field not declared in schema`；`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal，`PGPASSWORD`/agent/owner token 为 secretKeyRef。
+  - 没有新 blocked/stranded。n8n 三卡距 05:12 提醒约 2.2h，其余本周期提醒在 00:57/01:14/01:47，均不足 24h，本轮不重复推送。SQLite 反查 11 项 blocked + 5 项 todo 的 Arvino 群通知订阅无缺口。
+  - 配额无新阻塞：anthropic #1 健康，#2 ready-to-retry；openai-codex 正常；copilot ready-to-retry；deepseek 仍 402 exhausted。巡检前 repo/ledger 两副本均 953 行且一致。
+
+- **2026-10-21 07:40 PST（本次，无状态变化，未到 24h 重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` Spawned/Reclaimed/Crashed/Timed out/Stale 全 0，**无 Guarded、无 blocker_auth**；dispatch 前后完整 `diagnostics` 均为 8 条：`t_a36d7ed7`（32.6h）、`t_477917c2`（32.1h）、`t_f2717f22`（32.0h）、`t_b4e33024`（30.1h）、`t_a18cdf9c`（28.1h）、`t_071d0e68`（28.1h）、`t_71f47a4b`（27.8h）`stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 cf>0=2）。
+  - 功能复验无退化：arvino 四端点、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas 均 **200**；审批 webhook 仍 **404**、`gitea.k8shome.com` 仍 **525**。arvino api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 与 live env 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94a10`；`firebird-canary` Synced/Healthy@`6f52a6fc46`；`firebird-manila` Synced/Healthy@`213c486a39`；`argocd-image-updater` Unknown/Healthy，ComparisonError 仍为 `.spec.namespace: field not declared in schema`；`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal，`PGPASSWORD`/agent/owner token 为 secretKeyRef。
+  - GitHub PR#28/#29 仍 OPEN/MERGEABLE，文件清单分别保持「CHANGELOG+2 个 guard 脚本」与「5 个 docs 文件」。没有新 blocked/stranded；n8n 三卡距 05:12 提醒约 2.5h，其余本周期提醒在 00:57/01:14/01:47，均不足 24h，本轮不重复推送。
+  - 配额无新阻塞：anthropic #1 健康，#2 ready-to-retry；openai-codex 正常；copilot ready-to-retry；deepseek 仍 402 exhausted。巡检前 repo/ledger 两副本均 960 行且一致。
+
+- **2026-10-21 07:57 PST（本次，无状态变化，未到 24h 重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` 全部 0，**无 Guarded、无 blocker_auth**；前后完整 `diagnostics` 仍为 8 条：`t_a36d7ed7`（32.9h）、`t_477917c2`（32.4h）、`t_f2717f22`（32.3h）、`t_b4e33024`（30.4h）、`t_a18cdf9c`（28.4h）、`t_071d0e68`（28.3h）、`t_71f47a4b`（28.1h）`stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（cf=2）。
+  - 功能复验无退化：arvino 四端点、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas 均 **200**；审批 webhook 仍 **404**、`gitea.k8shome.com` 仍 **525**。arvino api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 与 live env 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94a10`；`firebird-canary` Synced/Healthy@`6f52a6fc46`；`firebird-manila` Synced/Healthy@`213c486a39`；`argocd-image-updater` Unknown/Healthy，ComparisonError 仍为 `.spec.namespace: field not declared in schema`；`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal，`PGPASSWORD`/agent/owner token 为 secretKeyRef。
+  - 没有新 blocked/stranded。n8n 三卡距 05:12 提醒约 2.8h，其余本周期提醒在 00:57/01:14/01:47，均不足 24h，本轮不重复推送。11 项 blocked + 5 项 todo 的 Arvino 群通知订阅无缺口。
+  - 配额无新阻塞：anthropic #1 健康、#2 ready-to-retry；openai-codex 正常；copilot ready-to-retry；deepseek 仍 402 exhausted。巡检前 repo/ledger 两副本均 967 行且一致。
+
+- **2026-10-21 08:13 PST（本次，无状态变化，未到 24h 重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` 全部 0，**无 Guarded、无 blocker_auth**；完整 `diagnostics` 8 条：`t_a36d7ed7`（33.2h）、`t_477917c2`（32.6h）、`t_f2717f22`（32.6h）、`t_b4e33024`（30.6h）、`t_a18cdf9c`（28.7h）、`t_071d0e68`（28.6h）、`t_71f47a4b`（28.4h）`stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（cf=2）。
+  - 功能复验无退化：arvino 四端点、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas 均 **200**；审批 webhook 仍 **404**、`gitea.k8shome.com` 仍 **525**。arvino api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 与 live env 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94a10`；`firebird-canary` Synced/Healthy@`6f52a6fc46`；`firebird-manila` Synced/Healthy@`213c486a39`；`argocd-image-updater` Unknown/Healthy，ComparisonError 仍为 `.spec.namespace: field not declared in schema`；`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal，`PGPASSWORD`/agent/owner token 为 secretKeyRef。
+  - 没有新 blocked/stranded。n8n 三卡距 05:12 提醒约 3h，其余本周期提醒在 00:57/01:14/01:47，均不足 24h，本轮不重复推送。11 项 blocked + 5 项 todo 的 Arvino 群通知订阅无缺口。
+  - 配额无新阻塞：anthropic #1 健康、#2 ready-to-retry；openai-codex 正常；copilot ready-to-retry；deepseek 仍 402 exhausted。
+
+- **2026-10-21 08:30 PST（本次，无状态变化，未到 24h 重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` 全部 0，**无 Guarded、无 blocker_auth**；dispatch 前后完整 `diagnostics` 均为 8 条：`t_a36d7ed7`（33.5h）、`t_477917c2`（32.9h）、`t_f2717f22`（32.9h）、`t_b4e33024`（30.9h）、`t_a18cdf9c`（29.0h）、`t_071d0e68`（28.9h）、`t_71f47a4b`（28.7h）`stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（cf=2）。
+  - 功能复验无退化：arvino `healthz/docs/dashboard/ui`、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080) 全 **200**；审批 webhook 仍 **404**、`gitea.k8shome.com` 仍 **525**。arvino api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 与 live env 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94a10`；`firebird-canary` Synced/Healthy@`6f52a6fc46`；`firebird-manila` Synced/Healthy@`213c486a39` 且仍以 GitHub main 为源；`argocd-image-updater` Unknown/Healthy，ComparisonError 仍为 `.spec.namespace: field not declared in schema`；`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal，其余已列敏感项为 secretKeyRef。
+  - 没有新 blocked/stranded。n8n 三卡距 05:12 提醒约 3.3h，其余本周期提醒在 00:57/01:14/01:47，均不足 24h，本轮不重复推送。11 项 blocked + 5 项 todo 均已有 Arvino 群通知订阅。
+  - 配额无新阻塞：anthropic #1 健康、#2 ready-to-retry；openai-codex 正常；copilot ready-to-retry；deepseek 仍 402 exhausted。
+
+- **2026-10-21 08:47 PST（本次，无状态变化，未到 24h 重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` 全部 0，**无 Guarded、无 blocker_auth**；dispatch 前后完整 `diagnostics` 均为 8 条：`t_a36d7ed7`（33.8h）、`t_477917c2`（33.2h）、`t_f2717f22`（33.2h）、`t_b4e33024`（31.2h）、`t_a18cdf9c`（29.3h）、`t_071d0e68`（29.2h）、`t_71f47a4b`（28.9h）`stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 cf>0=2）。
+  - 功能复验无退化：arvino `healthz/docs/dashboard/ui`、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080) 均 **200**；审批 webhook 仍 **404**、`gitea.k8shome.com` 仍 **525**。arvino api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 与 live env 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94a10`；`firebird-canary` Synced/Healthy@`6f52a6fc46`；`firebird-manila` Synced/Healthy@`213c486a39` 且仍以 GitHub main 为源；`argocd-image-updater` Unknown/Healthy，ComparisonError 仍为 `.spec.namespace: field not declared in schema`；`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal，`PGPASSWORD`/agent/owner token 为 secretKeyRef。
+  - 没有新 blocked/stranded。n8n 三卡距 05:12 提醒约 3.6h，其余本周期提醒在 00:57/01:14/01:47，均不足 24h，本轮不重复推送。11 项 blocked + 5 项 todo 的 Arvino 群通知订阅无缺口。
+  - 配额无新阻塞：anthropic #1 健康、#2 ready-to-retry；openai-codex 正常；copilot ready-to-retry；deepseek 仍 402 exhausted。巡检前 repo/ledger 两副本均 988 行且一致。
+
+- **2026-10-21 09:04 PST（本次，无状态变化，未到 24h 重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` 全部 0，**无 Guarded、无 blocker_auth**；完整 `diagnostics` 为 8 条：`t_a36d7ed7`（34.0h）、`t_477917c2`（33.5h）、`t_f2717f22`（33.4h）、`t_b4e33024`（31.5h）、`t_a18cdf9c`（29.5h）、`t_071d0e68`（29.5h）、`t_71f47a4b`（29.2h）`stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 cf>0=2）。
+  - 功能复验无退化：arvino 四端点、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080) 均 **200**；审批 webhook 仍 **404**、`gitea.k8shome.com` 仍 **525**。arvino api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 与 live env 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94a10`；`firebird-canary` Synced/Healthy@`6f52a6fc46`；`firebird-manila` Synced/Healthy@`213c486a39` 且仍以 GitHub main 为源；`argocd-image-updater` Unknown/Healthy，ComparisonError 仍为 `.spec.namespace: field not declared in schema`；`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal，`PGPASSWORD`/agent/owner token 为 secretKeyRef。
+  - 待审 PR 无变化：Gitea homelab `#210 #211 #213 #218 #219 #221 #222 #223` 全 open/mergeable；GitHub PR#28/#29 均 OPEN/MERGEABLE，文件清单仍分别为 CHANGELOG+2 个 guard 脚本、5 个 docs 文件。
+  - 没有新 blocked/stranded。n8n 三卡距 05:12 提醒约 3.9h，其余本周期提醒在 00:57/01:14/01:47，均不足 24h，本轮不重复推送。11 项 blocked + 5 项 todo 均有 Arvino 群通知订阅。配额无新阻塞：anthropic #1 健康、#2 ready-to-retry；openai-codex 正常；copilot ready-to-retry；deepseek 仍 402 exhausted。
+
+- **2026-10-21 09:21 PST（本次，无状态变化，未到 24h 重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` 全部 0，**无 Guarded、无 blocker_auth**；完整 `diagnostics` 为 8 条：`t_a36d7ed7`（34.3h）、`t_477917c2`（33.8h）、`t_f2717f22`（33.7h）、`t_b4e33024`（31.8h）、`t_a18cdf9c`（29.8h）、`t_071d0e68`（29.7h）、`t_71f47a4b`（29.5h）`stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 cf>0=2）。
+  - 功能复验无退化：arvino `healthz/docs/dashboard/ui`、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080)、Hermes Dashboard `/health` 均 **200**；审批 webhook 仍 **404**、`gitea.k8shome.com` 仍 **525**。arvino api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 与 live env 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94a10`；`firebird-canary` Synced/Healthy@`6f52a6fc46`；`firebird-manila` Synced/Healthy@`213c486a39`；`argocd-image-updater` Unknown/Healthy，ComparisonError 仍为 `.spec.namespace: field not declared in schema`；`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal，`PGPASSWORD`/agent/owner token 为 secretKeyRef。
+  - 没有新 blocked/stranded。n8n 三卡距 05:12 提醒约 4.2h，其余本周期提醒在 00:57/01:14/01:47，均不足 24h，本轮不重复推送。11 项 blocked + 5 项 todo 均有 Arvino 群通知订阅。
+  - 配额无新阻塞：anthropic #1 健康、#2 ready-to-retry；openai-codex 正常；copilot ready-to-retry；deepseek 仍 402 exhausted。巡检前 repo/ledger 两副本均 1002 行且一致。
+
+- **2026-10-21 09:32 PST（总监登记：Qoder 智能体团队注册完成并同步台账；本轮未做组件健康复验）**
+  - **智能体团队已注册并真跑过任务**：团队「Arvino 研发交付组」（team_profile_id `562925f0-04d2-4630-bc68-43e16f318bed`，configurationVersion 1），席位 lead=arvino-lead、member=backend/frontend/devops/tester（1+4，与 Arvin 定的首批一致）。2026-10-21 03:34 的只读任务真跑过（会话 `132f03e8-3bf3-876e-bdbf-3f504e4e294a`，宿主注入 `<team_task_context>` + `<member_request>`），工作区 `git status --porcelain` 前后同为 4 项、**零新增改动**。回执 `contrib/qoder-agent-team/registration-verification.json` 结论 `passed_with_blockers`。
+  - **成员派发未生效（根因已定位，编排侧）**：那次任务只产生 leader 一个会话，四名成员无独立执行会话。leader 会话全量工具调用仅 7 次（Bash×5、Glob×1、Read×1），**从未调用**宿主 `capabilities` 中已声明的 `send_discussion_agent_message` / `query_discussion`，协作插件与 `collaboration:skills` 均已挂载——即派发通道可用但未被使用，根因是 `arvino-lead.md` 此前没写明派发机制。已在 `arvino-lead.md` 补写派发契约（成员未回执即视为未派发、总监不是默认执行者）。**但仓库文件 ≠ 设置页工作指令，Qoder 无导入通道，须 Arvin 重贴后才生效。**
+  - **异构模型仍无实证**：Arvin 已确认 tester 绑为与实现者不同家族，但 tester 从未执行，无实际运行模型家族记录。观测到的模型仅 leader `MiniMax-M3.1-Flash`（model profile `e10829b3-752b-4022-bdbd-398393e2a864`）。判定须等首次成员派发后从成员会话 `runtime-config` 读回。
+  - **逐智能体工具权限未读回**：账号侧存储，本地无持久化配置、无 CLI、无注册 API；tester/security 禁止 Edit/Write 一项待设置页确认。
+  - **firebird-sea 写任务仍阻塞**：旧 Hermes 值守 job `1ee96fd19f7f`（**每 3 分钟**）与 `1972eac66c26`（夜间）直接改 firebird-sea 仓库，不经 arvino 看板、也不经 Arvino 账本，故「看板 running=0 ⇒ 无双调度」的判断覆盖不到它们。已作为新增待批准项 7.4 提交 Arvin 定案。
+  - **接管已在并行实施（此处原表述"方案未获批、四项待批未变"已于 09:44 校正）**：候选分支 `candidate/t1-step-leases`（远程 head `e8fa6e6`）已实现方案 A 的租约机制——`f06984d` 账本+harness、`e7e58a7` **B3 已定案**（`ARVINO_TAKEOVER_EXTERNAL_ONLY`，接管期内只走外部执行路径）、`41fad7a` 总寿命 4h 硬上限与冲突审计、`e8fa6e6` 角色路由缺口修复；新增迁移 `c3d4e5f6a7b8`（`steps` 加 5 个租约列 + `repo_write_locks` 表）与 `tests/test_step_leases.py`（15 项）。本地 L0 一次性 compose 全链路演练跑通 governed 租约链路（claim→5 次 renew→complete applied、冲突 409 落审计），真实 Postgres 压测 16 worker 同步骤 1 胜 15 冲突。**尚未部署、尚未迁移活库、尚未停 Hermes**，故仍不能宣称已接管派发。证据 `contrib/qoder-agent-team/t1-step-leases-evidence.md`。
+  - **红线范围已变（待 Arvin 确认）**：`CHANGELOG_FRAMEWORK.md` 今日 09:24–09:29 期间新增两条治理条目，记录 Arvin 经 clarify 两次确认把红线**由 6 条收窄为 1 条**（仅保留不泄密/不输出密钥），并覆盖此前的 L0/L1/L2/L3 分级放行规则；`PROJECT_CHARTER.md` §3 已按此改写（该文件 09:28:51 被改，本轮未动）。**本条上方各文档与 `contrib/qoder-agent-team/` 角色文件仍按旧 6 条红线表述，属待同步状态**；该授权经 Hermes 对话中的 clarify 取得，本机无法独立复核该记录原话。
+  - **仍待 Arvin 逐条批准**：活库迁移 `c3d4e5f6a7b8`（L2，runbook `contrib/qoder-agent-team/live-migration-runbook.md`）、部署 harness + B3 开关、停/改 Hermes（S1 停取手段与 N 量化）、真实业务仓库写（L3）。**本轮新提一项**：旧 Hermes firebird 值守 job `1ee96fd19f7f`（**每 3 分钟**）与 `1972eac66c26`（夜间）直接改 firebird-sea 仓库，既不经 arvino 看板也不经 Arvino 账本，Arvino 侧 `repo_write_locks` 约束不到它们——在停旧调度前，**firebird-sea 的业务写任务须保持阻塞**。
+  - 工作区卫生（本轮产生，**未提交**）：`contrib/qoder-agent-team/` 整目录未跟踪（新增 `registration-playbook.md`、`takeover-approval-request.md`、`registration-verification.json`，并更新 `roles.yaml`、`TEAM.md`、五个角色文件）；`docs/internal/CHANGELOG_FRAMEWORK.md` 已修改未提交，新增「注册事实与状态同步」「成员未激活根因定位 + arvino-lead 派发契约补写」两节共 11 条。按变更文档铁律：**已记录但未 commit → 尚未生效**；本轮不代为提交（属框架变更，须 Arvin 审）。
+
+- **2026-10-21 09:39 PST（本次，无状态变化，未到 24h 重报周期）**
+  - 看板维持 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`dispatch` 全部 0，**无 Guarded、无 blocker_auth**；前后完整 `diagnostics` 均为 8 条：`t_a36d7ed7`（34.6h）、`t_477917c2`（34.1h）、`t_f2717f22`（34.0h）、`t_b4e33024`（32.1h）、`t_a18cdf9c`（30.1h）、`t_071d0e68`（30.0h）、`t_71f47a4b`（29.8h）`stuck_in_blocked` + `t_ecaabae7` 历史 `repeated_failures`（唯一 cf>0=2）。
+  - 功能复验无退化：arvino 四端点、n8n healthz、canary `/shop`/`/house`、`git.k8shome.com`、agent-canvas(8080) 均 **200**；审批 webhook 仍 **404**、`gitea.k8shome.com` 仍 **525**。arvino api/worker/OPA/Postgres 全 1/1 Running、0 重启；Temporal 7 pods Running，frontend 旧 3 次重启未增加。
+  - ArgoCD 与 live env 无变化：`arvino-orchestrator-gke` Synced/Degraded@`3cf5b94a10`；`firebird-canary` Synced/Healthy@`6f52a6fc46`；`firebird-manila` Synced/Healthy@`213c486a39` 且仍以 GitHub main 为源；`argocd-image-updater` Unknown/Healthy，ComparisonError 仍为 `.spec.namespace: field not declared in schema`；`GH_TOKEN`、`ARVINO_DATABASE_URL` 仍为 literal，`PGPASSWORD`/agent/owner token 为 secretKeyRef。
+  - 没有新 blocked/stranded。n8n 三卡距 05:12 提醒约 4.5h，其余本周期提醒在 00:57/01:14/01:47，均不足 24h，本轮不重复推送。11 项 blocked + 5 项 todo 的 Arvino 群通知订阅无缺口。
+  - 配额无新阻塞：anthropic #1 健康、#2 ready-to-retry；openai-codex 正常；copilot ready-to-retry；deepseek 仍 402 exhausted。巡检前 repo/ledger 两副本均 1024 行且一致。
+
+- **2026-10-21 09:41 PST（总监登记：红线收窄二次确认 + 活库迁移 `c3d4e5f6a7b8` 已执行并验收通过）**
+  - **红线收窄二次确认**：Arvin 在 Qoder 会话直接回复「红线收窄确认——6 条砍到 1 条 对的」。唯一红线 = **不泄密/不输出密钥**；原五条红线（不花钱、不动架构决策、不碰生产集群写操作、不绕过QA门禁、不自己合并PR）与 L0–L3 分级放行规则一并作废。据此，commit/push、开 PR、合并、部署、迁移、停/改旧调度、业务仓库写、费用支出**不再需要逐条请示**，由总监按任务目标决定并留证；工程纪律（变更留痕、可回滚、门禁与独立验收、版本绑定、失败处理、不外发私有资料）继续执行。**唯一不得触碰的是泄密/密钥。**
+  - **活库迁移 `c3d4e5f6a7b8` 已执行**（按 `contrib/qoder-agent-team/live-migration-runbook.md`）。前置只读核查：候选 worktree HEAD `e8fa6e6`、`alembic heads` 唯一 `c3d4e5f6a7b8`、其 `down_revision` = 活库当前版本 `b1c2d3e4f5a6`；活库 `alembic_version` 实读 `b1c2d3e4f5a6`；public 表 11 张；行数基线 projects 2 / issues 5 / workflow_runs 8 / steps 68 / events 72 / approvals 0；`steps` 的 executor_* 列 0 个、`repo_write_locks` 表 0 张（确认此前未应用过）；pods 全 Running 0 重启。备份 `/tmp/arvino-schema-before-20261021T093954.sql`，sha256 `953f113fcac834f63bcd7c2b701217cd587b416f7b0cb8582555cdd6628a6efd`，16993 字节，11 张 CREATE TABLE、**0 行 COPY/INSERT**（schema-only，无业务数据）。执行：`kubectl --context gcp-gke -n arvino port-forward svc/arvino-postgres 55435:5432` + `PGOPTIONS="-c statement_timeout=30000 -c lock_timeout=10000"` + `DATABASE_URL`（口令经 `PGPASSWORD` 环境变量传入，**不入连接串、不打印**）+ `alembic upgrade head` → exit **0**，日志 `Running upgrade b1c2d3e4f5a6 -> c3d4e5f6a7b8, step_leases`，`Context impl PostgresqlImpl`（事务型 DDL，失败自动回滚，无半应用状态）。
+  - **验收逐项全过**：`alembic_version` = `c3d4e5f6a7b8`；`steps` 新增 5 列且**全部 nullable=YES**（`executor_principal` / `executor_lease_expires_at` / `executor_lease_token_hash` / `executor_claimed_at` / `executor_attempt`）；`repo_write_locks` 表 + `ix_repo_write_locks_run_id` + 主键索引就位；public 表 11→12；**六张关键表行数与基线完全一致**；pods 全 Running **0 新增重启**（api 31h / worker 31h / opa 34h / postgres 3d23h）；`/healthz` **200** `{"status":"ok","version":"0.1.0"}`；api 镜像仍为旧镜像 `3c9be880517a`，不读新列新表。**未触发回滚**（回滚路径 `alembic downgrade -1` 仍可用，已在活库 schema 克隆库验证往返）。**部署候选分支/B3 开关与停旧调度仍未执行 → 仍不得宣称已接管派发。**
+  - **本轮未做**：未部署候选镜像、未改/未停旧 Hermes 调度、未开 PR、未合并 main、未写业务仓库、未做费用支出、未输出任何密钥。**Qoder 设置页中的角色工作指令仍需 Arvin 手工重贴后才在云端生效**（红线口径已同步到仓库文件 13 份，旧措辞残留 0 处）。
+
+- **2026-10-21 09:45 PST（总监登记：单条红线同步完成 + 活库迁移只读复核；本轮未做全组件健康复验）**
+  - **红线已由 Arvin 在 Qoder 会话明确确认收窄为单条**：原话「红线收窄确认——6 条砍到 1 条 对的」。唯一红线为**不泄密/不输出密钥**；原「不花钱、不动架构决策、不碰生产集群写操作、不绕过 QA 门禁、不自己合并 PR」五条与 L0–L3 分级放行规则一并作废。commit/push、开 PR、合并、部署、迁移、停/改旧调度、业务仓库写、费用支出不再逐条请示，由总监按任务目标决定并留证；工程纪律（变更留痕、可回滚、门禁与独立验收、版本绑定、失败处理、不外发私有资料）继续保留，但不再是审批闸门。
+  - **文档同步本轮才真正落到磁盘**：`TEAM.md` §1.2、`approval-request-template.md`、`redline-release-policy-proposal.md`、`takeover-approval-request.md`、`takeover-design-proposal.md`、`automation-dispatch-design.md`、`registration-playbook.md`、`registration-verification-checklist.md`、`t1-step-leases-evidence.md`、`live-migration-runbook.md`、10 个正式角色 + 3 个 legacy 角色文件，以及 `docs/internal/SYSTEM_STATUS_WORKFLOW.md` 均已改为单条红线口径。09:45 CHANGELOG 条目中「旧 6 条措辞残留 0 处」写的是**当时的核验结论**，而实际文件同步是在之后完成的；据此在本文件与 CHANGELOG 追加更正记录（只增不删，不改历史行）。
+  - **活库迁移只读复核（未重跑迁移）**：`alembic_version` = `c3d4e5f6a7b8`；`steps` 的 `executor_*` 列 5 个齐备；`to_regclass('public.repo_write_locks')` 返回 `repo_write_locks`；public 表 12 张。api/worker/opa/postgres 全 Running。**api 镜像仍是 `.../arvino:3c9be880517a`，未部署候选分支**；namespace 内不存在 B3 相关 configmap（仅 `arvino-policy`、`kube-root-ca.crt`）。
+  - **未执行项**：候选镜像部署 + `ARVINO_TAKEOVER_EXTERNAL_ONLY` 开关、停/改旧 Hermes 调度（`1ee96fd19f7f` 每 3 分钟、`1972eac66c26` 夜间）、真实业务仓库写。因此**仍不得宣称已接管派发**；firebird-sea 业务写在停旧调度前保持阻塞。
+  - **待人工完成**：Qoder 设置页中的十个角色工作指令与巡检 job prompt 需 Arvin 手工重贴后才在云端生效；重贴前以仓库文件为版本化真相源。另：本会话早前一次命令输出曾带出 live `GH_TOKEN` 明文，**须立即吊销/轮换**，该值不得复述、复用或外传。
+  - **状态口径**：本条以上 09:32 条目中的「仍待 Arvin 逐条批准」「红线范围已变（待 Arvin 确认）」「待同步状态」均为历史记录，**不代表当前状态**；当前以本条为准。

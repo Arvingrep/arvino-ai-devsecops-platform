@@ -1,0 +1,111 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "registration_verification_evidence_not_approval_not_task_ledger",
+  "verified_at": "2026-10-21T09:16:00+08:00",
+  "operator": "Arvin（Qoder 设置页手工操作）",
+  "channel": "manual_gui",
+  "independent_recheck_by": "Qoder 总监（只读复核对账本地会话与运行日志）",
+  "summary": "团队「Arvino 研发交付组」已在 Qoder 账号侧真实创建并成功派发过一次只读任务；5 个席位与 roles.yaml 一一对应。成员被激活为独立执行会话、tester 异构模型、逐智能体工具权限三项仍无实证，列为阻塞。",
+
+  "team": {
+    "name": "Arvino 研发交付组",
+    "description_matches_playbook": true,
+    "description": "Arvino 平台的受控试点团队：1 名 Qoder 总监 + 4 名执行成员，十专业职责按阶段轮换；当前仅限只读与候选快照演练。",
+    "team_profile_id": "562925f0-04d2-4630-bc68-43e16f318bed",
+    "discussion_team_id": "51d5f922-c844-4de9-8185-c42c017438a2",
+    "configuration_version": 1,
+    "leader_agent_profile_id": "cd541ef8-857a-40ff-9479-d342b9344191",
+    "member_count": 4,
+    "seat_layout": "1 leader + 4 members",
+    "enabled": "inferred_true_task_dispatched_successfully",
+    "device_online_requirement": "文档要求，本次运行期设备在线"
+  },
+
+  "registered_agent_profiles": [
+    {"role": "arvino-lead", "role_in_team": "leader", "agent_profile_id": "cd541ef8-857a-40ff-9479-d342b9344191", "discussion_agent_member_id": "ba3c34e2-7335-44a9-99f7-db79ed5a21d8"},
+    {"role": "arvino-backend", "role_in_team": "member", "agent_profile_id": "5387c844-93ab-43c1-a09b-16e8eee768af", "discussion_agent_member_id": "51670dd2-469c-4a6c-b8b3-c214c2059679"},
+    {"role": "arvino-frontend", "role_in_team": "member", "agent_profile_id": "fe94b877-7502-456a-8f93-2bc84d8f5fa4", "discussion_agent_member_id": "f8874285-5c0c-4443-8a83-b1d8883d46a8"},
+    {"role": "arvino-devops", "role_in_team": "member", "agent_profile_id": "16ea8880-3a5f-4f57-8358-4f328cd24101", "discussion_agent_member_id": "de861ed6-51fc-4624-b3d0-1903b8c522cc"},
+    {"role": "arvino-tester", "role_in_team": "member", "agent_profile_id": "d6856db8-8e19-4d9d-9292-9a4847325bc8", "discussion_agent_member_id": "2055b065-59d4-41a0-ab1c-ed2bfa5d7c43"}
+  ],
+
+  "not_yet_registered": [
+    "arvino-architect",
+    "arvino-security",
+    "arvino-researcher",
+    "arvino-design",
+    "arvino-smartcontract"
+  ],
+
+  "read_only_routing_check": {
+    "session_id": "132f03e8-3bf3-876e-bdbf-3f504e4e294a",
+    "discussion_id": "594175e2-4e1a-4d66-9a51-0ca3a608d661",
+    "run_log": "/Users/arvin/.qoder/logs/runs/2026-10-21T03-33-59-657+08-00-ku3mau-p86332/qodercli.log",
+    "task_text": "读取本仓库 README.md，列出仓库顶层目录结构。不要修改、创建或删除任何文件，不要运行会写入的命令。",
+    "task_text_matches_playbook_v2": true,
+    "started_at": "2026-10-21T03:34:01+08:00",
+    "team_context_injected_by_host": true,
+    "host_injection_marker": "<team_task_context> 与 <member_request> 双段注入，mode=bootstrap，throughEventSeq=13",
+    "v1_team_selectable": "passed",
+    "v2_task_executed": "passed",
+    "v3_leader_selected": "passed",
+    "v3_members_activated": "not_observed",
+    "v3_detail": "本轮 03:33-03:40 窗口内该项目目录仅新增 leader 一个会话；4 名成员无独立执行会话。运行日志中 is_subagent=false，唯一 subagent 为宿主内置的 skill-evolution-fork，非 arvino 成员。leader 直接用 Bash/Glob/Read 自行完成了该只读任务，未派发到成员。",
+    "v3_root_cause": "已定位：编排侧，非成员绑定故障。leader 会话全量工具调用仅 7 次（Bash×5、Glob×1、Read×1），从未调用 send_discussion_agent_message 或 query_discussion；而宿主注入的 capabilities 数组中明确声明了 send_discussion_agent_message，协作插件与 collaboration:skills 也已挂载。即派发通道可用但未被使用——arvino-lead 的工作指令此前没有写明派发机制与「成员未回执即视为未派发」这一硬约束。已于 2026-10-21 在 arvino-lead.md 中补写派发契约；该修改需重贴到 Qoder 设置页的 arvino-lead 工作指令后才会生效。",
+    "v4_workspace_unchanged": "passed",
+    "v4_evidence": "git status --porcelain 计数 任务前后同为 4（2 modified + 2 untracked），与 2026-10-21 02:22 巡检基线一致，无新增条目",
+    "v5_heterogeneous_model": "not_verified",
+    "v5_detail": "本轮仅观测到 leader 一个模型：model profile e10829b3-752b-4022-bdbd-398393e2a864，运行日志解析为 minimax-m3.1-flash-cp / \"MiniMax-M3.1-Flash\"。tester 未被执行，无实际模型记录，异构条件无法判定。",
+    "v5_operator_report": "Arvin 2026-10-21 确认：arvino-tester 的默认模型已按操作卡绑为与实现者不同的模型家族。属操作者口述的配置事实，仍须等 tester 实际执行后从其会话 runtime-config 读回模型家族，才可勾选硬条件。",
+    "conclusion": "passed_with_blockers"
+  },
+
+  "model_observed": {
+    "scope": "仅 leader",
+    "model_profile_id": "e10829b3-752b-4022-bdbd-398393e2a864",
+    "resolved_model": "minimax-m3.1-flash-cp",
+    "display_name": "MiniMax-M3.1-Flash",
+    "source": "/Users/arvin/.qoder/logs/runs/2026-10-21T03-33-59-657+08-00-ku3mau-p86332/qodercli.log",
+    "caveat": "只观测到一个执行点，不能据此推断其余 4 个 agent profile 绑定的模型"
+  },
+
+  "per_agent_tool_permissions": {
+    "status": "not_verifiable_locally",
+    "reason": "Qoder 把自定义智能体的允许/禁止列表存在账号侧，本地无持久化配置、无 CLI、无注册 API，无法只读读回。",
+    "must_be_confirmed_by": "在 设置 > 智能体 逐个读回 tester 与 security 的禁止列表含 Edit 与 Write"
+  },
+
+  "not_verified": [
+    "成员（backend/frontend/devops/tester）能否被 leader 派发为独立执行会话 —— 本轮未观测到成员会话",
+    "tester 与 security 的异构模型实证 —— 两者均未执行，无实际运行模型记录",
+    "逐智能体工具权限的允许/禁止列表实际值（尤其 tester/security 禁 Edit/Write）",
+    "逐智能体文件路径强制隔离（官方文档确认无此 UI 字段，文件可达性取决于全局权限模式与逐命令审批）",
+    "业务写任务端到端",
+    "旧 Hermes 调度无双调度证明（firebird 值守 job 并发写问题见 takeover-approval-request.md §7.4）"
+  ],
+
+  "blocking_conditions": [
+    {"category": "技术配置", "condition": "成员派发链路未生效。根因已定位为 arvino-lead 工作指令缺失派发机制与「成员未回执即视为未派发」硬约束（不是成员未启用或未绑定本机）。已于 2026-10-21 在 arvino-lead.md 补写派发契约。", "release_evidence": "把更新后的 arvino-lead 工作指令重贴到 Qoder 设置页后，再跑一次必须由成员动手的团队任务；核对是否产生以该成员 agent_profile_id 对应身份运行的独立会话。"},
+    {"category": "模型与权限", "condition": "异构模型无实证。Arvin 已确认 tester 绑为不同家族，但 tester 从未执行，无实际运行模型家族记录。", "release_evidence": "成员会话的 runtime-config 记录其 model profile id 解析后的实际模型家族，与实现者不同方可勾选。"},
+    {"category": "模型与权限", "condition": "逐智能体工具权限禁止列表无法本地读回（账号侧存储，无 CLI、无注册 API）。", "release_evidence": "设置页读回快照 + 一次证明 tester 无法编辑被测实现的实测。"}
+  ],
+
+  "preconditions_check": {
+    "device_online": true,
+    "full_access_enabled": "not_changed_by_this_registration",
+    "login_or_subscription_changed": false,
+    "paid_model_probe_run": false,
+    "business_repo_written": false,
+    "commit_push_merge": false,
+    "hermes_schedule_touched": false
+  },
+
+  "unperformed_actions": [
+    "业务写任务",
+    "生产写",
+    "付费",
+    "commit/push/merge",
+    "数据库迁移",
+    "旧 Hermes 调度停领或改动"
+  ]
+}
