@@ -10,6 +10,7 @@
 
 1. **在 Qoder 设置页重贴十个角色的工作指令**（仓库文件已改，UI 不会自动同步）。
 2. **决定 11 个 blocked 看板任务**：补凭据、恢复执行，还是取消；并指定 firebird PR 审核由谁接。
+3. **考虑提高 Qoder 当日用量上限**：账号日配额在今天 16:05 用尽（新会话一律 403 `Billing daily count exceeded`），巡检已改用当前会话模型续命，但明天同一时点可能再次触顶。
 
 ## 进行中
 
@@ -25,7 +26,7 @@
 - **Operator API 已恢复**：owner/agent 拆成独立 secret key（`owner-token`/`token`，值不同，SealedSecret 已同步重封），api 滚动重启中断 59s、0 重启；owner 实测 `POST /runs` 201（`run-7067ae89b67d`）、`cancel` 200，agent 建 run 仍 403、读接口 200。→ [证据](t1-step-leases-evidence.md)
 - **GitOps 已收敛**：homelab main `88b3203` 同步 Deployment 引用与 SealedSecret；`arvino-orchestrator-gke` 已恢复 Synced（本次变更所致，不是未知带外改动）。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - **Telegram 提醒通道已纠正并验证**：根因是 chat id 配错（旧 id 已失效，非连接器故障）；24h 提醒改发 Arvin 私聊、巡检异常告警改发 k8sopenclaw 运维群，两处试发均成功。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
-- **巡检 job 已迁至新会话**：熔断恢复后仍无成功轮次（16:02→17:30 断档 88 分钟），根因是会话创建阶段失败（旧 job 模型桶配额 403 `Billing daily count exceeded`、auto 审批分类器 400）；已迁至 Full Access 新会话，17:30 轮成功。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
+- **巡检 job 已迁至新会话**：熔断恢复后仍无成功轮次（16:02→17:30 断档 88 分钟），根因是会话创建阶段失败（旧 job 模型桶配额 403 `Billing daily count exceeded`、auto 审批分类器 400）；已迁至 Full Access 新会话 `bd0998dd`，17:30 轮成功。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - T1 租约离线验收通过：claim/renew/release/reclaim、token 哈希、4h 总寿命、冲突审计、16 路并发压测。
 - 只读巡检已接管并持续运行（每 15 分钟；15:00 轮捕获 ArgoCD 漂移、15:15 轮确认恢复 Synced；17:30 轮为迁移后首轮成功，24h 提醒基线已建，下次到点约 10-22 11:20）。→ [指导书](status-inspection-prompt.md)
 - 单条治理红线已写入仓库 13 份角色文件；旧五条红线与 L0–L3 分级作废。
