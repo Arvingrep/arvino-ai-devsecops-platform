@@ -9,6 +9,7 @@ per-repository write mutex and read-only parallelism.
 
 from __future__ import annotations
 
+from datetime import timedelta
 from pathlib import Path
 
 import pytest
@@ -20,7 +21,7 @@ from arvino.domain import ConflictError, PolicyDeniedError, Principal, Principal
 from arvino.engine import CompletionResult
 from arvino.ports import StepOutcome
 from tests import payloads as P
-from tests.conftest import AGENT, OWNER, REPO, Env
+from tests.conftest import AGENT, OWNER, REPO, Env, build_env
 
 DEV = Principal(id="agent:developer", kind=PrincipalKind.AGENT, roles=("developer",))
 DEV2 = Principal(id="agent:developer-2", kind=PrincipalKind.AGENT, roles=("developer",))
@@ -347,6 +348,68 @@ def test_api_claim_complete_and_reclaim_contract(env: Env) -> None:
         json={"attempt": attempt, "status": "succeeded", "lease_token": token},
     )
     assert late.json()["result"] == "stale"
+
+
+# ----------------------------------------------------------------------------- limits & audit
+
+
+def test_claim_ttl_is_capped_by_max_lifetime() -> None:
+    env = build_env(lease_max_lifetime_seconds=120)
+    run_id = running_fast(env)
+    lease = env.engine.claim_step(run_id, "develop", DEV, ttl_seconds=3600)
+    assert lease.lease_expires_at == env.clock.now() + timedelta(seconds=120)
+    lock = repo_lock(env)
+    assert lock is not None
+    assert lock[3] == lease.lease_expires_at
+
+
+def test_renew_cannot_exceed_max_lifetime() -> None:
+    env = build_env(lease_max_lifetime_seconds=120)
+    run_id = running_fast(env)
+    lease = env.engine.claim_step(run_id, "develop", DEV, ttl_seconds=120)
+    env.clock.advance(100)
+    renewed = env.engine.renew_lease(
+        run_id, "develop", lease.lease_token, DEV, ttl_seconds=3600  # type: ignore[arg-type]
+    )
+    assert renewed.lease_expires_at == env.clock.now() + timedelta(seconds=20)
+
+    env.clock.advance(21)
+    with pytest.raises(ConflictError, match="maximum lifetime"):
+        env.engine.renew_lease(
+            run_id, "develop", lease.lease_token, DEV, ttl_seconds=60  # type: ignore[arg-type]
+        )
+    rejected = [e for e in env.engine.events(run_id) if e.type == "step.lease_renew_rejected"]
+    assert rejected and rejected[-1].payload["reason"] == "max_lifetime_exceeded"
+
+
+def test_claim_conflict_is_audited(env: Env) -> None:
+    run_id = running_fast(env)
+    env.engine.claim_step(run_id, "develop", DEV, ttl_seconds=60)
+    with pytest.raises(ConflictError, match="already leased"):
+        env.engine.claim_step(run_id, "develop", DEV2, ttl_seconds=60)
+    rejected = [e for e in env.engine.events(run_id) if e.type == "step.lease_claim_rejected"]
+    assert len(rejected) == 1
+    assert rejected[0].payload["reason"] == "already_leased"
+    assert rejected[0].payload["detail"]
+    assert rejected[0].actor == DEV2.id
+
+
+def test_role_denied_claim_is_audited(env: Env) -> None:
+    run_id = running_fast(env)
+    with pytest.raises(PolicyDeniedError):
+        env.engine.claim_step(run_id, "develop", READER, ttl_seconds=60)
+    rejected = [e for e in env.engine.events(run_id) if e.type == "step.lease_claim_rejected"]
+    assert rejected and rejected[-1].payload["reason"] == "role_denied"
+
+
+def test_repo_lock_conflict_is_audited(env: Env) -> None:
+    run1 = running_fast(env, "k1")
+    run2 = env.start(Profile.FAST, "k2")
+    env.engine.claim_step(run1, "develop", DEV, ttl_seconds=60)
+    with pytest.raises(ConflictError, match="write-locked"):
+        env.engine.claim_step(run2.id, "develop", DEV2, ttl_seconds=60)
+    rejected = [e for e in env.engine.events(run2.id) if e.type == "step.lease_claim_rejected"]
+    assert rejected and rejected[-1].payload["reason"] == "repo_locked"
 
 
 # ----------------------------------------------------------------------------- migration drill

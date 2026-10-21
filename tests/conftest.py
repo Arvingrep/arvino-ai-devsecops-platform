@@ -105,6 +105,7 @@ def build_env(
     executor: ScriptedExecutor | None = None,
     agent_accounts: frozenset[str] = frozenset(),
     clock: Clock | None = None,
+    lease_max_lifetime_seconds: int | None = None,
 ) -> Env:
     url = f"sqlite:///{tmp_path / 'test.db'}" if tmp_path else "sqlite://"
     sa = make_engine(url)
@@ -118,6 +119,12 @@ def build_env(
         RecordingNotifier(),
     )
     static = policy if policy is not None else StaticPolicy(allow=True)
+    engine_settings = EngineSettings(agent_accounts=agent_accounts)
+    if lease_max_lifetime_seconds is not None:
+        engine_settings = EngineSettings(
+            agent_accounts=agent_accounts,
+            lease_max_lifetime_seconds=lease_max_lifetime_seconds,
+        )
     engine = Engine(
         make_session_factory(sa),
         load_registry(),
@@ -130,7 +137,7 @@ def build_env(
             notifier=notifier,
         ),
         clock=clock,
-        settings=EngineSettings(agent_accounts=agent_accounts),
+        settings=engine_settings,
     )
     project = engine.create_project(
         "acme",

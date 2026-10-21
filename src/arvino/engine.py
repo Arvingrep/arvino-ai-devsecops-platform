@@ -94,6 +94,9 @@ _ERR_MAX = 2000
 # shorter lease but can never extend it beyond LEASE_TTL_MAX_SECONDS.
 LEASE_TTL_DEFAULT_SECONDS = 900
 LEASE_TTL_MAX_SECONDS = 3600
+# A lease can be renewed, but never past this hard deadline from first claim.
+# Without it a healthy-but-wrong holder could pin a step (and repo lock) forever.
+LEASE_MAX_LIFETIME_SECONDS = 4 * 3600
 # Reclaim requires positive stop evidence; mere lease expiry is NOT evidence.
 STOP_EVIDENCE_KINDS = frozenset({"terminated", "operator_declared"})
 # Steps whose executor may write to the repository.  Read/evaluation roles
@@ -102,6 +105,14 @@ REPO_WRITE_ROLES = frozenset(role.value for role in IMPLEMENTER_ROLES) | {
     "devops",
     "smartcontract",
 }
+
+
+class _LeaseConflict(ConflictError):
+    """Conflict raised by a lease action, carrying a stable audit reason."""
+
+    def __init__(self, reason: str, message: str) -> None:
+        super().__init__(message)
+        self.reason = reason
 
 
 def _hash_lease_token(token: str) -> str:
@@ -134,6 +145,8 @@ class EngineSettings:
     # When set, a spending approval is required once a run's cumulative API cost
     # exceeds this threshold. None means unlimited.
     budget_usd: float | None = None
+    # Hard cap on a single lease's total lifetime, measured from first claim.
+    lease_max_lifetime_seconds: int = LEASE_MAX_LIFETIME_SECONDS
 
 
 def _failed(error: str, *, retryable: bool = False, **output: Any) -> StepOutcome:
@@ -1760,6 +1773,41 @@ class Engine:
             raise ConflictError("ttl_seconds must be positive")
         return min(ttl_seconds, LEASE_TTL_MAX_SECONDS)
 
+    def _lease_lifetime_cap(self, anchor: datetime) -> datetime:
+        """Hard deadline for a lease that started at ``anchor``."""
+        max_lifetime = self.settings.lease_max_lifetime_seconds
+        if max_lifetime <= 0:
+            raise ConflictError("lease_max_lifetime_seconds must be positive")
+        return anchor + timedelta(seconds=max_lifetime)
+
+    def _record_lease_rejection(
+        self,
+        run_id: str,
+        step_key: str,
+        principal_id: str,
+        event_type: str,
+        reason: str,
+        detail: str,
+    ) -> None:
+        """Best-effort audit of a rejected lease action.
+
+        The main transaction has already rolled back, so this uses a fresh one;
+        failing to write the audit must not mask the original 4xx error.
+        """
+        try:
+            with transaction(self._sf) as s:
+                self._event(
+                    s,
+                    run_id,
+                    event_type,
+                    principal_id,
+                    step=step_key,
+                    reason=reason,
+                    detail=detail[:500],
+                )
+        except Exception:  # pragma: no cover - defensive
+            log.exception("failed to record %s for %s/%s", event_type, run_id, step_key)
+
     @staticmethod
     def _assert_claim_role(st: StepRow, principal: Principal) -> bool:
         """Authorise a claim by role and report whether the role was explicit.
@@ -1818,6 +1866,28 @@ class Engine:
         *,
         ttl_seconds: int | None = None,
     ) -> LeaseView:
+        """Claim a step, recording a rejection event when the claim loses."""
+        try:
+            return self._claim_step(run_id, step_key, principal, ttl_seconds=ttl_seconds)
+        except _LeaseConflict as exc:
+            self._record_lease_rejection(
+                run_id, step_key, principal.id, "step.lease_claim_rejected", exc.reason, str(exc)
+            )
+            raise
+        except PolicyDeniedError as exc:
+            self._record_lease_rejection(
+                run_id, step_key, principal.id, "step.lease_claim_rejected", "role_denied", str(exc)
+            )
+            raise
+
+    def _claim_step(
+        self,
+        run_id: str,
+        step_key: str,
+        principal: Principal,
+        *,
+        ttl_seconds: int | None = None,
+    ) -> LeaseView:
         """Atomically claim a running agent step for an external executor.
 
         The plaintext token is returned exactly once and only its SHA-256 is
@@ -1828,31 +1898,38 @@ class Engine:
         token = secrets.token_urlsafe(32)
         token_hash = _hash_lease_token(token)
         now = self._now()
-        expires_at = now + timedelta(seconds=ttl)
+        expires_at = min(
+            now + timedelta(seconds=ttl), self._lease_lifetime_cap(now)
+        )
         with transaction(self._sf) as s:
             run = self._lock_run(s, run_id)
             st = self._step(run, step_key)
             if st.kind != StepKind.AGENT.value:
-                raise ConflictError("only agent steps can be claimed")
+                raise _LeaseConflict("not_claimable", "only agent steps can be claimed")
             if RunStatus(run.status).terminal:
-                raise ConflictError(f"run {run_id} is terminal")
+                raise _LeaseConflict("not_claimable", f"run {run_id} is terminal")
             if st.status != StepStatus.RUNNING.value:
-                raise ConflictError(
-                    f"step {step_key!r} is {st.status}; only running steps can be claimed"
+                raise _LeaseConflict(
+                    "not_claimable",
+                    f"step {step_key!r} is {st.status}; only running steps can be claimed",
                 )
             if st.not_before is not None and st.not_before > now:
-                raise ConflictError(f"step {step_key!r} is not yet runnable")
+                raise _LeaseConflict(
+                    "not_claimable", f"step {step_key!r} is not yet runnable"
+                )
 
             if st.executor_lease_token_hash is not None:
                 held_until = st.executor_lease_expires_at
                 if held_until is not None and held_until <= now:
-                    raise ConflictError(
+                    raise _LeaseConflict(
+                        "lease_expired",
                         f"lease on {step_key!r} expired at {held_until.isoformat()}; "
-                        "operator reclaim with stop evidence is required"
+                        "operator reclaim with stop evidence is required",
                     )
                 suffix = f" until {held_until.isoformat()}" if held_until else ""
-                raise ConflictError(
-                    f"step {step_key!r} is already leased by {st.executor_principal!r}{suffix}"
+                raise _LeaseConflict(
+                    "already_leased",
+                    f"step {step_key!r} is already leased by {st.executor_principal!r}{suffix}",
                 )
 
             role_verified = self._assert_claim_role(st, principal)
@@ -1864,15 +1941,17 @@ class Engine:
                 lock = s.get(RepoWriteLockRow, repo_key)
                 if lock is not None:
                     if lock.expires_at <= now:
-                        raise ConflictError(
+                        raise _LeaseConflict(
+                            "repo_lock_expired",
                             f"repository {repo_key!r} is write-locked by "
                             f"{lock.executor_principal!r} until {lock.expires_at.isoformat()}; "
-                            "operator reclaim is required"
+                            "operator reclaim is required",
                         )
-                    raise ConflictError(
+                    raise _LeaseConflict(
+                        "repo_locked",
                         f"repository {repo_key!r} is write-locked by "
                         f"{lock.executor_principal!r} (run {lock.run_id}, step {lock.step_key}) "
-                        f"until {lock.expires_at.isoformat()}"
+                        f"until {lock.expires_at.isoformat()}",
                     )
                 s.add(
                     RepoWriteLockRow(
@@ -1889,8 +1968,9 @@ class Engine:
                 try:
                     s.flush()
                 except IntegrityError as exc:
-                    raise ConflictError(
-                        f"repository {repo_key!r} was write-locked concurrently"
+                    raise _LeaseConflict(
+                        "repo_lock_race",
+                        f"repository {repo_key!r} was write-locked concurrently",
                     ) from exc
 
             prev_attempt = st.attempt
@@ -1912,7 +1992,9 @@ class Engine:
                 .execution_options(synchronize_session=False)
             )
             if res.rowcount != 1:  # type: ignore[attr-defined]
-                raise ConflictError(f"step {step_key!r} was claimed concurrently")
+                raise _LeaseConflict(
+                    "claim_race", f"step {step_key!r} was claimed concurrently"
+                )
             self._event(
                 s,
                 run_id,
@@ -1945,11 +2027,30 @@ class Engine:
         *,
         ttl_seconds: int | None = None,
     ) -> LeaseView:
+        """Renew a lease, auditing a rejection that hits the lifetime cap."""
+        try:
+            return self._renew_lease(
+                run_id, step_key, lease_token, principal, ttl_seconds=ttl_seconds
+            )
+        except _LeaseConflict as exc:
+            self._record_lease_rejection(
+                run_id, step_key, principal.id, "step.lease_renew_rejected", exc.reason, str(exc)
+            )
+            raise
+
+    def _renew_lease(
+        self,
+        run_id: str,
+        step_key: str,
+        lease_token: str,
+        principal: Principal,
+        *,
+        ttl_seconds: int | None = None,
+    ) -> LeaseView:
         """Extend a live lease.  Expired leases cannot be renewed (reclaim first)."""
         ttl = self._lease_ttl(ttl_seconds)
         token_hash = _hash_lease_token(lease_token)
         now = self._now()
-        expires_at = now + timedelta(seconds=ttl)
         with transaction(self._sf) as s:
             run = self._lock_run(s, run_id)
             st = self._step(run, step_key)
@@ -1963,10 +2064,18 @@ class Engine:
                 raise ConflictError("lease token mismatch")
             if st.executor_attempt != st.attempt:
                 raise ConflictError("lease attempt is stale")
+            cap = self._lease_lifetime_cap(st.executor_claimed_at or now)
+            if now >= cap:
+                raise _LeaseConflict(
+                    "max_lifetime_exceeded",
+                    "lease reached its maximum lifetime; "
+                    "operator reclaim with stop evidence is required",
+                )
             if st.executor_lease_expires_at is None or st.executor_lease_expires_at <= now:
                 raise ConflictError(
                     "lease expired; operator reclaim with stop evidence is required"
                 )
+            expires_at = min(now + timedelta(seconds=ttl), cap)
             res = s.execute(
                 update(StepRow)
                 .where(
