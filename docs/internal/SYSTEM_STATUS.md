@@ -1338,3 +1338,13 @@
   - 24h 提醒：**未发送**。reminders 基线 `2026-10-21T03:20:41Z` 距今约 12.7h <24h，11 个 blocked 任务均无 due；下批约 `2026-10-22T03:20:41Z`。异常告警未发：本轮无「正常→异常」转换。Telegram `hermes send` 通道 15:04 记录的 `Chat not found` 仍未重测（无待发内容），送达能力仍待 Arvin 修复。
   - 与上一条台账（15:46 PST）差异：**无**（仅 blocked 龄自然增长、ArgoCD `reconciledAt` 例行前移）。距 `state.last_run_utc`(07:48:48Z/15:48 PST) 约 13 分钟 <45 分钟，**无巡检断档**；15:46 条目记录的 8.2h 断档后已连续 3 轮（15:46 起 state 计时）正常触发。人类速览 `STATUS_SUMMARY.md` 未修改（无实质进展）。
   - 本条目由 Qoder 本地定时任务 job 10ea8cf0-46f9-4014-b4a4-6d3293d39b7a 生成；只读巡检，未 dispatch/未认领/未恢复 Hermes。
+- **2026-10-21 16:55+0800 总监执行：Telegram 提醒通道纠正并验证（一次性配置错误，结案）**
+  - **根因**：不是连接器故障，而是目标 chat id 配错。旧目标 `telegram:-1004348153434`（历史记录中的「Arvino 群」）已失效，调用返回 Chat not found；`hermes send --list telegram` 现在只列 `telegram:Arvin [2057618975]` 与 `telegram:k8sopenclaw [-1003843122779]`（Arvin 2026-10-21 实测）。
+  - **纠正**：`contrib/qoder-agent-team/status-inspection-prompt.md` 第 5 步按语义分流——24h blocked 提醒（需 Arvin 决策，含任务 id 与卡住时长）发 **Arvin 私聊 `telegram:2057618975`**；巡检异常告警（基础设施状态）发 **运维群 `telegram:-1003843122779`**，群发失败再回退私聊一次，两处都失败才记「告警发送失败」。决策类内容不进运维群，避免内部积压明细扩散。
+  - **验证**：两个目标各试发一条通道验证消息，均返回 `sent`、exit 0（私聊 1 条 + 群 1 条，内容仅说明通道修复，非告警）。
+  - **结案**：15:04/15:20 条目记录的「Telegram 通道不可达、需 Arvin 修复」不再成立，已从阻塞项移除。台账中此前出现的 `telegram:-1004348153434` 均属历史记录，现行目标以本条与指导书为准。
+  - **残留**：旧 Hermes job `0c82db48c322`（仍 paused）的 prompt 内仍是旧 chat id；将来若恢复该 job，必须先同步纠正，否则会重犯。
+- **2026-10-21 16:55+0800 巡检链路缺口（已定位并恢复）：15m 巡检 job 曾被熔断暂停**
+  - Qoder 本地 job `10ea8cf0-46f9-4014-b4a4-6d3293d39b7a` 在 16:45 轮报 `lastRunStatus=failed`、`lastError={"type":"session-failed"}`、`consecutiveFailures=3` → 被熔断置为 `enabled=false / pauseReason=failureCircuit`；**16:02 之后台账再无自动追加，巡检实际停摆约 1 小时**（15:46 条目也记录过 8.2h 断档，该 job 稳定性是已知弱项）。
+  - 影响：看板/GKE/ArgoCD/PR 只读巡检与 24h 提醒基线维护中断；reminders 下批到期约 2026-10-22T03:20:41Z，到期前无内容可发，实质影响有限。
+  - **处置**：16:55 已 `enable` 该 job（`pauseReason` 清空、`consecutiveFailures` 归零、`nextRunAt`=17:00+0800），并立即手动触发一轮验证。失败点在会话创建阶段（约 3.5s 即 session-failed），不是巡检内容或权限问题；恢复后需观察后续几轮是否再熔断，若复现则改换模型/执行位置或改为手动巡检兜底。

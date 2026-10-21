@@ -40,9 +40,10 @@
 
 5. 24h 提醒与告警
 - 首次运行（state.reminders 不存在）：不要发送任何提醒或异常告警，只建立基线。把当前所有 blocked/stranded 任务的 reminders[task_id] 设为当前 UTC，把当前健康/镜像/schema/ArgoCD 状态写入 state.alerts 基线（值为当前 UTC），并在台账写明「接管基线已建立，24h 计时与异常去重从本轮起算；历史提醒记录保留在本台账」。之后每轮才比较和发送。
-- 有 due 任务时，发送一条汇总消息（最多 8 个，按 age 降序）：/Users/arvin/.local/bin/hermes send --to telegram:-1004348153434 "…"。内容含任务 id、卡住小时数、title 前缀、需要什么决定；不含 body、密钥或私有账号。发送成功才把全部 due 任务标记为当前 UTC；失败记「提醒发送失败」但不中断巡检。
-- 健康从正常变异常、镜像漂移、B3=false、schema 不符、pods 非 Ready、ArgoCD 真实非 Healthy → 发一条「⚠ Arvino 巡检异常」到同一目标；同一异常 24h 内不重复（state.alerts[key]=last_sent_utc）。无变化不发消息。
+- 有 due 任务时，发送一条汇总消息（最多 8 个，按 age 降序）：/Users/arvin/.local/bin/hermes send --to telegram:2057618975 "…"（**Arvin 私聊**）。内容含任务 id、卡住小时数、title 前缀、需要什么决定；不含 body、密钥或私有账号。决策类内容只发决策人私聊，不进运维群，避免内部积压明细扩散。发送成功才把全部 due 任务标记为当前 UTC；失败记「提醒发送失败」但不中断巡检。
+- 健康从正常变异常、镜像漂移、B3=false、schema 不符、pods 非 Ready、ArgoCD 真实非 Healthy → 发一条「⚠ Arvino 巡检异常」到运维群：/Users/arvin/.local/bin/hermes send --to telegram:-1003843122779 "…"；群发失败再回退一次 Arvin 私聊 telegram:2057618975，两处都失败才记「告警发送失败」。同一异常 24h 内不重复（state.alerts[key]=last_sent_utc）。无变化不发消息。
 - 已知基线不算异常：gitea 525、审批 webhook 404、ArgoCD 应用级陈旧 Degraded、image-updater ComparisonError、firebird-manila 以 GitHub main 为源、agent-canvas 仅本机 8080。
+- 通道纠正（2026-10-21，Arvin 实测）：旧目标 `telegram:-1004348153434`（Arvino 群）已失效，报 Chat not found；`hermes send --list telegram` 现在只列 `telegram:Arvin [2057618975]` 与 `telegram:k8sopenclaw [-1003843122779]`。两个新目标均已试发成功；不要再用旧 id，也不要自行猜测其它 chat id。
 
 6. 追加台账（只增不删）
 - 用 cat >> docs/internal/SYSTEM_STATUS.md <<'EOF' 追加到文件末尾；绝不改写、重排或删除已有行。
