@@ -1222,3 +1222,13 @@
   - 24h 提醒：reminders/alerts 基线为 2026-10-21T03:20:41Z，距今约 132 分钟 <24h，无 due 任务；本轮全部检查正常无「正常→异常」转移，未发送任何消息。下一提醒窗口约 2026-10-22T03:20:41Z。
   - 与上一条台账（13:15 PST）差异：**无变化**。距 state.last_run_utc(05:16:30Z) 约 17 分钟，<45 分钟，无巡检断档。
   - 本条目由 Qoder 本地定时任务 job 10ea8cf0-46f9-4014-b4a4-6d3293d39b7a 生成；只读巡检，未 dispatch/未认领/未恢复 Hermes。
+
+- **2026-10-21 13:45 PST（本次，无状态变化）**
+  - 看板 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`running=0`、近 60 分钟 `claimed=0`、stranded `ready=0` → **无双调度风险**。11 项 blocked 全部 ≥24h，age（按 created_at，epoch 秒计算）：`t_a36d7ed7`(105h)、`t_0f5b931b`(104h)、`t_188c5a78`(100h)、`t_ecaabae7`(66h, cf=2, pid 22099 not alive)、`t_477917c2`(65h)、`t_f2717f22`(65h)、`t_f01dcf8f`(38h)、`t_b4e33024`(36h)、`t_a18cdf9c`(34h)、`t_071d0e68`(34h)、`t_71f47a4b`(34h)。未 dispatch、未 unblock、未清 cf。看板计数查询需 `immutable=1` 重试（ro 首试打开失败），明细查询正常。
+  - GKE 无退化：api/worker/opa/postgres 全 Running/Ready、0 重启（与 state 一致）；api/worker 镜像 `…/arvino:e8fa6e6f3839` 无漂移。Temporal 7 pods 全 Running，frontend 旧 3 次重启（6d2h 前）未增加。B3 读回 `takeover_external_only=True` / `adapters=queue`。DB `alembic=c3d4e5f6a7b8` / `executor%`=5 / `repo_write_locks` 存在。
+  - HTTP 关键码无退化：arvino `healthz/readyz/docs/dashboard/ui`=200、n8n=200、canary `/shop`/`/house`=200、`git.k8shome.com`=302、agent-canvas(8080)=200；`gitea.k8shome.com`=525 为已知基线；审批 webhook 404 未复查（POST 越界），沿用基线。
+  - ArgoCD 无真实变化：`arvino-orchestrator-gke` 应用级 Synced/Degraded（陈旧状态位，无 conditions），status.resources 15/15 全 Synced、无非 Healthy；`firebird-canary`/`firebird-manila` Synced/Healthy；`argocd-image-updater` Unknown/Healthy（已知 ComparisonError，PR#218 待修）。
+  - PR：GitHub open=5 / mergeable=5（#29/#28/#26/#25/#23）；Gitea `homelab` open=14 / mergeable=8、`firebird-sea` open=2 / mergeable=2（只读脚本 `scripts/gitea-open-prs.sh` 正常，无凭据输出）。
+  - 24h 提醒：11 项 blocked 均在 2026-10-21T03:20:41Z 已提醒，距今约 135 分钟 <24h → **本轮无 due 提醒、未发送**；下一窗口约 2026-10-22T03:20:41Z。无正常→异常转换，无异常告警发送。
+  - 与上一条台账（13:33 轮）差异：**无**。巡检距上轮约 12 分钟（<45，无断档）。
+  - 本条目由 Qoder 本地定时任务 job 10ea8cf0-46f9-4014-b4a4-6d3293d39b7a 生成；只读巡检，未 dispatch/未认领/未恢复 Hermes。
