@@ -1327,3 +1327,14 @@
   - 24h 提醒：**未发送**。reminders 基线 `2026-10-21T03:20:41Z` 距今约 12.5h <24h，11 个 blocked 任务均无 due；下批约 `2026-10-22T03:20:41Z`。异常告警未发：本轮无「正常→异常」转换，断档为巡检任务自身状态。另：Telegram `hermes send` 通道 15:04 记录的 `Chat not found` 仍未重测（无待发内容），送达能力仍待 Arvin 修复。
   - 与上一条台账（15:30 PST）差异：① **巡检断档 8.2 小时**（本轮为首个后续轮次）；② 各检查项数值全部相同，仅 blocked 龄自然增长、ArgoCD `reconciledAt` 与 GitHub #29 `updatedAt` 例行前移。人类速览 `STATUS_SUMMARY.md` 未修改：断档不算第 7 步所列实质进展类型，且无部署/镜像/配置/PR/任务归属变化。
   - 本条目由 Qoder 本地定时任务 job 10ea8cf0-46f9-4014-b4a4-6d3293d39b7a 生成；只读巡检，未 dispatch/未认领/未恢复 Hermes。
+
+- **2026-10-21 16:02 PST（本次，无状态变化）**
+  - 看板（只读，`mode=ro` 打不开、`mode=ro&immutable=1` 重试一次成功）：done 159 / blocked 11 / todo 5 / archived 1，running 0、ready/triage/review 0；`task_events` 近 60 分钟 `claimed`=0、stranded ready=0 → **无**「⚠ 双调度风险」。blocked 24h+ 仍 11 项，龄 107.9/107.2/102.7/69.0/67.4/67.4/40.9/38.5/36.5/36.4/36.3h（自然增长）；仅 `t_ecaabae7` consecutive_failures=2，last_failure 仍为同一「pid 22099 not alive」类错误（非新增）。未 dispatch、未 unblock、未编辑任务。
+  - GKE **无退化**：arvino 4 pods 全 Running/Ready、restarts 全 0（与 state 持平）；deploy/sts 副本 1/1；api/worker 镜像 `e8fa6e6f3839` **无漂移**，opa `latest-static`、postgres `16-alpine` 不变。Temporal 7 pods 全 Running、非 Running=0、frontend 重启 3（历史值持平）。
+  - B3 读回：`takeover_external_only= True`、`adapters= queue` 符合期望（未读取/打印任何 env 值或 Secret）。DB：alembic `c3d4e5f6a7b8`、steps `executor%` 列 5、`repo_write_locks` 在位，三项符合。
+  - HTTP（仅状态码）：arvino healthz/readyz/docs/dashboard/ui 全 200；n8n 200；canary /shop、/house 200；git.k8shome.com 302；本机 8080 200；gitea 525（已知基线）→ **无退化**。审批 webhook 需 POST、越只读边界，沿用 state 基线 404 未重测。
+  - ArgoCD **无真实变化**：`arvino-orchestrator-gke` Synced/Degraded@`88b32039f43d`；应用级 `health.lastTransitionTime` 仍 `2026-10-19T15:31:37Z`、conditions 空 → 陈旧状态位（已知基线）；`reconciledAt=2026-10-21T07:58:50Z`（例行前移）；资源级 15/15 全 Synced、无非 Healthy 资源。`firebird-canary`、`firebird-manila` Synced/Healthy；`argocd-image-updater` Unknown/Healthy（已知 ComparisonError，PR#218 待修）。其余应用全 Synced/Healthy。未 sync、未修改 Application。
+  - PR（只读）：GitHub open 5 / mergeable 5 / 0 draft（#29 #28 #26 #25 #23），与基线一致（#29 updatedAt 为 07:48Z 上轮推送）。Gitea 经 `./scripts/gitea-open-prs.sh` 实读成功：homelab open 14 / mergeable 8、firebird-sea open 2 / mergeable 2，与基线完全一致；输出无凭据。未创建/合并/评论任何 PR。
+  - 24h 提醒：**未发送**。reminders 基线 `2026-10-21T03:20:41Z` 距今约 12.7h <24h，11 个 blocked 任务均无 due；下批约 `2026-10-22T03:20:41Z`。异常告警未发：本轮无「正常→异常」转换。Telegram `hermes send` 通道 15:04 记录的 `Chat not found` 仍未重测（无待发内容），送达能力仍待 Arvin 修复。
+  - 与上一条台账（15:46 PST）差异：**无**（仅 blocked 龄自然增长、ArgoCD `reconciledAt` 例行前移）。距 `state.last_run_utc`(07:48:48Z/15:48 PST) 约 13 分钟 <45 分钟，**无巡检断档**；15:46 条目记录的 8.2h 断档后已连续 3 轮（15:46 起 state 计时）正常触发。人类速览 `STATUS_SUMMARY.md` 未修改（无实质进展）。
+  - 本条目由 Qoder 本地定时任务 job 10ea8cf0-46f9-4014-b4a4-6d3293d39b7a 生成；只读巡检，未 dispatch/未认领/未恢复 Hermes。
