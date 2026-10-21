@@ -4,6 +4,8 @@ Multi-project agile AI development, operations, and maintenance platform for a s
 
 **Not another AI company wrapper.** This is a thin orchestration layer that coordinates Plane, Temporal, OpenHands/Claude Code, Gitea/GitHub, OPA, Trivy, Argo CD and Nightingale — it only owns what no existing tool owns: workflow DAGs, the cross-tool run ledger, and the invariants between them.
 
+> **当前接管进度（给人看的一页速览）**：[contrib/qoder-agent-team/STATUS_SUMMARY.md](contrib/qoder-agent-team/STATUS_SUMMARY.md)
+
 ## Architecture
 
 ```

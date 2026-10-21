@@ -26,6 +26,8 @@
 | 2026-10-21 | 接管 | Hermes cron `0c82db48c322`(看板每15分钟只读巡检)保持暂停,由 Qoder 本地定时任务 job `10ea8cf0-46f9-4014-b4a4-6d3293d39b7a` 接管同等范围的只读健康检查,并继续只增不删地写 SYSTEM_STATUS.md；周期 `*/15 * * * *`(Asia/Shanghai),Auto Approval(非 Full Access),到期 2026-12-31；指导书 `contrib/qoder-agent-team/status-inspection-prompt.md`；回退方式是 `hermes cron resume 0c82db48c322`(两条巡检不得同时启用)；首跑证据在 SYSTEM_STATUS.md 11:15/11:19 PST 条目 | Qoder 总监值班 | ⬜ 待审 |
 | 2026-10-21 | 修复 | 首跑发现 Auto Approval 分类器拦截 inline keychain 读取,导致 Gitea PR 无法检查；新增只读脚本 `scripts/gitea-open-prs.sh`(运行时读 keychain、token 不回显不落盘、退出即失效),巡检指导书 §4 改为调用该脚本,不再自行拼 curl | Qoder 总监值班 | ⬜ 待审 |
 
+| 2026-10-21 | 新增 | 面向人类的单页状态快照 `contrib/qoder-agent-team/STATUS_SUMMARY.md`：只保留「进行中/已完成/未开始/被阻塞」四段，每项一行，技术证据外链；**覆盖式更新，无实质进展不动**；巡检第 7 步在实质进展时同步更新并随台账提交；SYSTEM_STATUS.md 与 README 增加入口。台账 SYSTEM_STATUS.md 仍保持只增不删 | Qoder 总监值班 | ⬜ 待审 |
+
 ## 变更规则(后续所有LLM/Agent必须遵守,写入skill同步生效)
 
 1. **先写变更记录,再动手，或至少动手后、报告给Arvin前必须补上** — 没有记录的变更一律视为"未发生"，下次巡检发现没记录的改动要撤销或补记录后才算数。
