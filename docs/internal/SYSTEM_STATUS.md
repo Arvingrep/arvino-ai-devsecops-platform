@@ -1305,3 +1305,13 @@
   - **GH_TOKEN**：Arvin 已确认在 GitHub 侧 Regenerate，旧值失效；顶部 11:30 告警解除。剩余 PR#222/#219 的 `secretKeyRef` 改造仍随 PR 队列审核合并。
   - **未变/未验证**：claim/renew/complete 路径未受影响；真实业务仓库写、T1 自动派发、tester 异构模型实证仍未开始。Arvino 标准/治理流虽有 `qa`/`security` agent 步骤，但目前由同一外部队列执行；Qoder 团队 tester 需 UI 指令重贴后接入并读回实际模型家族。
   - 详细证据：`contrib/qoder-agent-team/t1-step-leases-evidence.md` §9；人类速览 `STATUS_SUMMARY.md` 已同步。
+- **2026-10-21 15:30 PST（本次，1 项变化：Gitea PR 核查由 GITEA_API_EMPTY 恢复实读成功，其余全部与基线一致）**
+  - 看板（只读，`mode=ro` 直连一次成功）：done 159 / blocked 11 / todo 5 / archived 1，running 0、ready/triage/review 0；claimed_60m=0、stranded ready=0 → 无「⚠ 双调度风险」。blocked 24h+ 仍 11 项，龄 107.4/106.7/102.2/68.5/66.9/66.9/40.4/38.0/36.0/35.9/35.8h（自然增长）；仅 `t_ecaabae7` consecutive_failures=2，last_failure 仍为 worker pid 不存活类（与基线同一错误，非新增）。未 dispatch、未 unblock、未编辑任务。
+  - GKE 无退化：arvino 4 pods 全 Running/Ready、restarts 全 0（与 state 持平）；deploy/sts 副本 1/1；api/worker 镜像 `e8fa6e6f3839` 无漂移；opa `latest-static`、postgres `16-alpine` 不变。Temporal 7 pods 全 Running、非 Running=0、frontend 重启 3（历史值持平）。
+  - B3 读回：`takeover_external_only= True`、`adapters= queue` 符合期望（未读取/打印任何 env 或 Secret）。DB：alembic `c3d4e5f6a7b8`、steps `executor%` 列 5、`repo_write_locks` 在位，三项符合。
+  - HTTP（仅码）：arvino healthz/readyz/docs/dashboard/ui 全 200；n8n 200；canary /shop、/house 200；git.k8shome.com 302；本机 8080 200；gitea 525（已知基线）→ **无退化**。审批 webhook 需 POST、越只读边界，沿用 state 基线 404 未重测。
+  - ArgoCD 无真实变化：`arvino-orchestrator-gke` Synced/Degraded@`88b32039f43d`，应用级 `health.lastTransitionTime` 仍 `2026-10-19T15:31:37Z`、conditions 空、`reconciledAt=2026-10-21T07:28:46Z`；资源级复核 15/15 全 Synced、无非 Healthy 资源（陈旧状态位，已知基线；该 revision 即 15:22 总监执行条目所述的 owner/agent token 拆分提交，provenance 已由该条目明确）。`firebird-canary`/`firebird-manila` Synced/Healthy，`argocd-image-updater` Unknown/Healthy（已知 ComparisonError，PR#218）。其余应用全 Synced/Healthy。未 sync、未改 Application。
+  - PR：GitHub open 5 / mergeable 5 / 0 draft（#29 #28 #26 #25 #23，#29 updatedAt 前移系本分支台账 commit 推送）。Gitea 经 `./scripts/gitea-open-prs.sh` **实读恢复成功**：homelab open 14 / mergeable 8、firebird-sea open 2 / mergeable 2，与基线完全一致；输出无凭据。未创建/合并/评论 PR。
+  - 24h 提醒：**未发送**。reminders 基线 `2026-10-21T03:20:41Z` 距今约 4.2h <24h，无 due 项；下批约 `2026-10-22T03:20:41Z`。异常告警未发：本轮无「正常→异常」转换（Gitea 恢复属好转方向）。上轮记录的 Telegram `Chat not found` 通道问题仍未重测（无待发内容），送达能力待 Arvin 修复。
+  - 与上一条台账（15:20 巡检 / 15:22 总监执行）差异：① Gitea PR 核查由 GITEA_API_EMPTY 恢复实读成功；② 15:20 条目对 `88b32039f43d` 的「自动 sync、来源待核」推测已被 15:22 总监执行条目证实为人工操作，风险项解除。其余系统状态无变化；blocked 龄自然增长。距 `state.last_run_utc`(07:21:12Z) 约 9 分钟 <45 分钟，**无巡检断档**。
+  - 本条目由 Qoder 本地定时任务 job 10ea8cf0-46f9-4014-b4a4-6d3293d39b7a 生成；只读巡检，未 dispatch/未认领/未恢复 Hermes。
