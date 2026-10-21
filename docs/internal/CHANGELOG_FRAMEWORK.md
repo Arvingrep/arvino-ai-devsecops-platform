@@ -189,3 +189,16 @@
 | 2026-10-21 | 核验 | **旧红线措辞残留复核**：在 `contrib/qoder-agent-team/` 与 `docs/internal/` 全量 grep「不花钱 / 不碰生产 / 不绕过 QA / 不自己合并 / 逐条批准 / 逐动作人工审批 / 无 commit/push 授权」。保留项仅限三类：(a) `CHANGELOG_FRAMEWORK.md` 与 `SYSTEM_STATUS.md` 的历史条目；(b) `automation-dispatch-design.md` 中巡检 job 自身的只读范围声明；(c) legacy 角色「废弃角色没有执行授权」。其余为 0 处。 | Qoder 总监 | 待 Arvin 审 |
 | 2026-10-21 | 安全 | **密钥事件**：本会话早前一次读取 live env 的命令将 `GH_TOKEN` 明文带入会话记录。已当场停止后续取值、只保留键名引用；**须由 Arvin 立即吊销并轮换该 token**。该值未写入任何仓库文件、台账或报告，也不得在本项目任何后续输出中复述。 | Qoder 总监 | ⚠ 待 Arvin 轮换 |
 | 2026-10-21 | 记录更正 | 上一行「旧红线措辞残留复核」把保留项写成三类，实际实测为**四类**：除 (a) CHANGELOG/SYSTEM_STATUS 历史条目、(b) `automation-dispatch-design.md` 中巡检 job 自身的只读范围、(c) legacy 角色「废弃角色没有执行授权」外，还有 (d) `TEAM.md`、`approval-request-template.md`、`redline-release-policy-proposal.md`、`takeover-approval-request.md` 中**引用被取消的五条以说明其已作废**的表述。按定义性说明保留，不视为残留。除此之外为 0 处。 | Qoder 总监 | 待 Arvin 审 |
+
+## 2026-10-21 10:47 接管部署 + 旧调度暂停（执行记录）
+
+技术依据：Arvin 在本会话回复「确认开始，按链路执行接管迁移」。本节登记镜像构建、GitOps 部署、B3 开关、部署验收与旧调度暂停；所有命令与结果均为本机实测。
+
+| 日期 | 类型 | 内容 | 操作者 | Arvin审核 |
+|---|---|---|---|---|
+| 2026-10-21 | 构建 | 从 `.worktrees/t1-step-leases`（HEAD `e8fa6e6f3839932ae2bbda3e99b5bed46f725e02`）以 `linux/amd64` 构建并推送 `.../arvino:e8fa6e6f3839`；index digest `sha256:75bffd04…`，amd64 manifest `sha256:95c4fb74…`。构建上下文包含 `alembic.ini` 与 `alembic/`，不会重现 #27 的启动崩溃。 | Qoder 总监 | 待 Arvin 知会 |
+| 2026-10-21 | 部署 | **GitOps 变更**：homelab `apps/arvino-orchestrator/manifests-gke/01-all.yaml`、`kustomization.yaml` 与 `application-gke.yaml` 更新，commit `f075222` 推送 Gitea main；api/worker 增加 `ARVINO_TAKEOVER_EXTERNAL_ONLY=true`，镜像 tag 改为 `e8fa6e6f3839`。ArgoCD `arvino-orchestrator-gke` 手动 sync 成功，`sync.revision = f075222c82e1…`。未恢复 automated sync，保留人工闸。 | Qoder 总监 | 待 Arvin 知会 |
+| 2026-10-21 | 验收 | api/worker 均 1/1 Running、0 重启，运行镜像与推送 digest 一致；`/healthz` 与 `/readyz` 200，readyz 显示 `adapters=queue`；两个 pod 内 readback `takeover_external_only=True`；OpenAPI 暴露 claim/renew/release/reclaim/complete；未授权 claim 返回 401（非 404）；`alembic_version=c3d4e5f6a7b8`、5 个 `executor_*` 列、`repo_write_locks` 均在。**未做**活库真实 claim→complete 演练。ArgoCD 应用级 health 仍为旧的 Degraded（`lastTransitionTime=2026-10-19T15:31:37Z`，所有资源 Synced/Healthy），判定为陈旧状态位，不伪造健康。 | Qoder 总监 | 待 Arvin 知会 |
+| 2026-10-21 | 停调度 | `1ee96fd19f7f`（每 3 分钟）、`1972eac66c26`（夜间）、`0c82db48c322`（看板值守，每 15 分钟）于 10:42 全部 `paused`；最后执行 firebird 10:40:24、看板 10:28:24。观察至 10:46:37，firebird 两个 3 分钟周期与看板一个 15 分钟周期均无新执行；看板 running=0、近 45 分钟 task_events=0。恢复：`hermes cron resume <id>`。 | Qoder 总监 | 待 Arvin 知会 |
+| 2026-10-21 | 安全 | **同一密钥再次外泄到会话记录**：两次只读 Deployment env 的命令把 live `GH_TOKEN` 明文带入输出（其中一次是核对 B3 env 时被过滤条件带出）。已停止继续读取 env 值；该值未写入仓库/台账/报告。**轮换仍未执行，须立即吊销**；后续只允许读取键名，任何命令不得打印 env 值。 | Qoder 总监 | ⚠ 待 Arvin 轮换 |
+| 2026-10-21 | 未验证 | 首次真实业务任务：活库 `claim→renew→complete`、harness 实际认领、firebird-sea 仓库写、CI/QA/安全门禁与独立验收、回滚演练；自动周期派发（T1 调度层）未接线，当前为总监手动派发。A6 十角色注册/成员派发/异构模型读回与 Qoder 设置页重贴仍待人工。以上均**不得**写成已完成。 | Qoder 总监 | 待 Arvin 审 |

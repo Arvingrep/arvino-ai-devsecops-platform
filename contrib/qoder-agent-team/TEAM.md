@@ -27,11 +27,11 @@
 
 解除第 1、2 条只需再跑一次**必须由成员动手**的团队任务并读回成员的运行模型；解除第 3 条需设置页读回快照。
 
-## 1.2 治理与实施现状（2026-10-21 09:44 实测；与本文件其余章节冲突时以本节为准）
+## 1.2 治理与实施现状（2026-10-21 10:43 实测；与本文件其余章节冲突时以本节为准）
 
 1. **红线已收窄为单条并完成本地同步**。Arvin 在本会话明确确认（此前 Hermes 侧也已两次 clarify）：红线由 6 条收窄为 1 条，仅保留**不泄密/不输出密钥**；原“不花钱、不动架构决策、不碰生产集群写操作、不绕过 QA 门禁、不自己合并 PR”五条与 L0–L3 分级放行规则一并被覆盖。`PROJECT_CHARTER.md` §3.3 已改写，本文件与十个角色文件已按单条红线同步。**Qoder 设置页中的工作指令仍需 Arvin 手工重贴后才在云端生效**；未重贴前，以本仓库文件为版本化真相源。
-2. **接管已在并行实施，活库迁移已执行并验收通过**。候选分支 `candidate/t1-step-leases`（远程 head `e8fa6e6`）已实现方案 A 的租约机制，**B3 已定案**（`e7e58a7`，`ARVINO_TAKEOVER_EXTERNAL_ONLY`）；A1–A4 已有离线测试与真实 Postgres 并发压测证据。**活库迁移 `c3d4e5f6a7b8` 已于 2026-10-21 09:40–09:45 执行并验收**：活库 `alembic_version` 由 `b1c2d3e4f5a6` 变为 `c3d4e5f6a7b8`；`steps` 新增 5 个可空租约列（`executor_principal` / `executor_lease_expires_at` / `executor_lease_token_hash` / `executor_claimed_at` / `executor_attempt`）；`repo_write_locks` 表及 `ix_repo_write_locks_run_id` 索引就位；public 表 11→12；关键表行数与基线完全一致（projects 2 / issues 5 / workflow_runs 8 / steps 68 / events 72 / approvals 0）；pods 全 Running **0 新增重启**；`/healthz` 200；api 镜像仍为旧镜像 `3c9be880517a`、不读新列新表；执行前 schema-only 备份已留存（sha256 `953f113f…`，0 行业务数据）。**部署候选分支/B3 开关与停旧调度仍未执行**，故仍不得宣称已接管派发；A6 仍阻塞于十职责 UI 注册、成员派发与异构模型实证（RoleRouter 映射已修复）。
-3. **并发写者不止一个**。除 arvino 看板调度外，旧 Hermes 的 firebird 值守 job `1ee96fd19f7f`（**每 3 分钟**）与 `1972eac66c26`（夜间）直接改 firebird-sea 仓库，既不经看板也不经 Arvino 账本，Arvino 侧的 `repo_write_locks` 约束不到它们。**在停旧调度前，firebird-sea 的业务写任务保持阻塞。**
+2. **接管已实施：迁移、部署与 B3 开关均已完成**。候选分支 `candidate/t1-step-leases`（远程 head `e8fa6e6`）实现方案 A 的租约机制，**B3 已定案**（`e7e58a7`，`ARVINO_TAKEOVER_EXTERNAL_ONLY`）；A1–A4 已有离线测试与真实 Postgres 并发压测证据。**活库迁移 `c3d4e5f6a7b8` 已于 2026-10-21 09:40–09:45 执行并验收**：版本变更、5 个可空租约列、`repo_write_locks` 表与索引就位、public 表 11→12、关键表行数与基线一致、0 新增重启、`/healthz` 200，schema-only 备份留存（`953f113f…`）。**候选镜像已于 10:41 部署**：api/worker 均为 `arvino:e8fa6e6f3839`（amd64 manifest `sha256:95c4fb74…`），两处 `ARVINO_TAKEOVER_EXTERNAL_ONLY=true` 运行时读回为 `True`/`queue`，1/1 Running 0 重启，`/healthz` `/readyz` 200，OpenAPI 已暴露 claim/renew/release/reclaim/complete 五条租约路径。**尚未在活库做真实的 claim→renew→complete 演练**；A6 仍阻塞于十职责 UI 注册、成员派发与异构模型实证（RoleRouter 映射已修复）。
+3. **旧调度已暂停，第二并发写者已停**。`1ee96fd19f7f`（firebird PR 值守，原每 3 分钟）、`1972eac66c26`（夜间）与 `0c82db48c322`（arvino 看板值守，原每 15 分钟）已于 2026-10-21 10:42 全部置为 `paused`；最后一次 firebird 执行 10:40:24 已完成，暂停后无新执行。恢复方式为 `hermes cron resume <id>`。firebird-sea 的业务写从此须由总监派发并经 Arvino 账本，`repo_write_locks` 才具备约束力；**尚未向 firebird-sea 派发任何写任务**。
 
 唯一红线是**不泄密/不输出密钥**。commit/push、开 PR、合并、部署、迁移、停/改旧调度、业务仓库写和费用支出不再需要逐条审批，由总监按任务目标决定并留证。但必须保留 CI/QA/安全门禁、版本绑定、回滚与变更记录；禁止以任何方式打印、复述或外传密钥。工程纪律不是审批闸门，总监不得以“等批准”为由停滞。
 

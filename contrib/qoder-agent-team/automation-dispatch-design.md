@@ -17,7 +17,7 @@
 | 执行位置 | 分 local / cloud；**cloud 不继承本地工作区、文件、工具、插件、连接器、权限和当前会话模型**，只用保存的 prompt 与 schedule | 巡检必须读本地账本与仓库，**只能用 local**；cloud 不适用 |
 | 计划类型 | `at`（一次性）、`every`（固定间隔，本地最小 60 秒）、`cron`（5 段表达式 + IANA 时区）、可限制星期、可设 `expiresAt` | 用 `cron` + 工作时段时间窗，并设到期日，避免无限期运行 |
 | 执行会话 | 每次运行在**独立会话**中执行，不继承创建时对话的 transcript | prompt 必须自包含；状态不能靠"上次聊到哪"，要靠状态文件 |
-| 权限模式 | `executionAuthorization: true` = Full Access（bypassPermissions）；`false` = Auto Approval；**`add` 时默认 true** | 必须显式传 `false`；任何情况下都不为巡检开 Full Access |
+| 权限模式 | `executionAuthorization: true` = Full Access（bypassPermissions）；`false` = Auto Approval；**`add` 时默认 true** | 原"任何情况下都不为巡检开 Full Access"是旧6条红线下的工程判断，2026-10-21 红线收窄为单条（仅不泄密）后不再是强制要求；是否给巡检开 Full Access 可按实际需要自行决定 |
 | 输出模式 | `independent`（每次新建会话）/ `merged`（复用任务当前执行会话，不可用时新建） | 巡检用 `independent`，避免会话上下文累积导致成本上升与行为漂移 |
 | 模型 | local add 省略则继承**创建时会话的模型**并固定保存，之后不跟随变化 | 不在本层引入额外模型；不据模型名推断价格 |
 | 管理 | `list / add / update / remove / run / enable / disable`；本地任务 ID 可管理；cloud ID 不可用本工具管理 | 具备 disable 与 remove 的停机手段（kill switch） |
@@ -129,7 +129,7 @@ T0 的边界：**不认领、不派发、不完成任何任务**，只产出可�
 | 计划 | `*/30 9-18 * * 1-5`，Asia/Shanghai（约 20 次/工作日） |
 | 下次运行 | 2026-10-21T09:00:00+08:00 |
 | 到期 | 2026-11-04T23:59:59+08:00 |
-| 权限模式 | `auto`（Auto Approval，**非** Full Access） |
+| 权限模式 | `auto`（Auto Approval，当前实际配置；2026-10-21 后红线不再强制禁止 Full Access，此处是当时留痕，未重新配置） |
 | 输出模式 | `independent` |
 | 执行范围 | workspace `818c008c-4c94-4564-a93a-50eefaf42333`，cwd 为本仓库 |
 | 首次运行结果 | `succeeded`，耗时 138,426 ms |
