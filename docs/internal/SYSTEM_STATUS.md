@@ -1213,3 +1213,12 @@
   - 24h 提醒：**未发送**。11 项 blocked 的 reminders 与 health/image/b3/db_schema/argocd 的 alerts 基线均为 `2026-10-21T03:20:41Z`，距今约 115 分钟 <24h，本轮无 due 项；各检查项取值与基线完全一致，无「正常→异常」变化，故无「⚠ Arvino 巡检异常」消息。下一提醒窗口约 `2026-10-22T03:20:41Z`。
   - 与上一条台账（13:02）差异：系统状态**无变化**；仅 blocked 年龄随时间自然增长（最旧 104→105.1h 区间位移）。距 `state.last_run_utc`(05:02:53Z) 约 12 分钟，<45 分钟，**无巡检断档**。
   - 本条目由 Qoder 本地定时任务 job 10ea8cf0-46f9-4014-b4a4-6d3293d39b7a 生成；只读巡检，未 dispatch/未认领/未恢复 Hermes。
+
+- **2026-10-21 13:33 PST（本次，无状态变化：全部检查与接管基线一致）**
+  - 看板（只读，immutable 重试一次成功）：done=159、blocked=11、todo=5、archived=1、running=0、ready=0、triage=0、review=0；claimed_60m=0，无 running → **无**双调度风险。blocked 全部 >24h（age 33–105h），consecutive_failures 仅 t_ecaabae7=2（Gitea 525 恢复任务），其余为 0；stranded ready=0。未 dispatch/未修改任何任务。
+  - GKE：api/worker/opa/postgres 4 pods 全 Running/Ready，restarts=0（与基线一致，无增加）；api/worker 镜像 `e8fa6e6f3839` 无漂移。Temporal 7 pods 全 Running、非 Running=0，frontend 重启仍为 3（6d2h 前，无新增）。B3 读回 `takeover_external_only=True`、`adapters=queue` 符合期望。DB：alembic `c3d4e5f6a7b8`、executor 列=5、`repo_write_locks` 存在，均符期望。**HTTP 无退化**：arvino healthz/readyz/docs/dashboard/ui=200、n8n=200、canary shop/house=200、git.k8shome.com=302、agent-canvas(8080)=200、gitea=525（已知基线）；审批 webhook 未 POST 复测（超出只读边界），沿用基线 404。
+  - ArgoCD：`arvino-orchestrator-gke` Synced/Degraded@`f075222c82`，15/15 资源全 Synced 且无非 Healthy 资源、无 conditions，health lastTransitionTime 仍为 `2026-10-19T15:31:37Z`（陈旧状态位，非新故障）；`firebird-canary` Synced/Healthy、`firebird-manila` Synced/Healthy（GitHub main 源，已知）、`argocd-image-updater` Unknown/Healthy（ComparisonError 已知，PR#218 待修）。其余应用全 Synced/Healthy。无真实变化。
+  - PR：GitHub open=5、mergeable=5、无草稿（#29/#28/#26/#25/#23；#29 updatedAt 05:17Z 为本任务上轮台账推送所致）。Gitea 只读脚本正常：homelab open=14 mergeable=8、firebird-sea open=2 mergeable=2，均与基线一致。未创建/合并/评论任何 PR。
+  - 24h 提醒：reminders/alerts 基线为 2026-10-21T03:20:41Z，距今约 132 分钟 <24h，无 due 任务；本轮全部检查正常无「正常→异常」转移，未发送任何消息。下一提醒窗口约 2026-10-22T03:20:41Z。
+  - 与上一条台账（13:15 PST）差异：**无变化**。距 state.last_run_utc(05:16:30Z) 约 17 分钟，<45 分钟，无巡检断档。
+  - 本条目由 Qoder 本地定时任务 job 10ea8cf0-46f9-4014-b4a4-6d3293d39b7a 生成；只读巡检，未 dispatch/未认领/未恢复 Hermes。
