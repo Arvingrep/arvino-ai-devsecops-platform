@@ -1089,3 +1089,13 @@
   - **局限**：本地任务依赖 Qoder app 与宿主运行；app 关闭或 Mac 休眠时不触发，台账会出现断档（下次运行会在条目中标记断档分钟数）。Gitea API 依赖 keychain 中 `git.k8shome.com` 凭据，不可读时记录阻塞但不阻断其余检查。ArgoCD 应用级 `Degraded` 为 `2026-10-19T15:31:37Z` 陈旧状态位，必须按资源级健康复核，不能直接当新故障。
   - **验证状态**：任务配置已更新并暂时 `disable` 以完成本条登记；下一步 `enable` + `run` 立即触发一次，验证其能读取指导书、追加台账、commit/push、更新状态文件。首跑结果将追加在本条之后；**在首跑通过前，不宣称巡检接管已完整验收**。
   - **回退**：若 Qoder 连续失败或 app 长期不运行，可 `hermes cron resume 0c82db48c322` 恢复旧巡检；两条巡检**不得同时启用**（会重复写台账）。恢复前须先 `disable` Qoder 任务并记录原因。
+
+- **2026-10-21 11:19 PST（本次，无状态变化；接管首跑基线已建立，Gitea 凭据本轮不可读）**
+  - 看板 **159 done / 0 running / 11 blocked / 0 ready / 5 todo / 0 triage / 0 review**（另 1 archived）。`running=0`、近 60 分钟 `claimed=0`、stranded `ready=0` → **无双调度风险**。11 项 blocked 全部 ≥24h；`consecutive_failures>0` 仅 `t_ecaabae7`（=2，历史 repeated_failures）。diagnostics 摘要（age 取自 created_at，仅供排序）：`t_a36d7ed7`(~103h)、`t_0f5b931b`(~102h)、`t_188c5a78`(~97h)、`t_ecaabae7`(~64h,cf=2)、`t_477917c2`(~62h)、`t_f2717f22`(~62h)、`t_f01dcf8f`(~36h)、`t_b4e33024`(~33h)、`t_a18cdf9c`/`t_071d0e68`/`t_71f47a4b`(~31h)。未 dispatch、未 unblock、未清 cf。
+  - GKE 无退化：arvino api/worker/opa/postgres 全 Running/Ready、0 重启；api/worker 镜像 `…/arvino:e8fa6e6f3839` 与期望一致，**无镜像漂移**。Temporal 7 pods Running，frontend 旧 3 次重启（5d23h 前）未增加。B3 读回 `takeover_external_only=True` / `adapters=queue`（符合预期）。DB `alembic=c3d4e5f6a7b8` / `executor%` 列=5 / `repo_write_locks` 存在（全符合）。
+  - HTTP 关键码（只读、无退化）：arvino `healthz/readyz/docs/dashboard/ui`=200、n8n healthz=200、canary `/shop`/`/house`=200、`git.k8shome.com`=302、agent-canvas(8080)=200；审批 webhook POST=404、`gitea.k8shome.com`=525（均为**已知基线**，非异常）。
+  - ArgoCD 无真实变化：`arvino-orchestrator-gke` Synced/Degraded@`f075222c82`，但 15 个资源全 Healthy、无 conditions（应用级 Degraded 为陈旧状态位，按资源级复核不算新故障）；`firebird-canary` Synced/Healthy@`6f52a6fc46`；`firebird-manila` Synced/Healthy@`213c486a39`（仍以 GitHub main 为源，已知）；`argocd-image-updater` Unknown/Healthy（ComparisonError 已知，PR#218 待修）。其余应用全 Synced/Healthy。
+  - PR：**GitHub 5 个 open 全部 MERGEABLE、非草稿**（#29 `01a92f2 系`/本分支、#28、#26、#25、#23；#29 `updatedAt` 前进到 2026-10-21T03:13Z 系本任务接管 commit 推送到同分支所致，非外部变更）。**Gitea：本轮 `security find-internet-password` 被权限分类器拦截，凭据不可读 → 记「Gitea 凭据不可读」，本轮未核 homelab/firebird-sea open PR**；不阻断其余检查，不重试取密钥命令。未创建/合并/评论任何 PR。
+  - 24h 提醒：**本任务（Qoder job 10ea8cf0）首跑，`state.reminders`/`state.alerts` 均不存在 → 只建立基线，不发任何提醒或异常告警**。已把当前 11 项 blocked 的 `reminders[task_id]` 与 health/image/schema/argocd 的 `alerts` 基线设为当前 UTC（2026-10-21T03:19:25Z）；此后各轮才做比较与去重发送。历史 Hermes 提醒记录保留于本台账更早条目。
+  - 与上一条健康巡检（10:28 PST）差异：系统状态**无变化**。唯一新增为流程性：接管首跑基线落地 + Gitea 凭据本轮被拦（观测受限，非系统异常）。距 `state.last_run_utc`(03:01:26Z) 约 18 分钟，<45 分钟，**无巡检断档**。
+  - 本条目由 Qoder 本地定时任务 job 10ea8cf0-46f9-4014-b4a4-6d3293d39b7a 生成；只读巡检，未 dispatch/未认领/未恢复 Hermes。
