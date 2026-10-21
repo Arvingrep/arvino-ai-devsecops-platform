@@ -1,20 +1,21 @@
 # Arvino 接管进度 · 一页速览
 
-> **更新：2026-10-21 17:48 PST** · 维护：Qoder 总监值班
+> **更新：2026-10-21 19:30 PST** · 维护：Qoder 总监值班
 > 这是**当前快照**，不是历史日志；有实质进展时覆盖更新。
 > 技术细节与逐轮证据：[SYSTEM_STATUS.md](../../docs/internal/SYSTEM_STATUS.md) · [CHANGELOG_FRAMEWORK.md](../../docs/internal/CHANGELOG_FRAMEWORK.md)
 
-**一句话**：旧调度已停、只读巡检已接管并恢复连续运行（巡检 job 已迁至 Full Access 新会话），B3/租约/真实认领闭环、owner operator API、GitOps 收敛与 Telegram 提醒通道都已跑通；现在只剩 Qoder UI 指令和看板遗留任务等人工动作。
+**一句话**：旧调度已停、只读巡检已接管并恢复连续运行（巡检 job 已迁至 Full Access 新会话），B3/租约/真实认领闭环、owner operator API、GitOps 收敛与 Telegram 提醒通道都已跑通；GitHub 本轮合并 3 个 PR（代码已入库、运行态未变），现在只剩 Qoder UI 指令、PR#28 rebase 和看板遗留任务等人工动作。
 
 ## 需要 Arvin 动手（按优先级）
 
 1. **在 Qoder 设置页重贴十个角色的工作指令**（仓库文件已改，UI 不会自动同步）。
 2. **决定 11 个 blocked 看板任务**：补凭据、恢复执行，还是取消；并指定 firebird PR 审核由谁接。
 3. **考虑提高 Qoder 当日用量上限**：账号日配额在今天 16:05 用尽（新会话一律 403 `Billing daily count exceeded`），巡检已改用当前会话模型续命，但明天同一时点可能再次触顶。
+4. **PR#28 需 rebase**：base 分支前移后转为 CONFLICTING，重基后才能评审合并。
 
 ## 进行中
 
-- **PR 队列**：PR#29（本分支）已扩到全量 contrib + 台账，需按新内容重审后合并；另有 4 个 GitHub open PR 排队，Gitea homelab 新增 #224（hermes-feishu 换 Teams bot，可合并）待评审。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
+- **PR 队列**：GitHub 本轮合并 3 个（#26 GET /events、#29 台账全量入库、#25 移除 Plane 集成，`main`→`2244995`），open 降至 2：#23 可合并、#28 有冲突待 rebase；Gitea homelab 新增 #224（hermes-feishu 换 Teams bot，可合并）待评审。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - **Qoder 团队启用**：团队已注册（1 leader + 4 member），等 UI 指令重贴后跑一次必须由成员动手的任务。→ [注册核验](registration-verification.json)
 
 ## 已完成
@@ -27,6 +28,7 @@
 - **GitOps 已收敛**：homelab main `88b3203` 同步 Deployment 引用与 SealedSecret；`arvino-orchestrator-gke` 已恢复 Synced（本次变更所致，不是未知带外改动）。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - **Telegram 提醒通道已纠正并验证**：根因是 chat id 配错（旧 id 已失效，非连接器故障）；24h 提醒改发 Arvin 私聊、巡检异常告警改发 k8sopenclaw 运维群，两处试发均成功。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - **巡检 job 已迁至新会话**：熔断恢复后仍无成功轮次（16:02→17:30 断档 88 分钟），根因是会话创建阶段失败（旧 job 模型桶配额 403 `Billing daily count exceeded`、auto 审批分类器 400）；已迁至 Full Access 新会话 `bd0998dd`，17:30 轮成功。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
+- **PR#29/#26/#25 已合并入 main**（#29 台账全量入库防分支切换丢失、#26 GET /events 全局 feed、#25 移除 Plane 集成）；运行态未变：镜像仍 `e8fa6e6f3839`、ArgoCD revision 仍 `88b3203`，尚未部署。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - T1 租约离线验收通过：claim/renew/release/reclaim、token 哈希、4h 总寿命、冲突审计、16 路并发压测。
 - 只读巡检已接管并持续运行（每 15 分钟；15:00 轮捕获 ArgoCD 漂移、15:15 轮确认恢复 Synced；17:30 轮为迁移后首轮成功，24h 提醒基线已建，下次到点约 10-22 11:20）。→ [指导书](status-inspection-prompt.md)
 - 单条治理红线已写入仓库 13 份角色文件；旧五条红线与 L0–L3 分级作废。
@@ -44,7 +46,7 @@
 - **Qoder UI 指令**：需要 Arvin 手工重贴，云端不会读仓库。
 - **11 个看板任务**：调度已停，当前无执行者；最老已 109h，需逐项决定。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - **firebird PR 审核 / 夜间流程**：原 Hermes job 已停，暂无接管者。
-- **PR#29 合并**：不是故障，等一次独立重审后合并。
+- **PR#28 冲突**：合并 #25/#26/#29 后 base 前移，PR#28 变为 CONFLICTING/DIRTY，需 rebase 后再评审。
 
 ## 已知但不阻塞
 
