@@ -1,10 +1,10 @@
 # Arvino 接管进度 · 一页速览
 
-> **更新：2026-10-21 19:55 PST** · 维护：Qoder 总监值班
+> **更新：2026-10-21 20:00 PST** · 维护：Qoder 总监值班
 > 这是**当前快照**，不是历史日志；有实质进展时覆盖更新。
 > 技术细节与逐轮证据：[SYSTEM_STATUS.md](../../docs/internal/SYSTEM_STATUS.md) · [CHANGELOG_FRAMEWORK.md](../../docs/internal/CHANGELOG_FRAMEWORK.md)
 
-**一句话**：旧调度已停、只读巡检已接管并连续运行；租约闭环、owner operator API、GitOps 收敛、Telegram 通道、**T1 账本心跳**都已上线并有实证；剩下的是几个只有你能做的动作，和尚未部署的外部 harness。
+**一句话**：旧调度已停、只读巡检已接管并连续运行；租约闭环、owner operator API、GitOps 收敛、Telegram 通道、**T1 账本心跳**都已上线并有实证；剩下的是几个只有你能做的动作、尚未部署的外部 harness，和新冒出的 hermes-feishu gateway 崩溃循环。
 
 ## 需要 Arvin 动手（按优先级）
 
@@ -27,7 +27,7 @@
 - 活库迁移 `c3d4e5f6a7b8` 已执行：`executor_*` 5 列 + `repo_write_locks` 就位。
 - **真实认领闭环已打通**：2026-10-21 14:51 live `run-ffb5465ea777` 的 `triage` 完成 claim→renew→complete（HTTP 200/200/200，token 未落盘，租约字段已清理）。→ [证据](t1-step-leases-evidence.md)
 - **Operator API 已恢复**：owner/agent 拆成独立 secret key（`owner-token`/`token`，值不同，SealedSecret 已同步重封），api 滚动重启中断 59s、0 重启；owner 实测 `POST /runs` 201、`cancel` 200，agent 建 run 仍 403、读接口 200。→ [证据](t1-step-leases-evidence.md)
-- **T1 账本心跳已上线生产集群**：CronJob `arvino-t1-heartbeat` 每 5 分钟自动做租约清单、派发可见性不变量与过期租约回收；本机 E2E（建 run→claim→过期→自动 reclaim→步骤回 pending）与集群验收均通过。→ [证据](t1-step-leases-evidence.md)
+- **T1 账本心跳已上线生产集群**：CronJob `arvino-t1-heartbeat` 每 5 分钟自动做租约清单、派发可见性不变量与过期租约回收；本机 E2E（建 run→claim→过期→自动 reclaim→步骤回 pending）与集群验收均通过，生产 CronJob 已按 `*/5` 实际触发并成功完成。→ [证据](t1-step-leases-evidence.md)
 - **命名空间 NetworkPolicy 纳入 GitOps**：原先只存在于集群的 5 条策略已收编，带外漂移消除。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - **GitOps 已收敛**：homelab main `a996720` 同步 Deployment 引用、SealedSecret 双键与心跳清单；`arvino-orchestrator-gke` Synced。
 - **PR#29/#26/#25 已合并入 main**（台账全量入库防分支切换丢失、`GET /events` 全局 feed、移除 Plane 集成）；应用代码运行态仍未变：api/worker 镜像仍 `e8fa6e6f3839`（清单 revision 已前移，镜像未跟随），尚未部署。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
@@ -46,6 +46,7 @@
 
 ## 被阻塞
 
+- **hermes-feishu gateway 崩溃循环**：20:00 轮发现 gateway 容器 `CrashLoopBackOff`（已重启 6 次、exit 1，日志症状 `feishu connect timed out after 30s`），ArgoCD 应用健康由 Healthy 转为 Progressing；巡检只记录未修复，与 Gitea #224 的 Teams 替代方案相关，排查方向待你定。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - **Gitea #224**：等你的 4 项前置。
 - **Qoder UI 指令**：需要你手工重贴，云端不会读仓库。
 - **11 个看板任务**：调度已停，当前无执行者；最老已 112h，需逐项决定。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
@@ -55,7 +56,7 @@
 ## 已知但不阻塞
 
 - **homelab main 推送即自动部署**：`hermes-feishu`/`hermes-feishu-gke` 是 automated+selfHeal+prune，推 main 会直接生效；今天已因此误带一条未就绪变更并回退，推送前必须核对本地 HEAD 指向。
-- ArgoCD `arvino-orchestrator-gke` 应用级 `Degraded` 是 2026-10-19 的陈旧状态位（17/17 资源 Synced 且无非 Healthy）。
+- ArgoCD `arvino-orchestrator-gke` 应用级 `Degraded` 是 2026-10-19 的陈旧状态位（24/24 资源 Synced 且无非 Healthy）。
 - `gitea.k8shome.com` 525、审批 webhook 404、agent-canvas 仅本机 8080：均为已知基线；Gitea 网页 525 时 open PR 核查可能不可读，内网 git 推送仍正常。
 - 巡检每 15 分钟产生一次 `[skip ci]` 台账提交（约 96 次/日）；嫌吵可降为 30 分钟。
 - canary `/house` 偶发单次 curl 000、重试即 200：判为瞬时抖动，继续观察。
