@@ -2,7 +2,7 @@
 
 日期：2026-10-21
 执行者：总监（Qoder）
-状态：**候选代码完成并推送，离线验收通过；活库迁移已执行并验收；候选镜像已于 2026-10-21 10:45 部署并生效（B3）；2026-10-21 14:51 已在活库完成 live `claim → renew → complete` 演练（§8）；真实业务仓库写仍未执行**（原文“尚未部署”为 09:45 时的状态，10:45 已更新）
+状态：**候选代码完成并推送，离线验收通过；活库迁移已执行并验收；候选镜像已于 2026-10-21 10:45 部署并生效（B3）；2026-10-21 14:51 已在活库完成 live `claim → renew → complete` 演练（§8）；2026-10-21 15:00 完成 owner/agent token 拆分并复测 operator API（§9）；真实业务仓库写仍未执行**（原文“尚未部署”为 09:45 时的状态，10:45 已更新）
 
 ## 1. 范围与隔离
 
@@ -175,7 +175,33 @@ Arvin 通过按键确认批准两项：T1 租约设计稿定稿；在隔离 work
 
 **新发现的两个阻塞/限制**：
 
-1. **operator API 静态 token 被合并**：`arvino-api` 的 `ARVINO_OWNER_TOKEN` 与 `ARVINO_AGENT_TOKEN` 都引用 `arvino-api-secret/token`（同一值）。Authenticator 对相同 token 的最后一个 principal 生效（agent），因此 `POST /runs` 返回 403 `agent principals may not perform this action`；建 issue、cancel、reclaim 同样不可用。**这不影响 claim/renew/complete**，但意味着目前无法通过公开 API 正常创建/取消 run；本次种子与取消只能走 pod 内生产 engine。修复：为 owner 与 agent 使用不同 secret key（如 `owner-token`/`agent-token`），更新 Deployment env 并滚动重启 api；属配置变更，待另立任务。
+1. **operator API 静态 token 被合并**：`arvino-api` 的 `ARVINO_OWNER_TOKEN` 与 `ARVINO_AGENT_TOKEN` 都引用 `arvino-api-secret/token`（同一值）。Authenticator 对相同 token 的最后一个 principal 生效（agent），因此 `POST /runs` 返回 403 `agent principals may not perform this action`；建 issue、cancel、reclaim 同样不可用。**这不影响 claim/renew/complete**，但意味着目前无法通过公开 API 正常创建/取消 run；本次种子与取消只能走 pod 内生产 engine。修复：为 owner 与 agent 使用不同 secret key（如 `owner-token`/`agent-token`），更新 Deployment env 并滚动重启 api；属配置变更——**已于 2026-10-21 15:00 由任务 #23 修复并复测，见 §9**。
 2. **静态 agent token 无角色声明**：claim 返回 `role_verified=false`，即 `agent:harness` 没有 role claims，按兼容路径可认领任意 agent step（设计 §8.4 已注明运行时权限模型另议）。在多角色/多 tester 场景下，账本无法区分实现方与验收方身份；不影响本次单步验证，但不能作为异构模型证据。
 
 **Tester 异构模型**：本次测试**不涉及验收环节**（triage 由同一外部 harness 完成，没有 tester/QA 步骤），因此**不能**判断实现方与验收方的模型家族是否不同；tester 异构模型仍未实证，继续列在“未开始/待验证”，需另跑一条带 QA/tester 的真实任务。
+
+## 9. Operator API token 拆分与复测（2026-10-21 15:00–15:14 +0800）
+
+背景：§8 发现 `ARVINO_OWNER_TOKEN` 与 `ARVINO_AGENT_TOKEN` 共用 `arvino-api-secret/token`；同一 token 在 Authenticator 中最后匹配的 principal 为 `agent:harness`，导致 operator 端点返回 403。
+
+| 项 | 结果 |
+|---|---|
+| Secret | `arvino-api-secret` 新增独立键 `owner-token`（随机生成，43 字符；与 `token` 值不同）；生成、写入、校验全程未打印、未落盘 |
+| GitOps | `homelab` main `88b3203`：Deployment 的 `ARVINO_OWNER_TOKEN` 改引 `owner-token`，`ARVINO_AGENT_TOKEN` 保持 `token`；SealedSecret 重新密封为双键；已推送内网 Gitea |
+| 重启 | Recreate；旧 pod 删除 06:59:21Z → 新 pod Ready 07:00:20Z，**中断 59s**；新 pod 0 重启；worker 未动，`takeover_external_only=true` |
+| ArgoCD | `arvino-orchestrator-gke` 因本次 Deployment 补丁显示 OutOfSync（巡检 15:00 记录）；GitOps 推送后由总监手动触发 sync 到 `88b3203`，已恢复 **Synced**（health 仍为 2026-10-19 陈旧 Degraded） |
+
+复测（pod 内对 `127.0.0.1:8080`，使用运行时真实 token，不打印 token）：
+
+| 调用 | 身份 | HTTP | 结果 |
+|---|---|---|---|
+| `POST /runs` | owner | **201** | `run-7067ae89b67d`；`running`；`requested_by=owner`；`run.created` actor `owner` @07:00:57.885Z |
+| `POST /runs/{id}/cancel` | owner | **200** | `cancelled`；`failure_reason=cancelled by owner`；`run.cancelled` @07:00:58.442Z |
+| `GET /runs/{id}` | owner | **200** | 最终 `cancelled` |
+| `POST /runs` | agent | **403** | `agent principals may not perform this action`（分权仍生效） |
+| `GET /runs` | agent | **200** | 7 条 run 可见（只读权限正常） |
+| `POST /runs/{id}/cancel`（重封后复查） | owner | **200** | `cancelled`；SealedSecret 重新密封未改变 token 值 |
+
+观察：`run.cancelled` 事件的 actor 仍写 `system:engine`（引擎既有事件口径），但 `failure_reason` 明确为 `cancelled by owner`，且请求以 owner token 发出；事件 actor 未携带 principal，属审计可读性小缺口，不影响本次结论。
+
+**结论**：任务 #23 完成。owner/agent 已使用独立 secret key，operator API 恢复；owner 可建 run/取消，agent 不能执行 operator 动作。GitOps 与 SealedSecret 已同步，ArgoCD 漂移收敛。**Tester/QA 异构模型仍未实证**：本次没有验收步骤；Arvino 标准/治理流的 `qa` 步骤目前由同一外部队列执行，Qoder 团队 tester 需 UI 指令重贴后才能接入并读回实际模型家族。

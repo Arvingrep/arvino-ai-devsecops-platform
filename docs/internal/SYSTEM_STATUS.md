@@ -14,6 +14,8 @@
 **live `GH_TOKEN` 明文两次泄进会话记录，吊销与轮换仍未执行。** 起因是两次只读读取 Deployment env 的命令把该值带入输出（一次是核对 B3 开关时被过滤条件带出）。已核验：**仓库、台账、变更日志中该值字面量均为 0 处**（`grep -rIE "gh[pousr]_[A-Za-z0-9]{20,}"` 仅命中 gitleaks 自身的规则定义）；但 **live env 的 `GH_TOKEN` 仍无 `valueFrom`，即仍是明文 literal**——被泄出的值依然有效。
 **处置要求**：① 立即在 GitHub 侧吊销并重新签发该 token；② 合并 PR#222 / PR#219，把 `GH_TOKEN` 与 `ARVINO_DATABASE_URL` 改为 `secretKeyRef`（`ARVINO_AGENT_TOKEN`、`ARVINO_OWNER_TOKEN`、`ARVINO_NIGHTINGALE_WEBHOOK_TOKEN` 已是 secretKeyRef，无需动）；③ 后续任何命令**只允许读键名，不得打印 env 值**。此项由总监记录、未执行轮换动作（吊销需 Arvin 在 GitHub 侧操作）。
 
+> **2026-10-21 15:22+0800 更新：本条告警已解除。** Arvin 已确认在 GitHub 侧 Regenerate，旧值失效；`secretKeyRef` 改造仍随 PR#222/#219 审核。上方 11:30 原文保留作历史。
+
 ## 并行工作流状态（2026-10-21 11:30 实测；几条线在同时推进，此表为总览，明细见各节与巡检历史）
 
 | # | 工作流 | 载体 | 当前状态（实测） | 下一跳 | 阻塞 / 未验证 |
@@ -28,6 +30,7 @@
 
 > 本表由总监登记，作为并行推进期的总览；**任何一行的状态变更须以实测为准，不得沿用上一行结论**。各线明细分别见：接管线见 `contrib/qoder-agent-team/t1-step-leases-evidence.md` 与 `0de9c59`；巡检线见巡检历史；团队线见 `registration-verification.json`；治理口径见「治理公告」与 `CHANGELOG_FRAMEWORK.md` 同日条目。
 > 口径提醒：「调度层(唯一)」表内 Hermes 行仍把负责人写作 `cron 0c82db48c322`，该 job 已于 10:42 disabled，现役巡检为 Qoder 本地 job `10ea8cf0-46f9-4014-b4a4-6d3293d39b7a`。该表由值班巡检维护，此处仅作差异登记。
+> **2026-10-21 15:22+0800 状态更新**：本表 #1 的「尚无 live claim-to-complete 实证」已过时——§8 于 14:51 完成 live `claim → renew → complete`；owner/agent token 已于 15:00 拆分并复测（§9），GitOps/ArgoCD 已收敛。
 
 ## 调度层(唯一)
 
@@ -1295,3 +1298,10 @@
   - 24h 提醒：**未发送**。reminders 基线 2026-10-21T03:20:41Z 距今约 20.0h <24h，无 due 项；下批约 2026-10-22T03:20:41Z。异常消息未发：本轮唯一新状态为 ArgoCD 恢复正常方向（OutOfSync→Synced），不构成「正常→异常」；Gitea 不可读属已知 525 基线联动，不去重窗口外的告警条件。另 Telegram 通道 `hermes send` 上轮 2 次 Chat not found，本轮未重测（无待发内容），送达能力仍待修复。
   - 与上一条台账（15:04）差异：① ArgoCD arvino-orchestrator-gke OutOfSync→Synced 且 revision f075222c82→88b32039f43d（自动 sync 成功，见上）；② Gitea PR 由可读变 GITEA_API_EMPTY 不可读；③ blocked 年龄自然增长（最旧 104.7h→107.2h）。其余检查项全部与基线一致。距 `state.last_run_utc`(07:04:30Z) 约 16 分钟 <45 分钟，**无巡检断档**。
   - 本条目由 Qoder 本地定时任务 job 10ea8cf0-46f9-4014-b4a4-6d3293d39b7a 生成；只读巡检，未 dispatch/未认领/未恢复 Hermes。
+- **2026-10-21 15:22+0800 总监执行：任务 #23 完成（owner/agent token 拆分 + operator API 复测 + GitOps 收敛）**
+  - **变更**：`arvino-api-secret` 新增独立键 `owner-token`（随机生成、43 字符、与 `token` 值不同；生成/写入/校验全程未打印、未落盘）；`arvino-api` 的 `ARVINO_OWNER_TOKEN` 改引 `owner-token`，`ARVINO_AGENT_TOKEN` 仍引 `token`；SealedSecret `03-sealedsecret-arvino-api.yaml` 重新密封为双键并 apply，控制器回写后 owner 鉴权仍有效。Recreate 滚动重启：旧 pod 删除 06:59:21Z → 新 pod Ready 07:00:20Z，**中断 59s**、新 pod 0 重启；worker 未动，`takeover_external_only=true`。
+  - **GitOps/ArgoCD**：内网 Gitea `homelab` main 提交 `88b3203`（Deployment 引用 + SealedSecret 双键），由总监推送；总监于 15:14 手动触发 `arvino-orchestrator-gke` sync 到 `88b3203`，恢复 **Synced**。**巡检 15:00/15:15 记录的「Deployment 疑似带外注入 GH_TOKEN」「自动 sync」实为本任务：总监 14:59 patch Deployment、15:09 推送 GitOps、15:14 手动 sync；不是未知改动，也非自动 sync，无需 Arvin 再排查。** 应用级 health 仍为 2026-10-19 陈旧 `Degraded`，不影响。
+  - **复测**：owner `POST /runs` **201**（`run-7067ae89b67d`，`requested_by=owner`）、`cancel` **200**（`cancelled`，`failure_reason=cancelled by owner`）、`GET` **200**；agent `POST /runs` **403**、`GET /runs` **200**。operator 403 问题解除，agent 分权仍生效。
+  - **GH_TOKEN**：Arvin 已确认在 GitHub 侧 Regenerate，旧值失效；顶部 11:30 告警解除。剩余 PR#222/#219 的 `secretKeyRef` 改造仍随 PR 队列审核合并。
+  - **未变/未验证**：claim/renew/complete 路径未受影响；真实业务仓库写、T1 自动派发、tester 异构模型实证仍未开始。Arvino 标准/治理流虽有 `qa`/`security` agent 步骤，但目前由同一外部队列执行；Qoder 团队 tester 需 UI 指令重贴后接入并读回实际模型家族。
+  - 详细证据：`contrib/qoder-agent-team/t1-step-leases-evidence.md` §9；人类速览 `STATUS_SUMMARY.md` 已同步。
