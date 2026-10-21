@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# 遗留（Hermes 时代）：每 15 秒扫 Hermes 委派记录，产出 director-status.json。
+# Hermes 三个 cron job 已于 2026-10-21 暂停，本脚本不在接管链路内，保留仅供追溯；
+# 接管链路里的心跳是 scripts/t1_heartbeat.py（租约感知，跑在集群 CronJob 里）。
 """Director Heartbeat Monitor
 
 Watches Hermes delegation transcript files every 15 seconds and produces:

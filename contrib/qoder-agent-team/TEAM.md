@@ -8,7 +8,7 @@
 
 ## 1.1 注册状态（2026-10-21 实测，非声明）
 
-证据文件：`registration-verification.json`（结论 `passed_with_blockers`）；映射索引：`roles.yaml`。
+证据文件：`archive/registration-verification.json`（结论 `passed_with_blockers`）；映射索引：`roles.yaml`。
 
 | 项 | 实测结果 |
 |---|---|
@@ -37,7 +37,7 @@
 
 ## 2. 十个正式角色与废弃草案
 
-正式配置是角色定义；**五个首批职责已在 Qoder 账号侧注册**（映射见 `roles.yaml` 的 `qoder_agent_profile_id`，证据见 `registration-verification.json`），但注册只证明"存在并可被选中"，不证明运行时权限强制、模型异构或独立会话已生效。角色间使用不同执行会话。总监只编排，不亲自实现代码、部署配置或测试修复；可更新任务、决策、变更等管理记录。
+正式配置是角色定义；**五个首批职责已在 Qoder 账号侧注册**（映射见 `roles.yaml` 的 `qoder_agent_profile_id`，证据见 `archive/registration-verification.json`），但注册只证明"存在并可被选中"，不证明运行时权限强制、模型异构或独立会话已生效。角色间使用不同执行会话。总监只编排，不亲自实现代码、部署配置或测试修复；可更新任务、决策、变更等管理记录。
 
 | 配置名 | 正式职责 | 边界 | 指令文件 |
 |---|---|---|---|

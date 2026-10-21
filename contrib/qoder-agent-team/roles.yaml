@@ -2,7 +2,7 @@
 # instructions_file 相对于本索引目录；模型家族须另行实查，不在此猜模型名称。
 schema_version: 2
 deployment_status: registered_lead_backend_frontend_devops_tester
-registration_evidence: registration-verification.json
+registration_evidence: archive/registration-verification.json
 registration_evidence_sha256: f961e03dbf133965bad36cebaaef69328eae5be4a852817af54d996039d6dc82
 team_profile_id: 562925f0-04d2-4630-bc68-43e16f318bed
 team_discussion_id: 51d5f922-c844-4de9-8185-c42c017438a2

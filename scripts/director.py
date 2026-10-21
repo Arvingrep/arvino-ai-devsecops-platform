@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+# 遗留（Hermes 时代）：监控 Hermes 委派记录、产出给 Hermes runtime 消费的
+# dispatch-queue.json。Hermes 三个 cron job 已于 2026-10-21 暂停，本脚本不在
+# 接管链路内，保留仅供追溯；接管链路里的心跳是 scripts/t1_heartbeat.py。
 """Director Controller — task registry, dependency dispatch, agent monitoring.
 
 Extends the heartbeat monitor into a management layer that:
