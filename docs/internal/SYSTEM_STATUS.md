@@ -1496,3 +1496,8 @@
   - 与上一条台账（19:49 PST）差异：**2 项变化**——① ArgoCD `arvino-orchestrator-gke` 清单 revision 前移 `c081269d8`→`a99672033b`、资源 17→24（新增 7 条 NetworkPolicy），24/24 Synced、无非 Healthy；② `hermes-feishu-gke` 由 Healthy 转为 Progressing，gateway 容器 CrashLoopBackOff（真实故障，已告警）。附带消解一项疑点：T1 心跳 CronJob 已按 `*/5` 实际触发并成功完成，上一轮失败的验收 Job 与一次性 Pod 已清理。其余为自然增长与例行前移：blocked 最旧龄 111.7→111.9h、ArgoCD `reconciledAt` 前移、看板 `mode=ro` 本轮需 `immutable=1` 才读通（19:00–19:49 多轮为直连一次成功，属只读取用路径差异，计数与基线一致，非数据异常）。人类速览 `STATUS_SUMMARY.md` **已更新**：NetworkPolicy 纳入 GitOps 的资源计数（17→24）、T1 心跳实际调度实证、以及 `hermes-feishu` gateway 崩溃循环这一新增阻塞项，属第 7 步所列实质进展（部署/配置变更 + 新增阻塞）。
   - 巡检断档：**无**。state `last_run_utc=2026-10-21T11:52:30Z` → 本轮 `2026-10-21T12:00:26Z`，间隔约 8 分钟，15 分钟节奏在 Full Access 会话 `bd0998dd` 上连续保持（17:30 起十一轮连续成功，旧 job 熔断断档未复现）。
   - 本条目由 Qoder 本地定时任务 job bd0998dd-3f26-446e-87e6-eaf63e155821 生成；只读巡检，未 dispatch/未认领/未恢复 Hermes。
+- **2026-10-21 20:20+0800 总监执行：hermes-feishu gateway 崩溃循环已定位并恢复（回退后残留；非接管项目范围，仅台账留证）**
+  - 现象：20:00 巡检轮报 `hermes-feishu-gke` 由 Healthy 转为 Progressing，gateway 容器 CrashLoopBackOff（7 次重启、exit 1，日志 `feishu connect timed out after 30s`）。
+  - 成因：时间线落在总监误合并 #224（Teams 变更被自动同步）与随后 revert 之间。ConfigMap 当时已切到 teams 模式，Pod 启动时 seed-config 把那一版写进了 PVC 的 `/opt/data/config.yaml`；revert 只恢复了清单，PVC 上这个文件不会自动重写，gateway 于是按错误配置连飞书直至超时退出。
+  - 处置：删除崩溃 Pod `hermes-feishu-b45559496-xsm98` → ReplicaSet 重建 `hermes-feishu-b45559496-j2p5w`，init 按回退后的 ConfigMap 重新播种 → gateway 与 drive-sync 双容器 ready、0 重启，日志恢复正常启动，应用回到 `Synced/Healthy`。
+  - 结论：无残留业务影响（teams-webhook 资源已 prune、ConfigMap 已回退、gateway 已恢复）。该应用属 Arvin 另开的工作线，按范围约定**不写入人类速览**，仅在此台账留证。
