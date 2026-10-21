@@ -17,7 +17,6 @@
 - **真实认领闭环**：镜像、B3、租约均已上线，还差一条 live `claim → renew → complete` 实测。→ [证据](t1-step-leases-evidence.md)
 - **PR 队列**：PR#29（本分支）已扩到全量 contrib + 台账，需按新内容重审后合并；另有 4 个 open PR 排队。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - **Qoder 团队启用**：团队已注册（1 leader + 4 member），等 UI 指令重贴后跑一次必须由成员动手的任务。→ [注册核验](registration-verification.json)
-- **值班巡检**：每 15 分钟自动跑，已连续多轮无退化；24h 提醒基线已建，下一次到点约 10-22 11:20。→ [指导书](status-inspection-prompt.md)
 
 ## 已完成
 
@@ -25,7 +24,7 @@
 - B3 接管模式上线：api/worker 运行 `e8fa6e6f3839`，`takeover_external_only=True`、`adapters=queue`。
 - 活库迁移 `c3d4e5f6a7b8` 已执行：`executor_*` 5 列 + `repo_write_locks` 就位。
 - T1 租约离线验收通过：claim/renew/release/reclaim、token 哈希、4h 总寿命、冲突审计、16 路并发压测。
-- 只读巡检接管并验收：首跑、Gitea 只读脚本、11:30 自动轮次全部通过。
+- 只读巡检已接管并持续运行（每 15 分钟；首跑、Gitea 脚本、11:30 轮次均验收通过；已连续多轮无退化；24h 提醒基线已建，下次到点约 10-22 11:20）。→ [指导书](status-inspection-prompt.md)
 - 单条治理红线已写入仓库 13 份角色文件；旧五条红线与 L0–L3 分级作废。
 - ArgoCD 41 个 Application 均已同步；仅已知陈旧状态位与 image-updater ComparisonError 例外。
 
