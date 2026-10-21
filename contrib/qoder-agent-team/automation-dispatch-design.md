@@ -208,3 +208,53 @@ cron 的 prompt 只负责让每次运行先完整读取上述指导书；文件�
 - 本地任务依赖 Qoder app 与宿主运行；app 关闭或 Mac 休眠时不触发，台账会断档（下次运行标记断档分钟数）。
 - Gitea API 依赖 keychain 中 `git.k8shome.com` 凭据；不可读时记录阻塞，不阻断其余检查。
 - 96 次/日会产生大量台账提交；提交信息带 `[skip ci]` 以避免 CI 重复跑。若噪音/成本不可接受，可下调为 30 分钟，但必须先在 `CHANGELOG_FRAMEWORK.md` 记录并同步台账。
+
+## 12. T1 账本心跳：2026-10-21 接线结果与下一步方案
+
+### 12.1 本轮接上了什么（心跳侧，已在生产集群运行）
+
+T1 的定义是「对持有租约的执行者续租、检测过期、触发 reclaim 判定」。其中**检测过期 + reclaim 判定 + 派发可见性**这半边已经自动化；续租仍由执行者自己持有 token 自续。
+
+| 组件 | 位置 | 说明 |
+|---|---|---|
+| 心跳脚本 | `scripts/t1_heartbeat.py`（规范源） | 纯标准库，可在 api 镜像 / 本机 / CronJob 里跑 |
+| 部署清单 | `homelab` 仓库 `apps/arvino-orchestrator/manifests-gke/09-heartbeat-cronjob.yaml` | CronJob `arvino-t1-heartbeat`，`*/5 * * * *`，镜像随 kustomize 钉在 `e8fa6e6f3839`；脚本内容用同名 ConfigMap 内嵌 |
+| 网络策略 | 同目录 `10-networkpolicy-arvino.yaml` | 把命名空间原先只存在于集群的 5 条 NetworkPolicy 收编进 GitOps，并新增心跳 → api:8080 的双向放行 |
+
+心跳每轮做三件事：
+
+1. **租约清单**：用 owner token 读 `GET /runs?active=true`，汇总每个带租约步骤的 principal / 认领时间 / 到期时间；到期前 10 分钟记预警。
+2. **派发可见性**：用 agent token 读 `GET /work`，校验不变量——所有「running 且无租约」的 agent 步骤都必须出现在派发队列里；不满足即记 `dispatch_invariant_violations`。
+3. **过期回收**：租约过期超过 5 分钟、且执行方是我们自己管的 `agent:harness` 时，用 owner token 调 `POST /runs/{id}/steps/{key}/reclaim`，`stop_evidence=operator_declared` 并写明事实依据；引擎本身坚持「过期不等于停止」，这一步由心跳补上证据。
+
+### 12.2 还没有接上什么（派发执行侧）
+
+`GET /work` 里的活儿**仍然没有执行者**：外部 harness（能真正跑 Claude Code / OpenHands 的进程）尚未部署。所以当前是「账本自动心跳 + 自动暴露派发队列」，不是「自动执行」。下一段缺口是 harness 侧的 claim → 执行 → renew → complete 循环。
+
+### 12.3 下一步方案（简要，供 Arvin 过目）
+
+**改哪里**
+
+1. 新增 `scripts/t1_harness.py`（外部 harness 本体）：用 agent token 轮询 `GET /work`，对拿到的 step 调 `POST .../claim`（短 TTL，如 120s），把 lease token 存内存；执行期间按 TTL/3 调 `POST .../renew`；执行完调 `POST .../complete` 带 lease_token；失败调 `POST .../release`。
+2. 执行器二选一：Claude Code CLI（`scripts/agent-harness.sh` 已有雏形）或 OpenHands（`agent-canvas` 在本机 8080，当前 B3 模式下未被 api 使用）。
+3. 部署：与心跳同构，用 ConfigMap + CronJob/Deployment 放到 `arvino` 命名空间；harness 需要出网到执行环境与模型 API，因此要新增 egress 放行规则（写在同一份 NetworkPolicy 清单里）。
+4. 护栏：harness 只处理 `fast` profile、只处理 `triage`/`tests` 这类只读或沙盒步骤；`develop`/`pull_request` 这类会写业务仓库的步骤暂不接（等业务写试点阶段）。
+
+**风险**
+
+- 误回收：心跳回收判据是「过期 + 执行方是 agent:harness」，若真实执行方还在跑但网络抖动导致续租失败，会被误判为停止 → 步骤被重排。缓解：过期阈值 5 分钟、回收前写审计证据、步骤本身有 max_attempts 兜底。
+- 重复执行：同一 step 被两个 harness 认领会被引擎的 CAS 拒绝（租约机制本身已覆盖），但要观察 `lease_claim_rejected` 事件量。
+- 配额与成本：harness 会真实调用模型；今天账号日配额已在 16:05 用尽过，上线前需确认额度。
+- 写入面：harness 一旦能执行 `develop` 就会碰业务仓库，所以第一阶段必须把可执行 step 范围钉死在只读/沙盒。
+
+**回滚**
+
+- 心跳：`kubectl -n arvino patch cronjob arvino-t1-heartbeat --type merge -p '{"spec":{"suspend":true}}'`，或从 homelab 仓库删掉 `09-heartbeat-cronjob.yaml` 后同步；两者都不影响账本数据。
+- harness：先不部署，或同样用 CronJob suspend / 删清单回滚；账本侧有 4h 总寿命与 reclaim 审计，任何被卡住的步骤都能靠 operator reclaim 人工捞回。
+- 代码侧：全部改动在 `scripts/` 与 GitOps 清单，不改引擎与数据库，回滚不需要迁移。
+
+### 12.4 本轮踩到的坑（已修，值得记）
+
+- 心跳首轮验收 Job 以 `BackoffLimitExceeded` 失败：根因是 `arvino` 命名空间 `default-deny-all` + api 只放行 traefik/n8n 命名空间，同命名空间 Pod 连不上 api（DNS 正常、TCP 超时）。
+- 修法不是给心跳开全局放行，而是把原本只存在于集群的 NetworkPolicy 收编进 GitOps，再加两条最小增量规则（api 入站放行心跳 Pod、心跳出站只允许 api:8080）。
+- 副作用：治理收益——命名空间的网络策略从此在 git 里可见、可审计、可回滚，不再是带外配置。

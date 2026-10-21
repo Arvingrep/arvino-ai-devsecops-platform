@@ -205,3 +205,39 @@ Arvin 通过按键确认批准两项：T1 租约设计稿定稿；在隔离 work
 观察：`run.cancelled` 事件的 actor 仍写 `system:engine`（引擎既有事件口径），但 `failure_reason` 明确为 `cancelled by owner`，且请求以 owner token 发出；事件 actor 未携带 principal，属审计可读性小缺口，不影响本次结论。
 
 **结论**：任务 #23 完成。owner/agent 已使用独立 secret key，operator API 恢复；owner 可建 run/取消，agent 不能执行 operator 动作。GitOps 与 SealedSecret 已同步，ArgoCD 漂移收敛。**Tester/QA 异构模型仍未实证**：本次没有验收步骤；Arvino 标准/治理流的 `qa` 步骤目前由同一外部队列执行，Qoder 团队 tester 需 UI 指令重贴后才能接入并读回实际模型家族。
+
+## 10. T1 账本心跳上线与端到端实证（2026-10-21 19:30–19:53 +0800）
+
+目标：把租约闭环从"手动触发验证"变成"账本自动心跳 + 自动派发"。本轮接上的是**心跳侧**（租约监督、过期检测、reclaim 判定、派发可见性）；执行侧（外部 harness）仍未部署。
+
+### 10.1 组件
+
+| 组件 | 位置 | 说明 |
+|---|---|---|
+| 心跳脚本 | `scripts/t1_heartbeat.py`（本仓库规范源） | 纯标准库；owner token 读 `/runs?active=true`，agent token 读 `/work`；只写本机状态文件与 operator reclaim |
+| 部署清单 | `homelab` 仓库 `apps/arvino-orchestrator/manifests-gke/09-heartbeat-cronjob.yaml` | CronJob `arvino-t1-heartbeat`，`*/5 * * * *`，`concurrencyPolicy: Forbid`，镜像随 kustomize 钉 `e8fa6e6f3839`，脚本以同名 ConfigMap 内嵌 |
+| 网络策略 | 同目录 `10-networkpolicy-arvino.yaml` | 原先只存在于集群的 5 条 NetworkPolicy 收编进 GitOps + 两条增量规则（api 入站放行心跳 Pod；心跳出站只允许 api:8080） |
+
+### 10.2 端到端实证（本机真实 token，未打印任何 token）
+
+| 步骤 | 结果 |
+|---|---|
+| 建 run | owner `POST /runs` → 201，`run-2128e18a7f0f`，`requested_by=owner` |
+| 认领 | agent `POST .../claim`（TTL 60s）→ 200，`principal=agent:harness`，到期 `2026-10-21T11:37:41Z` |
+| 心跳（租约有效） | `leases_active=1`、`leases_expiring_soon=1`、`leases_expired=0`、`actions=0` |
+| 心跳（过期后） | `leases_expired=1`，回收阈值 30s 满足 → 自动 reclaim，`actions=1`（HTTP 200） |
+| 回收结果 | `GET /runs/{id}` → `triage` 状态 `running → pending`，`executor_lease_expires_at=None`；run 随后 owner cancel（200）清理 |
+
+集群侧验收：Job `t1-hb-verify-2` 成功，输出 `{"actions":0,"dispatch_invariant_violations":0,"dispatch_queue_depth":0,"leases_active":0,"leases_expired":0,"runs_active":0}`；调试 Pod 与验证 Job 已清理。
+
+### 10.3 首轮失败与根因
+
+首轮验收 Job 以 `BackoffLimitExceeded` 失败。根因不是脚本或权限：`arvino` 命名空间有 `default-deny-all`，api 的 NetworkPolicy 只放行 `traefik` 与 `n8n` 两个命名空间入站 8080，同命名空间的心跳 Pod DNS 正常但 TCP 超时（`urllib` 报 timed out，`HTTP 0`）。
+
+修法：把线上 5 条 NetworkPolicy 原样纳入 GitOps（client dry-run：4 条 `unchanged`、仅 `arvino-api` 增加一条心跳入站规则），另加 `arvino-t1-heartbeat` 出站策略（仅 api:8080）。同步后 7 条策略全部带 ArgoCD tracking-id，命名空间的带外漂移同时消除。
+
+### 10.4 边界与未接部分
+
+- 心跳只读 `/runs`、`/work`，唯一写操作是 operator `reclaim`（带 stop_evidence）；不认领业务任务、不碰业务仓库、不执行任何步骤。
+- 回收判据：过期 >5 分钟且 principal 属 `agent:harness`；引擎本身坚持"过期不等于停止"，证据由心跳补齐，回收行为与依据写入台账与事件流。
+- **未接**：外部 harness 未部署，`GET /work` 的派发队列仍无消费者；续租仍由执行者自持 token 自续。下一段（harness 侧）方案见 `automation-dispatch-design.md` §12.3。
