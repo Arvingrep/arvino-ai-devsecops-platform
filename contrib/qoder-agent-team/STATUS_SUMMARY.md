@@ -1,11 +1,11 @@
 # Arvino 接管进度 · 一页速览
 
-> **更新：2026-10-22 12:15 PST** · 维护：Qoder 总监值班
+> **更新：2026-10-22 12:30 PST** · 维护：Qoder 总监值班
 > 这是**当前快照**，不是历史日志；有实质进展时覆盖更新。
 > **范围**：本文件只覆盖 Arvino 调度接管项目，与接管无关的业务应用变更（如 Teams bot、其他仓库的其他 PR）不记录在此；这类事项属于各自的线，PR 该审还审、该合还合，但不写进这份速览。
 > 目录索引：[README.md](README.md) · 技术细节与逐轮证据：[SYSTEM_STATUS.md](../../docs/internal/SYSTEM_STATUS.md) · [CHANGELOG_FRAMEWORK.md](../../docs/internal/CHANGELOG_FRAMEWORK.md)
 
-**一句话**：旧调度已停、只读巡检已接管（昨夜整段未运行 12.5 小时，本轮已恢复）；租约闭环、owner operator API、GitOps 收敛、Telegram 通道、**T1 账本心跳**都已上线并有实证；**团队派发通道已验证 4 轮仍未通——你新建的团队任务里协作工具仍未挂载（0 个已连接 MCP 服务器），四个成员仍零会话、5 条任务一条未派出**；剩下的是几个只有你能做的动作，和尚未部署的外部 harness；**新增：10-22 04:02Z 集群 Pod 级扰动后 Temporal 持久层不可用（postgres Pending、history/matching 崩溃循环），Arvino API 表面健康但工作流执行将受影响，需你定容量/zone 处置方向**。
+**一句话**：旧调度已停、只读巡检已接管（昨夜整段未运行 12.5 小时，本轮已恢复）；租约闭环、owner operator API、GitOps 收敛、Telegram 通道、**T1 账本心跳**都已上线并有实证；**团队派发通道已验证 4 轮仍未通——你新建的团队任务里协作工具仍未挂载（0 个已连接 MCP 服务器），四个成员仍零会话、5 条任务一条未派出**；剩下的是几个只有你能做的动作，和尚未部署的外部 harness；**新增：10-22 04:02Z 起 Temporal 持久层不可用且本轮升级——postgres 仍 Pending、history/matching 崩溃循环未收敛；根因已收窄为全集群 CPU request 超卖（真实使用率仅 11–26%）且节点组已达上限、无法自动扩容，Arvino API 表面健康但工作流执行将受影响，需你定容量处置方向**。
 
 ## 交接给团队任务（推进到此为止）
 
@@ -21,7 +21,7 @@
 
 > **最高优先｜确认账号是否具备 Project & Discussion 权益**（这是团队派发通道的真正卡点）：本机 Project/Discussion 能力被判为 `enabled:false`，**原因是账号套餐**——套餐请求 HTTP **200 成功**（非网络/鉴权/陈旧会话），返回 **`userType:"personal_professional_trial"`、`isPersonalVersion:true`、`hasOrganization:false`、`isHighestTier:false`**，且该值在 **168 次采样中恒定不变**；代码侧 `hasOrganization` 由"组织字段非 null"推出 ⇒ 本机组织字段为 null（个人账号）。**"登出后重新登录"大概率无效**（那只是应用通用提示文案），仅作 1 分钟低成本复核。**真正动作**：① 问 Qoder 确认 `personal_professional_trial` 是否含 Project & Discussion；② 若需组织/团队版，请加入或开通组织套餐。**验证三条需同时成立**：启动日志出现 `Project Discussion access initialization completed {"enabled":true}`；应用日志 `MCP session injection prepared` 的 `finalNames` 非空集；`mcp_list` 非空。→ [证据 §11–§13](archive/dispatch-verification-2026-10-21.md)
 
-1. **决定 Temporal 降级的处置方向（2026-10-22 04:02Z 起）**：集群 Pod 级扰动后 `temporal-postgresql-0` 一直 Pending/Unschedulable（其 PV 限定 zone `asia-southeast1-b`，该区 3 节点 CPU 申请已 93–99%，调度器报 0/7 可用且 preemption 无效），`temporal-history`/`temporal-matching` 处于 CrashLoopBackOff（重启 1 分钟内 7→8），ArgoCD `temporal` 应用转为 Synced/Progressing。Arvino API/看板/租约/心跳**均正常**，但依赖工作流的执行会受影响。可选方向：节点池扩容、放松 PV 的 zone 亲和、或先降级 Temporal 依赖——本会话只读，未做任何写操作。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
+1. **决定 Temporal 降级的处置方向（2026-10-22 04:02Z 起，12:30 轮升级）**：`temporal-postgresql-0` 一直 Pending/Unschedulable，`temporal-history`/`temporal-matching` 崩溃循环未收敛（Pod 已被再次替换，启动后约 1 秒即 exit 1），ArgoCD `temporal` 仍 Synced/Progressing。**根因画像本轮升级**：不再是 zone b 局部饱和，而是**全集群 CPU request 超卖**——6 台节点 request 均 900–945m / 940m allocatable（合计 98.4%），postgres 需 100m 而最宽松节点仅余 40m；**实际使用率只有 11–26%**，瓶颈是 request 而非算力；且 **cluster-autoscaler 因节点组上限（max node group size reached）无法自动扩容，节点池已从 7 台缩到 6 台，自愈路径堵死**。可选方向：① **人工抬高节点组上限**（扩容不再自动生效）；② 下调/重分布 CPU request（真实余量充足）；③ 放松 PV 的 zone 亲和；④ 先降级 Temporal 依赖——本会话只读，未做任何写操作。Arvino API/看板/租约/心跳**均正常**，但依赖工作流的执行会受影响。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 2. **指定第一个真实任务**（哪个仓库、要达成什么）：外部 harness 接线后的端到端验收对象，也是团队任务的第一个载体。
 3. **在 Qoder 设置页重贴十个角色的工作指令**（仓库文件已改，UI 不会自动同步；不重贴则团队成员仍不会被真正派发）。
 4. **决定 11 个 blocked 看板任务**：补凭据、恢复执行，还是取消；并指定 firebird PR 审核由谁接。
@@ -50,7 +50,7 @@
 - Telegram 提醒通道已纠正并验证：根因是 chat id 配错（旧 id 已失效，非连接器故障）；24h 提醒改发 Arvin 私聊、巡检异常告警改发 k8sopenclaw 运维群，两处试发均成功。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - 巡检 job 已迁至新会话（熔断根因是账号日配额 + auto 分类器 400），17:30 起恢复 15 分钟节奏。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - T1 租约离线验收通过：claim/renew/release/reclaim、token 哈希、4h 总寿命、冲突审计、16 路并发压测。
-- 只读巡检已接管并持续运行（每 15 分钟；15:00 轮捕获 ArgoCD 漂移、17:30 轮恢复迁移后节奏；**10-21 22:30→10-22 11:02 断档 751 分钟、期间零轮次，本轮已恢复**；24h 提醒基线已建，下次到点约 10-22 11:20）。→ [指导书](status-inspection-prompt.md)
+- 只读巡检已接管并持续运行（每 15 分钟；15:00 轮捕获 ArgoCD 漂移、17:30 轮恢复迁移后节奏；**10-21 22:30→10-22 11:02 断档 751 分钟、期间零轮次，本轮已恢复**；24h 提醒基线已建，首轮真实提醒已于 10-22 11:34 发出，下次到点约 10-23 11:34）。→ [指导书](status-inspection-prompt.md)
 - 单条治理红线已写入仓库 13 份角色文件；旧五条红线与 L0–L3 分级作废。
 - **文件已瘦身并有入口**：13 个规划期产物移入 `archive/`，新增目录索引 README（必读只有 4 个：索引→速览→台账→心跳设计），Finder 重复件已删——**但 `docs/internal/.dup-backup/` 还剩 2 个漏网重复件**（`CHANGELOG_FRAMEWORK 2.md` / `3.md`），已拆派 devops 收尾。→ [索引](README.md)
 - ArgoCD 全部 Application 均 Synced；仅已知陈旧状态位 Degraded 与 image-updater ComparisonError 例外。
@@ -65,7 +65,7 @@
 
 - **Qoder UI 指令**：需要你手工重贴，云端不会读仓库。
 - **派发工具未挂载（2026-10-22 00:10，**根因已定案并收窄到单一能力位**）**：应用自带日志 `MCP session injection prepared` 给出决定性对照——团队任务会话为 `finalNames:[]`（**注入 0 个 MCP 服务器**，连 `builtin`/`node-repl` 都被清空），普通会话为 `builtinNames:['builtin','extension-market','node-repl','browser-use']` + 6 插件 = 10 个；三实例一致，团队任务三次全为空集。协作工具实为**应用进程内的 SDK MCP 服务器**（`lY0`/`_Se` 构造，`exposedName` 裸名暴露），**不**经本机路由器、**不**出现在 `--mcp-config`/`mcp_list`。**深挖后收窄**：Project/Discussion 可用性由**服务端下发的 5 个能力标志**决定（关键位 `discussionsEnabled`；本地兜底值 `u7` 全 false），本机启动日志为 **`Project Discussion access initialization completed {"enabled":false}`**（两实例各 1 次、均 false）；**本地无任何文件/环境变量入口**（不落盘、`QODER_AGENT_TEAMS` 本构建 0 命中）；每智能体「用于协作」= `collaborationEnabled` 本机 5 个 arvino 智能体**已全为 true**。已排除：成员未注册（5 名成员对当前讨论均有扫描序与有效 runtime 凭据）、本机 MCP 配置缺失、路由器故障、应用缺代码、版本可自愈。**探针未派发、5 条任务一条未派出、未改派、未代做、未绕行**。**解除动作（账号/商务侧）：确认 `personal_professional_trial` 是否含 Project & Discussion；若需组织/团队版则开通或加入组织套餐**（"重新登录"大概率无效，仅作低成本复核）；**验证口诀（三条同时成立）：启动日志出现 `{"enabled":true}`、注入日志 `finalNames` 非空集、`mcp_list` 非空**。→ [过程证据 §11–§13](archive/dispatch-verification-2026-10-21.md) · [开局简报](archive/team-session-brief-2026-10-21.md)
-- **11 个看板任务**：调度已停，当前无执行者；最老已 128h，需逐项决定。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
+- **11 个看板任务**：调度已停，当前无执行者；最老已 129h，需逐项决定。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - **firebird PR 审核 / 夜间流程**：原 Hermes job 已停，暂无接管者。
 
 ## 已知但不阻塞
