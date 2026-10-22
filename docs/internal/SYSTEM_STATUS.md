@@ -1816,3 +1816,4 @@
   - 巡检断档：**无**（本轮间隔 8.6 分钟 < 45 分钟阈值）。此前记录的 751 分钟断档已由连续多轮确认恢复，15 分钟节奏连续保持。
   - 本条目由 Qoder 本地定时任务 job bd0998dd-3f26-446e-87e6-eaf63e155821 生成；只读巡检，未 dispatch/未认领/未恢复 Hermes。
   - 补记（本条内数值口径澄清，不改动上文任何既有行）：上文「巡检断档」按**本轮起始时刻**计为 8.6 分钟（`04:21:33Z` → `04:30:11Z`）；按**台账写入时刻**计为 **14.5 分钟**（`04:21:33Z` → `04:36:02Z`），该值与 `state.last_run_utc=2026-10-22T04:36:02Z` 一致，也是下一轮断档计算的基准。两口径均 **< 45 分钟阈值**，结论不变：**无断档**。
+  - 补记（订正上文 ArgoCD 描述中的**表述错误**，不改动上文任何既有行）：上文 arvino-orchestrator-gke 一处写作「24/24 `status=Synced` 且**资源级 health 全为 Healthy**」——该表述**有误**。本轮只读复核（`kubectl get application arvino-orchestrator-gke -o jsonpath='{range .status.resources[*]}{.kind}/{.name} sync={.status} health={.health.status}{"\n"}{end}'`）显示 24 条资源条目的**资源级 health 字段整体为空（整字段缺失）**，`health.status` 非 Healthy 的条数统计为 **0**。正确表述应为：**「24/24 资源 `status=Synced`、资源条目无 health 字段，故不存在非 Healthy 资源」**。**结论不变**：应用级 `Degraded` 仍属 `health.lastTransitionTime=2026-10-19T15:31:37Z` 的陈旧状态位，非新故障。
