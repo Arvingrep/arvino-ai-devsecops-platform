@@ -1,6 +1,6 @@
 # Arvino 接管进度 · 一页速览
 
-> **更新：2026-10-22 17:32 PST** · 维护：Qoder 总监值班
+> **更新：2026-10-22 18:01 PST** · 维护：Qoder 总监值班
 > 这是**当前快照**，不是历史日志；有实质进展时覆盖更新。
 > **范围**：本文件只覆盖 Arvino 调度接管项目，与接管无关的业务应用变更（如 Teams bot、其他仓库的其他 PR）不记录在此；这类事项属于各自的线，PR 该审还审、该合还合，但不写进这份速览。
 > 目录索引：[README.md](README.md) · 技术细节与逐轮证据：[SYSTEM_STATUS.md](../../docs/internal/SYSTEM_STATUS.md) · [CHANGELOG_FRAMEWORK.md](../../docs/internal/CHANGELOG_FRAMEWORK.md)
@@ -33,6 +33,7 @@
 - **PR 队列（仅接管相关）**：接管分支 #29（台账与 contrib 全量入库）已合并；两个与接管相关的 open PR 按「有问题不合并」只记录原因——#28（总监守卫生效方式与现行单条红线治理冲突）、#23（harness 令牌变量改名已被主线超越），是否关闭或 rebase 由你定。
 - **团队机制仍未跑通**：4 轮派发通道验证**均未通过**（协作 MCP 服务器未注册，工具面恒为 0）；backend / frontend / devops / tester 仍是零独立会话；本轮 5 条任务因通道不通**一条未派出**（未改派、未代做）。→ [注册核验](archive/registration-verification.json) · [派发验证](archive/dispatch-verification-2026-10-21.md)
 - **T1 派发执行侧**：心跳侧已自动上线，但 `GET /work` 的派发队列仍无消费者（外部 harness 未部署）；方案（改哪里/风险/回滚）见设计稿。→ [设计](automation-dispatch-design.md)
+- **值班已改成「排单式」（2026-10-22 18:01 起，作业指导书同步改版）**：巡检不再只报问题——确认异常就**实际派单**，每轮最多 3 单，派到独立 Qoder 会话做「只读诊断 + 产出可落地的补丁包」（diff / 验证命令与输出 / Gitea PR 标题正文 / 合并后验证清单 / 回滚方案 / 未验证项）。**被派单方一律不 push、不 merge、不建 PR、不写集群、不动看板**——生产写操作仍然回到你手里（homelab main 一推送即自动同步生产）。本轮已派 **3 单**：① **postgres 探针超时**（根因已定位：homelab 清单漏写 `timeoutSeconds`，走 k8s 默认 **1 秒**，在 CPU 超卖节点上必然超时 → 115 次探针失败 + 141 行连接重置；已由被派会话独立复核成立，集群实况确为 `timeoutSeconds: 1`）；② **`hermes-feishu-gke` gateway 崩溃循环**（BackOff x148 / 3h59m，exit 1 非 OOM，**ArgoCD 的 Healthy 是采样假象**）；③ **n8n 调度失败容量决策包**（精确数字 + 2–3 个选项 + 补丁，成本决策留给你）。**注意**：这是**独立会话派发，不是团队讨论链**——协作 MCP 至今未挂载（个人版权益，`mcp_list` 里没有 project/discussion 工具），团队讨论链仍不可用。→ [台账](../../docs/internal/SYSTEM_STATUS.md) · [作业指导书](status-inspection-prompt.md)
 - **候选分支并入 main**：租约代码所在分支（`candidate/t1-step-leases`）尚未并入 main，合并前需处理 alembic 链与镜像更新（线上仍跑 `e8fa6e6f3839`）。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - **Qoder 团队启用**：团队已注册（1 leader + 4 member），等 UI 指令重贴后跑一次必须由成员动手的任务。→ [注册核验](archive/registration-verification.json)
 - **拆派就绪、待通道**：6 条管理任务已建（派发通道实证 / 文件瘦身收尾 / PR#28+#23 处置材料 / harness 只读接线 / firebird-sea 任务书 / tester 异构模型），owner 与验收条件齐备，**全部 blockedBy「派发通道实证」**——第 4 轮复验仍为 0 工具，通道一通即可整队发出。
