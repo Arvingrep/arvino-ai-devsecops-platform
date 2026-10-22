@@ -1,11 +1,11 @@
 # Arvino 接管进度 · 一页速览
 
-> **更新：2026-10-22 14:00 PST** · 维护：Qoder 总监值班
+> **更新：2026-10-22 14:10 PST** · 维护：Qoder 总监值班
 > 这是**当前快照**，不是历史日志；有实质进展时覆盖更新。
 > **范围**：本文件只覆盖 Arvino 调度接管项目，与接管无关的业务应用变更（如 Teams bot、其他仓库的其他 PR）不记录在此；这类事项属于各自的线，PR 该审还审、该合还合，但不写进这份速览。
 > 目录索引：[README.md](README.md) · 技术细节与逐轮证据：[SYSTEM_STATUS.md](../../docs/internal/SYSTEM_STATUS.md) · [CHANGELOG_FRAMEWORK.md](../../docs/internal/CHANGELOG_FRAMEWORK.md)
 
-**一句话**：旧调度已停、只读巡检已接管（昨夜整段未运行 12.5 小时，本轮已恢复）；租约闭环、owner operator API、GitOps 收敛、Telegram 通道、**T1 账本心跳**都已上线并有实证；**团队派发通道已验证 4 轮仍未通——你新建的团队任务里协作工具仍未挂载（0 个已连接 MCP 服务器），四个成员仍零会话、5 条任务一条未派出**；剩下的是几个只有你能做的动作，和尚未部署的外部 harness；**新增：10-22 05:57Z 起 Temporal 已恢复——`temporal-postgresql-0` 在 Pending 115 分钟后调度成功，temporal 7/7 Running、history/matching 崩溃循环停止；容器日志实证崩溃的直接根因是 **DB 不可达**（`no usable database connection found`），此前「全集群 request 超卖为根因」的表述据此修正（超卖是并发条件、DB 不可达才是直接因），原先要你定的容量处置方向随之作废**；**新增待观察：GKE 节点池 web 升级（节点镜像滚动）引发工作负载反复重建，n8n 截至 14:00 仍 Pending/503（已发运维群告警），Arvino 自身 4/4 全绿、5 个端点均 200**；**另：给 Qoder 的支持询问已于 10-22 13:46 发出，等回复**。
+**一句话**：旧调度已停、只读巡检已接管（昨夜整段未运行 12.5 小时，本轮已恢复）；租约闭环、owner operator API、GitOps 收敛、Telegram 通道、**T1 账本心跳**都已上线并有实证；**团队派发通道已验证 4 轮仍未通——你新建的团队任务里协作工具仍未挂载（0 个已连接 MCP 服务器），四个成员仍零会话、5 条任务一条未派出**；剩下的是几个只有你能做的动作，和尚未部署的外部 harness；**新增：10-22 05:57Z 起 Temporal 已恢复——`temporal-postgresql-0` 在 Pending 115 分钟后调度成功，temporal 7/7 Running、history/matching 崩溃循环停止；容器日志实证崩溃的直接根因是 **DB 不可达**（`no usable database connection found`），此前「全集群 request 超卖为根因」的表述据此修正（超卖是并发条件、DB 不可达才是直接因），原先要你定的容量处置方向随之作废，ArgoCD `temporal` 应用本轮亦已转 Healthy（恢复闭环确认）**；**新增：GKE 节点池 web 升级本轮已收敛（7 台节点全部新镜像且 Ready），但 n8n 仍 Pending/503 未恢复——约束收敛为「节点组规模上限 + CPU/memory request 超卖 + PV zone 亲和」三重叠加，等升级救不了，需要你定容量处置方向（已发运维群告警），Arvino 自身 4/4 全绿、5 个端点均 200**；**另：给 Qoder 的支持询问已于 10-22 13:46 发出，等回复**。
 
 ## 交接给团队任务（推进到此为止）
 
@@ -21,7 +21,7 @@
 
 > **最高优先｜这就是「权益」卡点：项目/讨论限企业版，你的是个人版**。Qoder 官方文档「项目」原文写着 **「适用版本：企业版（Teams、Enterprise）。个人版暂不支持。」**（`docs.qoder.com/zh/qoder/projects`）；而智能体团队派发就靠「讨论」这个功能——个人版没有它 → 派发工具**根本不会挂载**，所以派不出去。本机实测与官方表述严丝合缝：套餐请求 HTTP **200 成功**（非网络/鉴权/陈旧会话），返回 **`userType:"personal_professional_trial"`、`isPersonalVersion:true`、`hasOrganization:false`、`isHighestTier:false`**，且该值在 **168 次采样中恒定不变**；代码侧 `hasOrganization` 由"组织字段非 null"推出 ⇒ 本机组织字段为 null（个人账号）。**"登出后重新登录"大概率无效**（那只是应用通用提示文案），仅作 1 分钟低成本复核。**进展：询问邮件已按你的指示于 2026-10-22 13:46 发出**——收件人 `support@qoder.com`（取自客户端包内唯一官方支持地址），附完整复现步骤、日志对照与 6 个待确认问题；发件用的是本机 Mail.app 里**唯一配置的 iCloud 账号**（未配置你的 Qoder 登录邮箱，也**未新增/未改动任何邮箱账号、未碰任何凭据**），正文已写明你的 Qoder 登录账号以便对方在账号侧定位。**现等 Qoder 回复**。**动作**：① 等回复（若要自己跟进，材料见 [询问材料](archive/qoder-support-request-2026-10-22.md)，仓库内副本保留了邮箱占位符）；② 若确需企业版，则为该账号开通或加入 **企业版（Teams / Enterprise）**；③ **权益通了还要新开一条团队任务**——本会话工具面创建时已固定，不会中途长出工具。**验证三条需同时成立**：启动日志出现 `Project Discussion access initialization completed {"enabled":true}`；应用日志 `MCP session injection prepared` 的 `finalNames` 非空集；`mcp_list` 非空。→ [证据 §11–§14](archive/dispatch-verification-2026-10-21.md)
 
-1. **确认 n8n 是否随节点池升级完成而恢复（2026-10-22 14:00 新增）**：`n8n` Deployment **0/1 ready**、Pod `n8n-7c6dffd4ff-dx4ns` 仍 **Pending/Unschedulable**，`https://n8n.k8shome.com/healthz` 返回 **503**（基线 200）。成因是 **GKE 节点池 web 正在升级**（节点镜像 `gke.1439001`→`gke.1626001`，节点被反复替换/驱逐，autoscaler 仍报 `2 max node group size reached`）。已发运维群告警；Arvino 自身 4/4 Running+Ready、5 个端点均 200 未受影响，但**依赖 n8n 的工作流执行受影响**。升级是否收敛需下轮复核。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
+1. **n8n 未随节点池升级恢复，需要你定容量处置方向（2026-10-22 14:10 更新）**：节点池升级**已完成**（7 台节点全部 `gke.1626001` 且 Ready，旧节点已排空），但 `n8n` Deployment 仍 **0/1 ready**、Pod `n8n-7c6dffd4ff-dx4ns` 仍 **Pending/Unschedulable**，`https://n8n.k8shome.com/healthz` 仍 **503**（基线 200）。实测约束已收敛为三重叠加：`0/7 nodes are available: 1 Insufficient memory, 1 node(s) didn't match PersistentVolume's node affinity, 6 Insufficient cpu`，autoscaler 仍报 `2 max node group size reached`（自愈路径堵死）→ **升级救不了，需二选一：抬高节点组规模上限（增加成本）或下调相关 request**。已发运维群告警；Arvino 自身 4/4 Running+Ready、5 个端点均 200 未受影响，但**依赖 n8n 的工作流执行受影响**。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 2. **指定第一个真实任务**（哪个仓库、要达成什么）：外部 harness 接线后的端到端验收对象，也是团队任务的第一个载体。
 3. **在 Qoder 设置页重贴十个角色的工作指令**（仓库文件已改，UI 不会自动同步；不重贴则团队成员仍不会被真正派发）。
 4. **决定 11 个 blocked 看板任务**：补凭据、恢复执行，还是取消；并指定 firebird PR 审核由谁接。
@@ -40,7 +40,7 @@
 ## 已完成
 
 - 旧 Hermes 三个 cron job 全部暂停；10:42 起看板 0 running、0 新认领。
-- **Temporal 降级已恢复（2026-10-22 05:57Z）**：`temporal-postgresql-0` 在 Pending/Unschedulable 115 分钟后调度成功到 zone b 新节点，temporal **7/7 Running 1/1**、history/matching 崩溃循环停止；容器日志实证崩溃的直接根因是 **DB 不可达**（`no usable database connection found`），此前「全集群 request 超卖为根因」的表述据此修正（超卖是并发条件、DB 不可达是直接因）。恢复是 GKE 节点池 web 升级**顺带**带来的，**节点组上限仍在**（`2 max node group size reached`）、自愈路径未打通，且 ArgoCD `temporal` 侧尚未转为 Healthy（下轮复核）。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
+- **Temporal 降级已恢复（2026-10-22 05:57Z）**：`temporal-postgresql-0` 在 Pending/Unschedulable 115 分钟后调度成功到 zone b 新节点，temporal **7/7 Running 1/1**、history/matching 崩溃循环停止；容器日志实证崩溃的直接根因是 **DB 不可达**（`no usable database connection found`），此前「全集群 request 超卖为根因」的表述据此修正（超卖是并发条件、DB 不可达是直接因）。恢复是 GKE 节点池 web 升级**顺带**带来的，**节点组上限仍在**（`2 max node group size reached`）、自愈路径未打通；ArgoCD `temporal` 应用已于 14:10 前转为 Healthy（ltt `2026-10-22T05:57:52Z`），恢复在 ArgoCD 侧闭环确认。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - B3 接管模式上线：api/worker 运行 `e8fa6e6f3839`，`takeover_external_only=True`、`adapters=queue`。
 - 活库迁移 `c3d4e5f6a7b8` 已执行：`executor_*` 5 列 + `repo_write_locks` 就位。
 - **真实认领闭环已打通**：2026-10-21 14:51 live `run-ffb5465ea777` 的 `triage` 完成 claim→renew→complete（HTTP 200/200/200，token 未落盘，租约字段已清理）。→ [证据](archive/t1-step-leases-evidence.md)
@@ -54,7 +54,7 @@
 - 只读巡检已接管并持续运行（每 15 分钟；15:00 轮捕获 ArgoCD 漂移、17:30 轮恢复迁移后节奏；**10-21 22:30→10-22 11:02 断档 751 分钟、期间零轮次，本轮已恢复**；24h 提醒基线已建，首轮真实提醒已于 10-22 11:34 发出，下次到点约 10-23 11:34）。→ [指导书](status-inspection-prompt.md)
 - 单条治理红线已写入仓库 13 份角色文件；旧五条红线与 L0–L3 分级作废。
 - **文件已瘦身并有入口**：13 个规划期产物移入 `archive/`，新增目录索引 README（必读只有 4 个：索引→速览→台账→心跳设计），Finder 重复件已删——**但 `docs/internal/.dup-backup/` 还剩 2 个漏网重复件**（`CHANGELOG_FRAMEWORK 2.md` / `3.md`），已拆派 devops 收尾。→ [索引](README.md)
-- ArgoCD 全部 Application 均 Synced；例外均为**应用级状态位**（`arvino-orchestrator-gke` 陈旧 Degraded、`temporal`/`n8n-gke` Progressing、`image-updater` ComparisonError），资源级无非 Healthy。
+- ArgoCD 全部 Application 均 Synced；例外均为**应用级状态位**（`arvino-orchestrator-gke` 陈旧 Degraded、`n8n-gke` Progressing、`image-updater` ComparisonError），资源级无非 Healthy。
 
 ## 未开始
 
@@ -66,7 +66,7 @@
 
 - **Qoder UI 指令**：需要你手工重贴，云端不会读仓库。
 - **派发工具未挂载（2026-10-22 00:10，**根因已定案并收窄到单一能力位**）**：应用自带日志 `MCP session injection prepared` 给出决定性对照——团队任务会话为 `finalNames:[]`（**注入 0 个 MCP 服务器**，连 `builtin`/`node-repl` 都被清空），普通会话为 `builtinNames:['builtin','extension-market','node-repl','browser-use']` + 6 插件 = 10 个；三实例一致，团队任务三次全为空集。协作工具实为**应用进程内的 SDK MCP 服务器**（`lY0`/`_Se` 构造，`exposedName` 裸名暴露），**不**经本机路由器、**不**出现在 `--mcp-config`/`mcp_list`。**深挖后收窄**：Project/Discussion 可用性由**服务端下发的 5 个能力标志**决定（关键位 `discussionsEnabled`；本地兜底值 `u7` 全 false），本机启动日志为 **`Project Discussion access initialization completed {"enabled":false}`**（两实例各 1 次、均 false）；**本地无任何文件/环境变量入口**（不落盘、`QODER_AGENT_TEAMS` 本构建 0 命中）；每智能体「用于协作」= `collaborationEnabled` 本机 5 个 arvino 智能体**已全为 true**。已排除：成员未注册（5 名成员对当前讨论均有扫描序与有效 runtime 凭据）、本机 MCP 配置缺失、路由器故障、应用缺代码、版本可自愈。**探针未派发、5 条任务一条未派出、未改派、未代做、未绕行**。**官方文档已明确**：项目/讨论「**适用版本：企业版（Teams、Enterprise）。个人版暂不支持。**」→ 本机正是个人版（`personal_professional_trial` / `hasOrganization:false`）。**解除动作**：向 Qoder 支持确认付费个人版是否含项目/讨论，或为账号开通/加入**企业版**（重新登录、改本地配置均无效）；**询问材料已于 10-22 13:46 发出**（收件人 `support@qoder.com`，等回复；仓库内副本保留邮箱占位符）：[给 Qoder 的询问材料](archive/qoder-support-request-2026-10-22.md)；**验证口诀（三条同时成立）：启动日志出现 `{"enabled":true}`、注入日志 `finalNames` 非空集、`mcp_list` 非空**。→ [过程证据 §11–§14](archive/dispatch-verification-2026-10-21.md) · [开局简报](archive/team-session-brief-2026-10-21.md)
-- **11 个看板任务**：调度已停，当前无执行者；最老已 129h，需逐项决定。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
+- **11 个看板任务**：调度已停，当前无执行者；最老已 130h，需逐项决定。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 - **firebird PR 审核 / 夜间流程**：原 Hermes job 已停，暂无接管者。
 
 ## 已知但不阻塞
