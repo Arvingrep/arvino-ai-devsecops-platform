@@ -1,6 +1,6 @@
 # Arvino 接管进度 · 一页速览
 
-> **更新：2026-10-22 18:01 PST** · 维护：Qoder 总监值班
+> **更新：2026-10-22 18:12 PST** · 维护：Qoder 总监值班
 > 这是**当前快照**，不是历史日志；有实质进展时覆盖更新。
 > **范围**：本文件只覆盖 Arvino 调度接管项目，与接管无关的业务应用变更（如 Teams bot、其他仓库的其他 PR）不记录在此；这类事项属于各自的线，PR 该审还审、该合还合，但不写进这份速览。
 > 目录索引：[README.md](README.md) · 技术细节与逐轮证据：[SYSTEM_STATUS.md](../../docs/internal/SYSTEM_STATUS.md) · [CHANGELOG_FRAMEWORK.md](../../docs/internal/CHANGELOG_FRAMEWORK.md)
@@ -21,12 +21,13 @@
 
 > **最高优先｜这就是「权益」卡点：项目/讨论限企业版，你的是个人版**。Qoder 官方文档「项目」原文写着 **「适用版本：企业版（Teams、Enterprise）。个人版暂不支持。」**（`docs.qoder.com/zh/qoder/projects`）；而智能体团队派发就靠「讨论」这个功能——个人版没有它 → 派发工具**根本不会挂载**，所以派不出去。本机实测与官方表述严丝合缝：套餐请求 HTTP **200 成功**（非网络/鉴权/陈旧会话），返回 **`userType:"personal_professional_trial"`、`isPersonalVersion:true`、`hasOrganization:false`、`isHighestTier:false`**，且该值在 **168 次采样中恒定不变**；代码侧 `hasOrganization` 由"组织字段非 null"推出 ⇒ 本机组织字段为 null（个人账号）。**"登出后重新登录"大概率无效**（那只是应用通用提示文案），仅作 1 分钟低成本复核。**进展：询问邮件已按你的指示于 2026-10-22 13:46 发出**——收件人 `support@qoder.com`（取自客户端包内唯一官方支持地址），附完整复现步骤、日志对照与 6 个待确认问题；发件用的是本机 Mail.app 里**唯一配置的 iCloud 账号**（未配置你的 Qoder 登录邮箱，也**未新增/未改动任何邮箱账号、未碰任何凭据**），正文已写明你的 Qoder 登录账号以便对方在账号侧定位。**现等 Qoder 回复**。**动作**：① 等回复（若要自己跟进，材料见 [询问材料](archive/qoder-support-request-2026-10-22.md)，仓库内副本保留了邮箱占位符）；② 若确需企业版，则为该账号开通或加入 **企业版（Teams / Enterprise）**；③ **权益通了还要新开一条团队任务**——本会话工具面创建时已固定，不会中途长出工具。**验证三条需同时成立**：启动日志出现 `Project Discussion access initialization completed {"enabled":true}`；应用日志 `MCP session injection prepared` 的 `finalNames` 非空集；`mcp_list` 非空。→ [证据 §11–§14](archive/dispatch-verification-2026-10-21.md)
 
-1. **n8n 未随节点池升级恢复，需要你定容量处置方向（2026-10-22 14:45 更新）**：节点池升级**已完成**（**6 台**节点全部 `gke.1626001` 且 Ready，升级期间多出的那台已排空），但 `n8n` Deployment 仍 **0/1 ready**、Pod `n8n-7c6dffd4ff-dx4ns` 仍 **Pending/Unschedulable**，`https://n8n.k8shome.com/healthz` 仍 **503**（基线 200）。实测约束仍是三重叠加：调度器侧最新 `0/6 nodes are available: 1 Insufficient memory, 6 Insufficient cpu`，autoscaler 仍报 `2 node(s) didn't match PersistentVolume's node affinity, 1 max node group size reached`（自愈路径堵死）→ **升级救不了，需二选一：抬高节点组规模上限（增加成本）或下调相关 request**。已发运维群告警；Arvino 自身 4/4 Running+Ready、5 个端点均 200 未受影响，但**依赖 n8n 的工作流执行受影响**。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
-2. **指定第一个真实任务**（哪个仓库、要达成什么）：外部 harness 接线后的端到端验收对象，也是团队任务的第一个载体。
-3. **在 Qoder 设置页重贴十个角色的工作指令**（仓库文件已改，UI 不会自动同步；不重贴则团队成员仍不会被真正派发）。
-4. **决定 11 个 blocked 看板任务**：补凭据、恢复执行，还是取消；并指定 firebird PR 审核由谁接。
-5. **考虑提高 Qoder 当日用量上限，并确认巡检 job 夜间是否被触发**：账号日配额 10-21 16:05 用尽过（新会话一律 403 `Billing daily count exceeded`），巡检已改模型续命；而 10-21 22:30→10-22 11:02 巡检**整段未运行 751 分钟**（期间零轮次、零台账提交，根因未在本地判定），需查 job `bd0998dd` 的调度健康；明天同一时点配额可能再触顶。
-6. **建议把平台仓库转为 private**：仓库现为 public，台账含内网主机名、ArgoCD 应用名、chat id 与本地路径（**无任何密钥**），建议转私有或把台账迁到私有库。
+1. **授权 P0 止血：清 `hermes-feishu` PVC 上被污染的 Python 依赖并重建 gateway Pod（2026-10-22 18:00 更新，等你一句授权）**：根因已追到一条链——`hermes-feishu-data` PVC 上的持久化依赖与镜像 ABI 不匹配（`pydantic_core` 报 `unknown location`、`tools.mcp_tool` 缺 `StdioServerParameters`），而 initContainer 的守卫**只在 `import lark_oapi` 失败时才重装** ⇒ 坏依赖被原样带进新 Pod；gateway **零探针** ⇒ exit(1) 被 kubelet 立刻重启 ⇒ 每轮重启吃满约 768m CPU，与 `arvino-postgres-0` 同节点 → 节点 CPU 被抢空 → postgres 1s 探针被饿死。**只清第三方包目录 `/opt/data/lazy-packages`（不动 `/opt/data/{config.yaml,auth.json,skills,workspace}`）**，让 Pod 重建后 initContainer 按镜像 ABI 重装干净依赖 ⇒ **gateway 崩溃循环与 postgres 探针超时一次性收敛**。**属生产写操作，总监不自行执行**；防复发（initContainer 幂等重建 + 补 liveness/readiness 探针 + CPU limit）随 homelab 仓 PR 走，**推 main 即自动部署**，故补丁必须由你决定是否落。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
+2. **n8n 未随节点池升级恢复，需要你定容量处置方向（2026-10-22 14:45 更新）**：节点池升级**已完成**（**6 台**节点全部 `gke.1626001` 且 Ready，升级期间多出的那台已排空），但 `n8n` Deployment 仍 **0/1 ready**、Pod `n8n-7c6dffd4ff-dx4ns` 仍 **Pending/Unschedulable**，`https://n8n.k8shome.com/healthz` 仍 **503**（基线 200）。实测约束仍是三重叠加：调度器侧最新 `0/6 nodes are available: 1 Insufficient memory, 6 Insufficient cpu`，autoscaler 仍报 `2 node(s) didn't match PersistentVolume's node affinity, 1 max node group size reached`（自愈路径堵死）→ **升级救不了，需二选一：抬高节点组规模上限（增加成本）或下调相关 request**。已发运维群告警；Arvino 自身 4/4 Running+Ready、5 个端点均 200 未受影响，但**依赖 n8n 的工作流执行受影响**。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
+3. **指定第一个真实任务**（哪个仓库、要达成什么）：外部 harness 接线后的端到端验收对象，也是团队任务的第一个载体。
+4. **在 Qoder 设置页重贴十个角色的工作指令**（仓库文件已改，UI 不会自动同步；不重贴则团队成员仍不会被真正派发）。
+5. **决定 11 个 blocked 看板任务**：补凭据、恢复执行，还是取消；并指定 firebird PR 审核由谁接。
+6. **考虑提高 Qoder 当日用量上限，并确认巡检 job 夜间是否被触发**：账号日配额 10-21 16:05 用尽过（新会话一律 403 `Billing daily count exceeded`），巡检已改模型续命；而 10-21 22:30→10-22 11:02 巡检**整段未运行 751 分钟**（期间零轮次、零台账提交，根因未在本地判定），需查 job `bd0998dd` 的调度健康；明天同一时点配额可能再触顶。
+7. **建议把平台仓库转为 private**：仓库现为 public，台账含内网主机名、ArgoCD 应用名、chat id 与本地路径（**无任何密钥**），建议转私有或把台账迁到私有库。
 
 ## 进行中
 
@@ -72,12 +73,12 @@
 
 ## 已知但不阻塞
 
-- **推 homelab main 前必须核对本地 HEAD 指向**：该仓有自动同步应用，推 main 会直接生效；今天已因此误带一条无关变更并回退。
+- **推 homelab main 前必须核对本地 HEAD 指向**：41 个 ArgoCD 应用里 **30 个开了自动同步**（`prune`+`selfHeal`，推 main 即直接生效），**11 个没开**（`arvino-orchestrator-gke`、`n8n-gke`、`agent-canvas-gke`、`koodo-reader-gke`、`k8sgpt-instances`、`k8sgpt-operator`、`dae-k8s-backend-access`、`dae-k8s-proposal-{crds,operator,storage}`、`zxem-gke`）——**「合并 PR」≠「上线」，后面这 11 个合并后还要人工 sync 一次才生效**（2026-10-22 18:0x 全量只读核验 `spec.syncPolicy.automated` 得出；仓库里没有 app-of-apps 统一改写这些值）。今天已因此误带一条无关变更并回退。
 - ArgoCD `arvino-orchestrator-gke` 应用级 `Degraded` 是 2026-10-19 的陈旧状态位（24/24 资源 Synced 且无非 Healthy）。
 - `gitea.k8shome.com` 525、审批 webhook 404、agent-canvas 仅本机 8080：均为已知基线；Gitea 网页 525 时 open PR 核查可能不可读，内网 git 推送仍正常。
 - 巡检每 15 分钟产生一次 `[skip ci]` 台账提交（约 96 次/日）；嫌吵可降为 30 分钟。
 - canary `/house` 偶发单次 curl 000、重试即 200：判为瞬时抖动，继续观察。
-- **postgres 就绪探针持续超时（2026-10-22 17:32 首次定性为持续异常）**：`arvino-postgres-0` 的 `pg_isready` 探针（`timeoutSeconds=1`，落在 CPU 超卖节点上偏紧）持续超时——kubelet 事件 3h43m 内累计 115 次、postgres 日志同期 141 行客户端连接丢失；**当前无服务降级**（Pod Ready、0 重启、11 个端点码与基线逐项一致），需你定是否放宽探针超时（已发运维群告警，24h 内不重复）。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
+- **postgres 就绪探针持续超时（2026-10-22 17:32 首次定性为持续异常；18:00 轮复现、根因上移一层）**：`arvino-postgres-0` 的 `pg_isready` 探针（`timeoutSeconds=1`，落在 CPU 超卖节点上偏紧）持续超时——kubelet 事件 3h43m 内累计 115 次、postgres 日志同期 141 行客户端连接丢失；**当前无服务降级**（Pod Ready、0 重启、11 个端点码与基线逐项一致）。**18:00 轮复现**（事件 count 115→119、末次 `10:01:42Z`），且**根因上移一层**：它与 `hermes-feishu-gke` gateway 崩溃循环**同源**——gateway 每轮重启吃满约 768m CPU 且与 postgres 同节点 → 节点 allocatable 940m 被抢空 → 1s 探针被**节点级 CPU 争抢**饿死（postgres 自身仅 51m）⇒ **先修 gateway（清 PVC 上被污染的 Python 依赖）探针超时随之消失，放宽 `timeoutSeconds` 是次优**；该处置属**生产写操作、等一句授权**（见上方第 1 条），只读补丁包（补 `timeoutSeconds`）与另 2 单在跑，已发运维群告警且 24h 内不重复。→ [台账](../../docs/internal/SYSTEM_STATUS.md)
 
 ---
 
